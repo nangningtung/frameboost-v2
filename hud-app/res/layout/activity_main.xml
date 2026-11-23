@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#08090d"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:fontFamily="monospace"
+        android:letterSpacing="0.1"
+        android:text="FRAMEBOOST HUD"
+        android:textColor="#00f0ff"
+        android:textSize="22sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:fontFamily="monospace"
+        android:text="In-Game Floating Overlay Controller (Exynos 9610)"
+        android:textColor="#8e96aa"
+        android:textSize="12sp" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginVertical="16dp"
+        android:background="#1affffff" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#12151f"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:id="@+id/txt_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:text="HUD Service: Stopped"
+            android:textColor="#ffffff"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btn_toggle_hud"
+            android:layout_width="match_parent"
+            android:layout_height="46dp"
+            android:layout_marginTop="12dp"
+            android:background="#00f0ff"
+            android:fontFamily="monospace"
+            android:text="START FLOATING HUD"
+            android:textColor="#08090d"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btn_permission"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:layout_marginTop="8dp"
+            android:background="#26ffffff"
+            android:fontFamily="monospace"
+            android:text="GRANT OVERLAY PERMISSION"
+            android:textColor="#ffd061"
+            android:textSize="11sp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <CheckBox
+        android:id="@+id/chk_auto_hide"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:checked="true"
+        android:fontFamily="monospace"
+        android:text="Auto-hide when not in game (Recommended)"
+        android:textColor="#ffffff"
+        android:textSize="12sp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:fontFamily="monospace"
+        android:lineSpacingExtra="3dp"
+        android:text="• Pill hanya muncul saat game terdeteksi aktif\n• Geser (drag) pill ke posisi manapun di layar\n• Tap pill untuk expand quick tuning menu"
+        android:textColor="#55ffffff"
+        android:textSize="11sp" />
+</LinearLayout>

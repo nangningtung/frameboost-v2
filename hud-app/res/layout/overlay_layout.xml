@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/overlay_root"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content">
+
+    <!-- COMPACT PILL (Collapsed State) -->
+    <LinearLayout
+        android:id="@+id/view_pill"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_pill"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <View
+            android:id="@+id/dot_state"
+            android:layout_width="7dp"
+            android:layout_height="7dp"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/bg_pill" />
+
+        <TextView
+            android:id="@+id/txt_pill_fps"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:text="60 FPS"
+            android:textColor="#00f0ff"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="4dp"
+            android:text="•"
+            android:textColor="#55ffffff"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/txt_pill_temp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:text="52°C"
+            android:textColor="#ffffff"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="4dp"
+            android:text="•"
+            android:textColor="#55ffffff"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/txt_pill_gpu"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:text="455M"
+            android:textColor="#00ff9d"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- EXPANDED DRAWER (On Tap) -->
+    <LinearLayout
+        android:id="@+id/view_drawer"
+        android:layout_width="260dp"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_drawer"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/txt_drawer_game"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:fontFamily="monospace"
+                android:maxLines="1"
+                android:text="Game Name"
+                android:textColor="#ffffff"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btn_collapse"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:gravity="center"
+                android:text="✕"
+                android:textColor="#00f0ff"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginVertical="6dp"
+            android:background="#26ffffff" />
+
+        <TextView
+            android:id="@+id/txt_drawer_fps_detail"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:text="FPS: 60.0 (1% Low: 48.2)"
+            android:textColor="#00f0ff"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/txt_drawer_gpu_detail"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:fontFamily="monospace"
+            android:text="GPU: 455MHz • Load: 45%"
+            android:textColor="#00ff9d"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/txt_drawer_cpu_detail"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:fontFamily="monospace"
+            android:text="CPU: 1.35GHz • Temp: 54°C"
+            android:textColor="#ffffff"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/txt_drawer_net_detail"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:fontFamily="monospace"
+            android:text="NET: BBR Active"
+            android:textColor="#ffd061"
+            android:textSize="11sp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginVertical="6dp"
+            android:background="#26ffffff" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:text="QUICK PRESET:"
+            android:textColor="#8e96aa"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btn_preset_battery"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_btn_preset"
+                android:fontFamily="monospace"
+                android:minHeight="0dp"
+                android:padding="0dp"
+                android:text="BAT"
+                android:textColor="#ffffff"
+                android:textSize="10sp" />
+
+            <Button
+                android:id="@+id/btn_preset_balanced"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_marginStart="3dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_btn_preset"
+                android:fontFamily="monospace"
+                android:minHeight="0dp"
+                android:padding="0dp"
+                android:text="BAL"
+                android:textColor="#ffffff"
+                android:textSize="10sp" />
+
+            <Button
+                android:id="@+id/btn_preset_perf"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_marginStart="3dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_btn_preset"
+                android:fontFamily="monospace"
+                android:minHeight="0dp"
+                android:padding="0dp"
+                android:text="PERF"
+                android:textColor="#ffffff"
+                android:textSize="10sp" />
+
+            <Button
+                android:id="@+id/btn_preset_esports"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_marginStart="3dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_btn_preset"
+                android:fontFamily="monospace"
+                android:minHeight="0dp"
+                android:padding="0dp"
+                android:text="ESP"
+                android:textColor="#ffffff"
+                android:textSize="10sp" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>
