@@ -6,12 +6,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
 import android.webkit.JavascriptInterface;
-import android.webkit.WebView;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.drawable.Drawable;
-import android.util.Base64;
-import java.io.ByteArrayOutputStream;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -87,23 +81,6 @@ public class WebAppInterface {
                 }
             }
         } catch (Exception ignored) {}
-    }
-
-    @JavascriptInterface
-    public String getAppIcon(String pkg) {
-        if (pkg == null || pkg.isEmpty()) return "";
-        try {
-            Drawable drawable = context.getPackageManager().getApplicationIcon(pkg);
-            int size = 96;
-            Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
-            drawable.setBounds(0, 0, size, size);
-            drawable.draw(new Canvas(bitmap));
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
-            return "data:image/png;base64," + Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP);
-        } catch (Exception ignored) {
-            return "";
-        }
     }
 
     @JavascriptInterface

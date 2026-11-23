@@ -55,14 +55,6 @@ pub struct BufferbloatResult {
     pub timestamp: u64,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct NetBaseline {
-    pub capability: NetCapability,
-    pub gateway_ping: PingResult,
-    pub internet_ping: PingResult,
-    pub timestamp: u64,
-}
-
 impl NetCapability {
     pub fn probe() -> Self {
         // Find default interface from ip route
@@ -317,23 +309,6 @@ pub fn measure_bufferbloat(target: &str) -> BufferbloatResult {
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_secs())
             .unwrap_or(0),
-    }
-}
-
-pub fn measure_baseline() -> NetBaseline {
-    let cap = NetCapability::probe();
-    let gw_ping = run_ping(&cap.gateway, 3);
-    let net_ping = run_ping("8.8.8.8", 3);
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-
-    NetBaseline {
-        capability: cap,
-        gateway_ping: gw_ping,
-        internet_ping: net_ping,
-        timestamp: now,
     }
 }
 

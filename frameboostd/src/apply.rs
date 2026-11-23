@@ -21,22 +21,6 @@ pub const PROFILE_GAME: BoostProfile = BoostProfile {
     cpu4_min: 1352000,
 };
 
-pub const PROFILE_WARN: BoostProfile = BoostProfile {
-    name: "WARN",
-    gpu_gov: "Booster",
-    gpu_min: 385000,
-    cpu0_min: 910000,
-    cpu4_min: 1352000,
-};
-
-pub const PROFILE_IDLE: BoostProfile = BoostProfile {
-    name: "IDLE",
-    gpu_gov: "Interactive",
-    gpu_min: 260000,
-    cpu0_min: 702000,
-    cpu4_min: 1040000,
-};
-
 /// Result of an apply operation with fine-grained per-knob status.
 pub struct ApplyReport {
     pub profile: &'static str,

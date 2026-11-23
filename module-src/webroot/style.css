@@ -1,3 +1,32 @@
+:root[data-profile="battery"] {
+  --accent: #34d399;
+  --accent-fg: #042f1e;
+  --accent-soft: rgba(52, 211, 153, 0.14);
+  --accent-border: rgba(52, 211, 153, 0.45);
+  --accent-text: #6ee7b7;
+}
+:root[data-profile="balanced"] {
+  --accent: #60a5fa;
+  --accent-fg: #0b2249;
+  --accent-soft: rgba(96, 165, 250, 0.14);
+  --accent-border: rgba(96, 165, 250, 0.45);
+  --accent-text: #93c5fd;
+}
+:root[data-profile="performance"] {
+  --accent: #fbbf24;
+  --accent-fg: #3b2600;
+  --accent-soft: rgba(251, 191, 36, 0.14);
+  --accent-border: rgba(251, 191, 36, 0.45);
+  --accent-text: #fcd34d;
+}
+:root[data-profile="esports"] {
+  --accent: #f472b6;
+  --accent-fg: #4a0b2b;
+  --accent-soft: rgba(244, 114, 182, 0.14);
+  --accent-border: rgba(244, 114, 182, 0.45);
+  --accent-text: #f9a8d4;
+}
+
 :root {
   /* Safe insets: status bar (40px) & 3-button nav clearance (94px) */
   --safe-top: 40px;
@@ -13,8 +42,15 @@
   --bg-card: #202126;
   --bg-card-hover: #2a2b31;
 
+  --accent: var(--primary, #d0bcff);
+  --accent-fg: #101114;
+  --accent-soft: rgba(208, 188, 255, 0.14);
+  --accent-border: rgba(208, 188, 255, 0.45);
+  --accent-text: #d0bcff;
   --accent-cyan: var(--primary, #d0bcff);
   --accent-amber: #f4b77a;
+  --accent-yellow: var(--accent-amber);
+  --surface-2: var(--bg-card-hover);
   --accent-red: #ffb4ab;
   --accent-green: #7ddca5;
 
@@ -748,9 +784,67 @@ body {
   border: 1px solid rgba(201, 197, 202, 0.24);
 }
 
+.hidden { display: none !important; }
+
+.surface-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+}
+
+.game-detail { display: flex; flex-direction: column; gap: 10px; }
+.game-detail-back { align-self: flex-start; }
+.game-detail-hero { display: flex; align-items: center; gap: 12px; padding: 12px; }
+.game-detail-icon {
+  width: 40px; height: 40px; border-radius: 10px; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; color: #fff; background: var(--accent);
+}
+.game-detail-identity { min-width: 0; }
+.game-detail-name { font-size: 14px; font-weight: 700; }
+.game-detail-pkg {
+  font-size: 11px; color: var(--text-dim); font-family: var(--font-mono);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.game-detail-card { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.game-detail-label { font-size: 11px; font-weight: 700; color: var(--text-sub); letter-spacing: .04em; }
+.game-detail-presets { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.game-detail-bbr { padding: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.game-detail-bbr-title { font-size: 12px; font-weight: 600; }
+.game-detail-bbr-desc { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
+.game-detail-launch { width: 100%; }
+
+.btn-secondary.active,
+.detail-preset.active {
+  background: var(--accent) !important;
+  color: var(--accent-fg) !important;
+  border-color: var(--accent) !important;
+}
+.detail-preset[data-preset="battery"] { color: #6ee7b7; border-color: rgba(52,211,153,.45); }
+.detail-preset[data-preset="balanced"] { color: #93c5fd; border-color: rgba(96,165,250,.45); }
+.detail-preset[data-preset="performance"] { color: #fcd34d; border-color: rgba(251,191,36,.45); }
+.detail-preset[data-preset="esports"] { color: #f9a8d4; border-color: rgba(244,114,182,.45); }
+.detail-preset[data-preset="battery"].active { background: #34d399 !important; color: #042f1e !important; border-color: #34d399 !important; }
+.detail-preset[data-preset="balanced"].active { background: #60a5fa !important; color: #0b2249 !important; border-color: #60a5fa !important; }
+.detail-preset[data-preset="performance"].active { background: #fbbf24 !important; color: #3b2600 !important; border-color: #fbbf24 !important; }
+.detail-preset[data-preset="esports"].active { background: #f472b6 !important; color: #4a0b2b !important; border-color: #f472b6 !important; }
+
+.preset-badge-battery { color: #6ee7b7 !important; }
+.preset-badge-balanced { color: #93c5fd !important; }
+.preset-badge-performance { color: #fcd34d !important; }
+.preset-badge-esports { color: #f9a8d4 !important; }
+.btn-secondary.off {
+  opacity: 0.55;
+}
+.btn-secondary.on {
+  background: rgba(125, 220, 165, 0.16) !important;
+  color: #7DDCA5 !important;
+  border-color: rgba(125, 220, 165, 0.45) !important;
+}
+
 .games-list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 

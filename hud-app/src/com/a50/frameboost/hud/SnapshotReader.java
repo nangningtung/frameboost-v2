@@ -11,6 +11,7 @@ public class SnapshotReader {
     public static class SnapshotData {
         public String daemonState = "IDLE";
         public String gamePkg = "";
+        public String gamePreset = "";
         public boolean isGame = false;
         public double fps = 0.0;
         public double p1LowFps = 0.0;
@@ -18,7 +19,7 @@ public class SnapshotReader {
         public int gpuClockMhz = 0;
         public double gpuBusyPct = 0.0;
         public int cpuBigMhz = 0;
-        public String tcpCc = "westwood";
+        public String tcpCc = "";
         public String battStatus = "Discharging";
         public int battCapacity = 0;
         public int battCurrentMa = 0;
@@ -53,6 +54,7 @@ public class SnapshotReader {
             SnapshotData data = new SnapshotData();
             data.daemonState = obj.optString("daemon_state", "IDLE");
             data.gamePkg = obj.optString("game_pkg", "");
+            data.gamePreset = obj.optString("game_preset", "");
             data.isGame = obj.optBoolean("is_game", false);
             data.fps = obj.optDouble("fps", 0.0);
             data.p1LowFps = obj.optDouble("p1_low_fps", 0.0);
@@ -60,11 +62,11 @@ public class SnapshotReader {
             int tempMc = obj.optInt("temp_big_mc", 0);
             data.tempBigC = tempMc > 0 ? (tempMc / 1000) : 0;
 
+            // Missing readings stay 0/empty so the UI can show "N/A" instead of
+            // inventing a plausible-looking clock or governor.
             JSONObject gpu = obj.optJSONObject("gpu");
             if (gpu != null) {
-                int cur = gpu.optInt("current_clock", 0);
-                int min = gpu.optInt("min_clock", 260000);
-                data.gpuClockMhz = (cur > 0 ? cur : min) / 1000;
+                data.gpuClockMhz = Math.max(0, gpu.optInt("current_clock", 0)) / 1000;
                 data.gpuBusyPct = gpu.optDouble("busy_pct", 0.0);
             }
 
@@ -72,15 +74,13 @@ public class SnapshotReader {
             if (cpu != null) {
                 JSONObject big = cpu.optJSONObject("big");
                 if (big != null) {
-                    int cur = big.optInt("cur_freq", 0);
-                    int min = big.optInt("min_freq", 1040000);
-                    data.cpuBigMhz = (cur > 0 ? cur : min) / 1000;
+                    data.cpuBigMhz = Math.max(0, big.optInt("cur_freq", 0)) / 1000;
                 }
             }
 
             JSONObject net = obj.optJSONObject("net");
             if (net != null) {
-                data.tcpCc = net.optString("congestion_control", "westwood");
+                data.tcpCc = net.optString("congestion_control", "");
             }
 
             JSONObject batt = obj.optJSONObject("battery");

@@ -32,7 +32,6 @@ public class OverlayService extends Service {
     private static final String CHANNEL_ID = "frameboost_hud_channel";
     private static final String PREFS = "hud_prefs";
 
-    private static final int COLOR_TEXT = 0xFFE5E1E6;
     private static final int COLOR_DIM = 0xFFC9C5CA;
     private static final int COLOR_ACCENT = 0xFFD0BCFF;
     private static final int COLOR_ACTIVE_TEXT = 0xFFE8DEF8;
@@ -41,20 +40,22 @@ public class OverlayService extends Service {
     private static final int COLOR_RED = 0xFFFFB4AB;
 
     private static final int BUBBLE_SIZE_DP = 56;
-    private static final int EDGE_MARGIN_DP = 10;
+    private static final int HANDLE_WIDTH_DP = 40;
+    private static final int HANDLE_HEIGHT_DP = 40;
+    private static final int HANDLE_SMALL_WIDTH_DP = 12;
+    private static final int HANDLE_SMALL_HEIGHT_DP = 40;
+    private static final int EDGE_MARGIN_DP = 0;
     private static final int PANEL_MARGIN_DP = 6;
 
     private WindowManager windowManager;
     private View overlayRoot;
     private View viewBubble;
     private View viewSidePanel;
-    private View bubbleContent;
     private View dotState;
     private View dotPanelState;
     private View panelHeader;
 
     private TextView txtBubbleFps;
-    private TextView txtBubbleExtra;
     private TextView txtPanelGame;
     private TextView txtMFps;
     private TextView txtMGpu;
@@ -75,12 +76,17 @@ public class OverlayService extends Service {
     private Handler handler;
     private Runnable updateRunnable;
     private java.util.concurrent.ExecutorService ioExecutor;
+    private java.util.concurrent.ExecutorService actionExecutor;
+    private android.animation.ValueAnimator snapAnimator;
 
     private boolean panelOpen = false;
     private boolean autoHide = true;
-    private boolean bubbleTelemetry = true;
+    private boolean fpsOverlayEnabled = true;
     private boolean dockedRight = false;
     private boolean touchMoved = false;
+    private int missedReads = 0;
+    /** Bubble's own Y while the panel borrows the window (panel Y is separate). */
+    private int bubbleY = -1;
 
     private String hudType = "COMPACT";
     private String activePreset = "BALANCED";
@@ -88,7 +94,6 @@ public class OverlayService extends Service {
 
     // Last rendered strings, to skip redundant layout passes at 2 Hz.
     private String lastBubbleFps = "";
-    private String lastBubbleExtra = "";
     private String lastMFps = "";
     private String lastMGpu = "";
     private String lastMCpu = "";
@@ -99,9 +104,6 @@ public class OverlayService extends Service {
     private int lastScreenW = 0;
     private int lastScreenH = 0;
     private int insetLeft = 0;
-    private int insetRight = 0;
-    private int insetTop = 0;
-    private int insetBottom = 0;
 
     private static volatile boolean running = false;
 
@@ -123,7 +125,7 @@ public class OverlayService extends Service {
 
         SharedPreferences prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         autoHide = prefs.getBoolean("auto_hide", true);
-        bubbleTelemetry = prefs.getBoolean("bubble_telemetry", true);
+        fpsOverlayEnabled = prefs.getBoolean("fps_overlay_enabled", true);
         hudType = prefs.getString("hud_type", prefs.getString("fps_overlay_type", "COMPACT"));
         activePreset = prefs.getString("game_preset", "BALANCED");
         dockedRight = prefs.getBoolean("hud_right", false);
@@ -136,13 +138,11 @@ public class OverlayService extends Service {
 
         viewBubble = overlayRoot.findViewById(R.id.view_bubble);
         viewSidePanel = overlayRoot.findViewById(R.id.view_sidepanel);
-        bubbleContent = overlayRoot.findViewById(R.id.bubble_content);
         dotState = overlayRoot.findViewById(R.id.dot_state);
         dotPanelState = overlayRoot.findViewById(R.id.dot_panel_state);
         panelHeader = overlayRoot.findViewById(R.id.panel_header);
 
         txtBubbleFps = overlayRoot.findViewById(R.id.txt_bubble_fps);
-        txtBubbleExtra = overlayRoot.findViewById(R.id.txt_bubble_extra);
         txtPanelGame = overlayRoot.findViewById(R.id.txt_panel_game);
         txtMFps = overlayRoot.findViewById(R.id.txt_m_fps);
         txtMGpu = overlayRoot.findViewById(R.id.txt_m_gpu);
@@ -174,7 +174,7 @@ public class OverlayService extends Service {
         windowManager.addView(overlayRoot, params);
 
         applyBubbleMode();
-        applyTelemetryState();
+        applyFpsOverlayState();
         highlightHudType();
         highlightPreset();
 
@@ -195,16 +195,20 @@ public class OverlayService extends Service {
 
         handler = main;
         ioExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        actionExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
         updateRunnable = new Runnable() {
             @Override
             public void run() {
                 if (!running) return;
                 ioExecutor.execute(() -> {
                     final SnapshotReader.SnapshotData data = SnapshotReader.read();
-                    handler.post(() -> applyHudData(data));
+                    // Sequential telemetry: schedule the next read only after this one
+                    // has finished, so slow IPC cannot pile up in the executor queue.
+                    handler.post(() -> {
+                        applyHudData(data);
+                        if (running) handler.postDelayed(updateRunnable, 500);
+                    });
                 });
-                // 2 Hz is enough for HUD telemetry; keeps IPC/read overhead low on the A50.
-                handler.postDelayed(this, 500);
             }
         };
         handler.post(updateRunnable);
@@ -258,17 +262,17 @@ public class OverlayService extends Service {
             } catch (Exception ignored) {}
         }
         insetLeft = left;
-        insetTop = top;
-        insetRight = right;
-        insetBottom = bottom;
     }
 
     private int usableWidth() {
-        return Math.max(dp(BUBBLE_SIZE_DP), getScreenWidth() - insetLeft - insetRight);
+        // Overlay params are relative to parent frame [insetLeft, 0, displayRight, displayBottom].
+        // Do not subtract right/bottom bars again: Samsung A50 already excludes them from parent.
+        return Math.max(dp(BUBBLE_SIZE_DP), getScreenWidth() - insetLeft);
     }
 
     private int usableHeight() {
-        return Math.max(dp(BUBBLE_SIZE_DP), getScreenHeight() - insetTop - insetBottom);
+        // params.y starts at parent top (0), not below status-bar inset.
+        return Math.max(dp(BUBBLE_SIZE_DP), getScreenHeight());
     }
 
     private int dockedX(int contentWidth) {
@@ -285,7 +289,14 @@ public class OverlayService extends Service {
 
     private int bubbleWidth() {
         int w = viewBubble != null ? viewBubble.getWidth() : 0;
-        return w > 0 ? w : dp(BUBBLE_SIZE_DP);
+        if (w > 0) return w;
+        return dp(fpsOverlayEnabled ? HANDLE_WIDTH_DP : HANDLE_SMALL_WIDTH_DP);
+    }
+
+    private int bubbleHeight() {
+        int h = viewBubble != null ? viewBubble.getHeight() : 0;
+        if (h > 0) return h;
+        return dp(fpsOverlayEnabled ? HANDLE_HEIGHT_DP : HANDLE_SMALL_HEIGHT_DP);
     }
 
     private int panelWidth() {
@@ -294,7 +305,7 @@ public class OverlayService extends Service {
     }
 
     private void clampY() {
-        int contentHeight = panelOpen ? viewSidePanel.getHeight() : bubbleWidth();
+        int contentHeight = panelOpen ? viewSidePanel.getHeight() : bubbleHeight();
         if (contentHeight <= 0) contentHeight = dp(BUBBLE_SIZE_DP);
         int maxY = Math.max(0, usableHeight() - contentHeight - dp(EDGE_MARGIN_DP));
         params.y = Math.max(0, Math.min(params.y, maxY));
@@ -309,32 +320,53 @@ public class OverlayService extends Service {
 
     private void placeBubble() {
         panelOpen = false;
+        if (bubbleY >= 0) params.y = bubbleY;
         clampY();
         params.x = dockedX(bubbleWidth());
         updateLayout();
         savePosition();
     }
 
+    /** Collapse the panel without animation, e.g. when the game closes. */
+    private void resetPanel() {
+        if (!panelOpen) return;
+        panelOpen = false;
+        viewSidePanel.animate().cancel();
+        viewSidePanel.setAlpha(1f);
+        viewSidePanel.setScaleX(1f);
+        viewSidePanel.setScaleY(1f);
+        viewSidePanel.setTranslationX(0f);
+        viewSidePanel.setVisibility(View.GONE);
+        viewBubble.setVisibility(View.VISIBLE);
+        if (bubbleY >= 0) params.y = bubbleY;
+        clampY();
+        updateLayout();
+    }
+
     private void snapToEdge(int fromX) {
+        // A drag can end past the bottom edge; bring the bubble back in bounds
+        // before the edge animation so it always docks fully visible.
+        clampY();
         int width = bubbleWidth();
         boolean right = (fromX + width / 2) >= usableWidth() / 2;
         dockedRight = right;
         int targetX = dockedX(width);
 
-        android.animation.ValueAnimator animator = android.animation.ValueAnimator.ofInt(fromX, targetX);
-        animator.setDuration(190);
-        animator.setInterpolator(new android.view.animation.DecelerateInterpolator());
-        animator.addUpdateListener(a -> {
+        if (snapAnimator != null) snapAnimator.cancel();
+        snapAnimator = android.animation.ValueAnimator.ofInt(fromX, targetX);
+        snapAnimator.setDuration(190);
+        snapAnimator.setInterpolator(new android.view.animation.DecelerateInterpolator());
+        snapAnimator.addUpdateListener(a -> {
             params.x = (int) a.getAnimatedValue();
             updateLayout();
         });
-        animator.addListener(new android.animation.AnimatorListenerAdapter() {
+        snapAnimator.addListener(new android.animation.AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(android.animation.Animator animation) {
                 savePosition();
             }
         });
-        animator.start();
+        snapAnimator.start();
     }
 
     private void savePosition() {
@@ -379,8 +411,9 @@ public class OverlayService extends Service {
                         if (touchMoved) {
                             int usable = usableWidth();
                             int bw = bubbleWidth();
+                            int maxY = Math.max(0, usableHeight() - bubbleHeight() - dp(EDGE_MARGIN_DP));
                             params.x = Math.max(0, Math.min(initialX + (int) dx, usable - bw));
-                            params.y = Math.max(0, initialY + (int) dy);
+                            params.y = Math.max(0, Math.min(initialY + (int) dy, maxY));
                             updateLayout();
                         }
                         return true;
@@ -420,6 +453,7 @@ public class OverlayService extends Service {
     private void openPanel() {
         if (panelOpen) return;
         panelOpen = true;
+        bubbleY = params.y;
         triggerHaptic();
 
         viewBubble.setVisibility(View.GONE);
@@ -521,15 +555,14 @@ public class OverlayService extends Service {
         if (btnPresetPerf != null) btnPresetPerf.setOnClickListener(presetListener);
         if (btnPresetEsp != null) btnPresetEsp.setOnClickListener(presetListener);
 
-        View telemetry = overlayRoot.findViewById(R.id.btn_bubble_telemetry);
-        if (telemetry != null) {
-            telemetry.setOnClickListener(v -> {
+        View fpsToggle = overlayRoot.findViewById(R.id.btn_fps_overlay);
+        if (fpsToggle != null) {
+            fpsToggle.setOnClickListener(v -> {
                 triggerHaptic();
-                bubbleTelemetry = !bubbleTelemetry;
+                fpsOverlayEnabled = !fpsOverlayEnabled;
                 getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                        .edit().putBoolean("bubble_telemetry", bubbleTelemetry).apply();
-                applyTelemetryState();
-                refreshBubbleText();
+                        .edit().putBoolean("fps_overlay_enabled", fpsOverlayEnabled).apply();
+                applyFpsOverlayState();
             });
         }
     }
@@ -543,7 +576,6 @@ public class OverlayService extends Service {
         applyBubbleMode();
         refreshBubbleText();
         lastBubbleFps = "";
-        lastBubbleExtra = "";
     }
 
     private void applyPreset(String preset) {
@@ -555,7 +587,11 @@ public class OverlayService extends Service {
         final String pkg = currentGamePkg;
         if (pkg == null || pkg.isEmpty()) return;
         // No auto-BBR argument: the daemon keeps the game's existing choice.
-        new Thread(() -> IpcClient.sendCommand("set_game_profile " + pkg + " " + preset)).start();
+        if (actionExecutor != null) {
+            actionExecutor.execute(() -> IpcClient.sendCommand("set_game_profile " + pkg + " " + preset));
+        } else if (ioExecutor != null) {
+            ioExecutor.execute(() -> IpcClient.sendCommand("set_game_profile " + pkg + " " + preset));
+        }
     }
 
     private void highlightHudType() {
@@ -584,15 +620,13 @@ public class OverlayService extends Service {
 
     private void applyBubbleMode() {
         if (viewBubble == null) return;
-        boolean compact = "COMPACT".equals(hudType);
-        if (txtBubbleExtra != null) {
-            txtBubbleExtra.setVisibility(compact ? View.GONE : View.VISIBLE);
-        }
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) viewBubble.getLayoutParams();
-        lp.width = compact ? dp(BUBBLE_SIZE_DP) : FrameLayout.LayoutParams.WRAP_CONTENT;
-        lp.height = dp(BUBBLE_SIZE_DP);
+        // Edge handle stays narrow in every HUD mode; no hidden 56dp bubble hitbox.
+        lp.width = dp(HANDLE_WIDTH_DP);
+        lp.height = dp(HANDLE_HEIGHT_DP);
         viewBubble.setLayoutParams(lp);
-        viewBubble.setMinimumWidth(dp(BUBBLE_SIZE_DP));
+        viewBubble.setMinimumWidth(0);
+        viewBubble.setMinimumHeight(0);
 
         if (!panelOpen && viewBubble.getVisibility() == View.VISIBLE) {
             viewBubble.post(() -> {
@@ -604,31 +638,53 @@ public class OverlayService extends Service {
         }
     }
 
-    private void applyTelemetryState() {
-        if (bubbleContent != null) {
-            bubbleContent.setVisibility(bubbleTelemetry ? View.VISIBLE : View.GONE);
+    private void applyFpsOverlayState() {
+        if (viewBubble != null) {
+            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) viewBubble.getLayoutParams();
+            lp.width = dp(fpsOverlayEnabled ? HANDLE_WIDTH_DP : HANDLE_SMALL_WIDTH_DP);
+            lp.height = dp(fpsOverlayEnabled ? HANDLE_HEIGHT_DP : HANDLE_SMALL_HEIGHT_DP);
+            viewBubble.setLayoutParams(lp);
+            if (!panelOpen) {
+                viewBubble.post(() -> {
+                    if (!panelOpen && viewBubble != null) {
+                        params.x = dockedX(bubbleWidth());
+                        updateLayout();
+                    }
+                });
+            }
         }
         if (dotState != null) {
-            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) dotState.getLayoutParams();
-            if (bubbleTelemetry) {
-                lp.gravity = Gravity.TOP | Gravity.END;
-                lp.setMargins(0, dp(8), dp(10), 0);
-            } else {
-                lp.gravity = Gravity.CENTER;
-                lp.setMargins(0, 0, 0, 0);
-            }
-            dotState.setLayoutParams(lp);
+            dotState.setVisibility(fpsOverlayEnabled ? View.GONE : View.VISIBLE);
+        }
+        if (txtBubbleFps != null) {
+            txtBubbleFps.setVisibility(fpsOverlayEnabled ? View.VISIBLE : View.GONE);
         }
         if (txtTelemetryState != null) {
-            txtTelemetryState.setText(bubbleTelemetry ? "ON" : "OFF");
-            txtTelemetryState.setTextColor(bubbleTelemetry ? COLOR_ACCENT : COLOR_DIM);
+            txtTelemetryState.setText(fpsOverlayEnabled ? "ON" : "OFF");
+            txtTelemetryState.setTextColor(fpsOverlayEnabled ? COLOR_ACCENT : COLOR_DIM);
         }
     }
 
     // ------------------------------------------------------------- telemetry
 
     private void applyHudData(SnapshotReader.SnapshotData data) {
-        if (data == null || overlayRoot == null) return;
+        if (overlayRoot == null) return;
+        if (data == null) {
+            // Ride out a single hiccup, but never leave a stale overlay floating
+            // over a non-game app when the daemon has really gone away.
+            if (++missedReads >= 4) {
+                resetPanel();
+                overlayRoot.setVisibility(View.GONE);
+            }
+            return;
+        }
+        missedReads = 0;
+
+        if (data.gamePreset != null && !data.gamePreset.isEmpty()
+                && !data.gamePreset.equals(activePreset)) {
+            activePreset = data.gamePreset;
+            highlightPreset();
+        }
 
         // Re-anchor if the screen metrics changed (rotation, split screen).
         int sw = getScreenWidth();
@@ -652,12 +708,7 @@ public class OverlayService extends Service {
         currentGamePkg = data.gamePkg == null ? "" : data.gamePkg;
 
         if (autoHide && !data.isGame) {
-            if (panelOpen) {
-                panelOpen = false;
-                viewSidePanel.animate().cancel();
-                viewSidePanel.setVisibility(View.GONE);
-                viewBubble.setVisibility(View.VISIBLE);
-            }
+            resetPanel();
             overlayRoot.setVisibility(View.GONE);
             return;
         }
@@ -687,31 +738,16 @@ public class OverlayService extends Service {
         if (txtBubbleFps == null) return;
         if (data == null) {
             // Re-render with the last known strings only for mode/telemetry changes.
-            txtBubbleFps.setText(lastBubbleFps.isEmpty() ? "60" : lastBubbleFps);
-            if (txtBubbleExtra != null) {
-                txtBubbleExtra.setText(lastBubbleExtra.isEmpty() ? "--" : lastBubbleExtra);
-            }
+            txtBubbleFps.setText(lastBubbleFps.isEmpty() ? "--" : lastBubbleFps);
             return;
         }
 
-        String fps = String.format(java.util.Locale.US, "%.0f",
-                data.fps > 0 ? data.fps : 60.0);
+        String fps = data.fps > 0
+                ? String.format(java.util.Locale.US, "%.0f", data.fps)
+                : "--";
         if (!fps.equals(lastBubbleFps)) {
             txtBubbleFps.setText(fps);
             lastBubbleFps = fps;
-        }
-
-        if (txtBubbleExtra != null && !"COMPACT".equals(hudType)) {
-            String extra;
-            if ("FULL".equals(hudType)) {
-                extra = String.format(java.util.Locale.US, "%d°C · %dM", data.tempBigC, data.gpuClockMhz);
-            } else {
-                extra = String.format(java.util.Locale.US, "%d°C", data.tempBigC);
-            }
-            if (!extra.equals(lastBubbleExtra)) {
-                txtBubbleExtra.setText(extra);
-                lastBubbleExtra = extra;
-            }
         }
     }
 
@@ -724,21 +760,31 @@ public class OverlayService extends Service {
             lastGame = game;
         }
 
-        String fps = String.format(java.util.Locale.US, "%.1f FPS", data.fps > 0 ? data.fps : 60.0);
+        String fps = data.fps > 0
+                ? String.format(java.util.Locale.US, "%.1f FPS", data.fps)
+                : "N/A";
         if (!fps.equals(lastMFps)) { txtMFps.setText(fps); lastMFps = fps; }
 
-        String gpu = String.format(java.util.Locale.US, "%d MHz · %.0f%%", data.gpuClockMhz, data.gpuBusyPct);
+        String gpu = data.gpuClockMhz > 0
+                ? String.format(java.util.Locale.US, "%d MHz · %.0f%%", data.gpuClockMhz, data.gpuBusyPct)
+                : "N/A";
         if (!gpu.equals(lastMGpu)) { txtMGpu.setText(gpu); lastMGpu = gpu; }
 
-        String cpu = String.format(java.util.Locale.US, "%.2f GHz · %d°C", data.cpuBigMhz / 1000.0, data.tempBigC);
+        String cpu = data.cpuBigMhz > 0
+                ? String.format(java.util.Locale.US, "%.2f GHz · %d°C", data.cpuBigMhz / 1000.0, data.tempBigC)
+                : "N/A";
         if (!cpu.equals(lastMCpu)) { txtMCpu.setText(cpu); lastMCpu = cpu; }
 
-        String net = data.tcpCc == null ? "--" : data.tcpCc.toUpperCase();
+        String net = data.tcpCc == null || data.tcpCc.isEmpty()
+                ? "N/A"
+                : data.tcpCc.toUpperCase();
         if (!net.equals(lastMNet)) { txtMNet.setText(net); lastMNet = net; }
 
-        String bat = String.format(java.util.Locale.US, "%d%% · %.1fW%s",
-                data.battCapacity, data.battPowerW,
-                data.battStatus.equalsIgnoreCase("Charging") ? " · CHG" : "");
+        String bat = data.battCapacity > 0
+                ? String.format(java.util.Locale.US, "%d%% · %.1fW%s",
+                        data.battCapacity, data.battPowerW,
+                        data.battStatus.equalsIgnoreCase("Charging") ? " · CHG" : "")
+                : "N/A";
         if (!bat.equals(lastMBat)) { txtMBat.setText(bat); lastMBat = bat; }
     }
 
@@ -795,6 +841,27 @@ public class OverlayService extends Service {
                 .setSmallIcon(R.drawable.ic_launcher)
                 .setContentIntent(pendingIntent)
                 .build();
+    }
+
+    @Override
+    public void onConfigurationChanged(android.content.res.Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        if (overlayRoot == null || windowManager == null) return;
+        overlayRoot.post(() -> {
+            refreshInsets();
+            if (panelOpen) {
+                int pw = panelWidth();
+                params.x = dockedRight
+                        ? Math.max(0, usableWidth() - pw - dp(PANEL_MARGIN_DP))
+                        : dp(PANEL_MARGIN_DP);
+                params.y = clampPanelY(viewSidePanel.getHeight());
+            } else {
+                params.x = dockedX(bubbleWidth());
+                clampY();
+            }
+            updateLayout();
+            savePosition();
+        });
     }
 
     @Override

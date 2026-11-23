@@ -4,58 +4,35 @@
     android:layout_width="wrap_content"
     android:layout_height="wrap_content">
 
-    <!-- ============================================================== -->
-    <!-- FLOATING BUBBLE (collapsed state, always draggable)            -->
-    <!-- ============================================================== -->
+    <!-- Slim edge handle. Tap or swipe inward to open panel. -->
     <FrameLayout
         android:id="@+id/view_bubble"
-        android:layout_width="56dp"
-        android:layout_height="56dp"
-        android:background="@drawable/bg_bubble"
+        android:layout_width="40dp"
+        android:layout_height="32dp"
+        android:layout_gravity="center_vertical|end"
+        android:background="@drawable/bg_edge_handle"
         android:clickable="true"
         android:focusable="false">
 
-        <LinearLayout
-            android:id="@+id/bubble_content"
+        <TextView
+            android:id="@+id/txt_bubble_fps"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
             android:layout_gravity="center"
+            android:fontFamily="monospace"
             android:gravity="center"
-            android:orientation="horizontal"
-            android:paddingLeft="9dp"
-            android:paddingRight="9dp">
-
-            <TextView
-                android:id="@+id/txt_bubble_fps"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="monospace"
-                android:includeFontPadding="false"
-                android:text="60"
-                android:textColor="#D0BCFF"
-                android:textSize="14sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/txt_bubble_extra"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="5dp"
-                android:fontFamily="monospace"
-                android:includeFontPadding="false"
-                android:text="52°C"
-                android:textColor="#C9C5CA"
-                android:textSize="9sp"
-                android:visibility="gone" />
-        </LinearLayout>
+            android:includeFontPadding="false"
+            android:text="--"
+            android:textColor="#D0BCFF"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
 
         <View
             android:id="@+id/dot_state"
-            android:layout_width="8dp"
-            android:layout_height="8dp"
-            android:layout_gravity="top|end"
-            android:layout_marginTop="8dp"
-            android:layout_marginEnd="10dp"
+            android:layout_width="6dp"
+            android:layout_height="6dp"
+            android:layout_gravity="center"
             android:background="@drawable/bg_dot" />
     </FrameLayout>
 
@@ -131,19 +108,23 @@
             android:layout_marginBottom="4dp"
             android:background="#1F46464F" />
 
-        <!-- Live metrics -->
+        <!-- Live metrics: one hero value, then compact telemetry grid. -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            android:background="@drawable/bg_segment_track"
+            android:gravity="center_vertical"
+            android:orientation="vertical"
+            android:padding="10dp">
 
             <TextView
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Frame rate"
-                android:textColor="#C9C5CA"
-                android:textSize="10sp" />
+                android:letterSpacing="0.06"
+                android:text="FRAME RATE"
+                android:textColor="#8A868E"
+                android:textSize="8sp"
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/txt_m_fps"
@@ -152,104 +133,106 @@
                 android:fontFamily="monospace"
                 android:text="-- FPS"
                 android:textColor="#D0BCFF"
-                android:textSize="11sp"
+                android:textSize="26sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
+            android:layout_marginTop="6dp"
             android:orientation="horizontal">
 
-            <TextView
+            <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="GPU"
-                android:textColor="#C9C5CA"
-                android:textSize="10sp" />
+                android:orientation="vertical">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="GPU"
+                    android:textColor="#8A868E"
+                    android:textSize="9sp" />
+                <TextView
+                    android:id="@+id/txt_m_gpu"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:text="N/A"
+                    android:textColor="#E5E1E6"
+                    android:textSize="10sp" />
+            </LinearLayout>
 
-            <TextView
-                android:id="@+id/txt_m_gpu"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:fontFamily="monospace"
-                android:text="-- MHz"
-                android:textColor="#E5E1E6"
-                android:textSize="11sp" />
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="CPU BIG"
+                    android:textColor="#8A868E"
+                    android:textSize="9sp" />
+                <TextView
+                    android:id="@+id/txt_m_cpu"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:text="N/A"
+                    android:textColor="#E5E1E6"
+                    android:textSize="10sp" />
+            </LinearLayout>
         </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
+            android:layout_marginTop="5dp"
             android:orientation="horizontal">
 
-            <TextView
+            <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="CPU big"
-                android:textColor="#C9C5CA"
-                android:textSize="10sp" />
+                android:orientation="vertical">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="NETWORK"
+                    android:textColor="#8A868E"
+                    android:textSize="9sp" />
+                <TextView
+                    android:id="@+id/txt_m_net"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:text="N/A"
+                    android:textColor="#7DDCA5"
+                    android:textSize="10sp" />
+            </LinearLayout>
 
-            <TextView
-                android:id="@+id/txt_m_cpu"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="monospace"
-                android:text="-- GHz"
-                android:textColor="#E5E1E6"
-                android:textSize="11sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
-            android:orientation="horizontal">
-
-            <TextView
+            <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Congestion"
-                android:textColor="#C9C5CA"
-                android:textSize="10sp" />
-
-            <TextView
-                android:id="@+id/txt_m_net"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="monospace"
-                android:text="--"
-                android:textColor="#7DDCA5"
-                android:textSize="11sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
-            android:orientation="horizontal">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Battery"
-                android:textColor="#C9C5CA"
-                android:textSize="10sp" />
-
-            <TextView
-                android:id="@+id/txt_m_bat"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="monospace"
-                android:text="--"
-                android:textColor="#E5E1E6"
-                android:textSize="11sp" />
+                android:orientation="vertical">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="BATTERY"
+                    android:textColor="#8A868E"
+                    android:textSize="9sp" />
+                <TextView
+                    android:id="@+id/txt_m_bat"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:text="N/A"
+                    android:textColor="#E5E1E6"
+                    android:textSize="10sp" />
+            </LinearLayout>
         </LinearLayout>
 
         <View
@@ -272,7 +255,7 @@
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="42dp"
+            android:layout_height="36dp"
             android:background="@drawable/bg_segment_track"
             android:orientation="horizontal"
             android:padding="3dp">
@@ -340,7 +323,7 @@
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="42dp"
+            android:layout_height="36dp"
             android:background="@drawable/bg_segment_track"
             android:orientation="horizontal"
             android:padding="3dp">
@@ -409,9 +392,9 @@
                 android:textSize="9sp" />
         </LinearLayout>
 
-        <!-- Bubble telemetry toggle -->
+        <!-- FPS overlay toggle -->
         <LinearLayout
-            android:id="@+id/btn_bubble_telemetry"
+            android:id="@+id/btn_fps_overlay"
             android:layout_width="match_parent"
             android:layout_height="42dp"
             android:layout_marginTop="8dp"
@@ -425,7 +408,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Bubble telemetry"
+                android:text="FPS overlay"
                 android:textColor="#E5E1E6"
                 android:textSize="10sp" />
 

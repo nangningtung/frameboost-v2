@@ -175,11 +175,41 @@
           </div>
         </div>
 
-        <!-- Dynamic Games List Container -->
-        <div class="games-list" id="games-container">
-          <div style="text-align:center; padding:20px; color:var(--text-dim); font-family:var(--font-mono); font-size:12px;">
-            Memuat daftar game...
+        <div id="games-list-view">
+          <!-- Dynamic Games List Container -->
+          <div class="games-list" id="games-container">
+            <div style="text-align:center; padding:20px; color:var(--text-dim); font-family:var(--font-mono); font-size:12px;">
+              Memuat daftar game...
+            </div>
           </div>
+        </div>
+
+        <div id="game-detail-view" class="hidden game-detail">
+          <button id="btn-close-game-detail" class="btn btn-secondary game-detail-back">← Back to Library</button>
+          <div class="surface-card game-detail-hero">
+            <div id="detail-game-icon" class="game-detail-icon">G</div>
+            <div class="game-detail-identity">
+              <div id="detail-game-name" class="game-detail-name">Game</div>
+              <div id="detail-game-pkg" class="game-detail-pkg">pkg</div>
+            </div>
+          </div>
+          <div class="surface-card game-detail-card">
+            <div class="game-detail-label">PER-GAME PRESET</div>
+            <div class="game-detail-presets">
+              <button class="btn btn-secondary detail-preset" data-preset="battery">Battery</button>
+              <button class="btn btn-secondary detail-preset" data-preset="balanced">Balanced</button>
+              <button class="btn btn-secondary detail-preset" data-preset="performance">Performance</button>
+              <button class="btn btn-secondary detail-preset" data-preset="esports">Esports</button>
+            </div>
+          </div>
+          <div class="game-detail-bbr surface-card">
+            <div>
+              <div class="game-detail-bbr-title">TCP BBR</div>
+              <div id="bbr-status-desc" class="game-detail-bbr-desc">Off</div>
+            </div>
+            <button id="btn-detail-bbr" class="btn btn-secondary">Toggle</button>
+          </div>
+          <button id="btn-detail-launch" class="btn btn-primary game-detail-launch">Apply Profile</button>
         </div>
       </section>
 

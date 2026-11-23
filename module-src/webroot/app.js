@@ -39,8 +39,7 @@
 
   // Elements: Network
   const netIface = document.getElementById("net-iface");
-  const netGw = document.getElementById("net-gw");
-  const netCcBadge = document.getElementById("net-cc-badge") || document.getElementById("net-health-badge");
+  const netCcBadge = document.getElementById("net-health-badge");
 
   // Elements: Game Library
   const gamesContainer = document.getElementById("games-container");
@@ -467,114 +466,39 @@
           <div class="game-tile-source ${sourceClass}">${sourceLabel}</div>
         </div>
         <div class="game-tile-body">
-          <div class="game-title" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${game.name}</div>
-          <div class="game-pkg" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${game.pkg}</div>
-          <div class="game-tile-profile">${game.profile || "Balanced 455M"}</div>
-          <div class="game-tune-row">
-            <select class="select-preset" data-pkg="${game.pkg}">
-              <option value="BATTERY" ${currentPreset === "BATTERY" ? "selected" : ""}>🔋 Battery</option>
-              <option value="BALANCED" ${currentPreset === "BALANCED" ? "selected" : ""}>⚡ Balanced</option>
-              <option value="PERFORMANCE" ${currentPreset === "PERFORMANCE" ? "selected" : ""}>🚀 Performance</option>
-              <option value="ESPORTS" ${currentPreset === "ESPORTS" ? "selected" : ""}>🔥 Esports</option>
-            </select>
-            <button class="btn-toggle-bbr ${isBbr ? "active" : ""}" data-pkg="${game.pkg}" data-bbr="${isBbr ? "1" : "0"}">
-              ${isBbr ? "BBR ON" : "BBR OFF"}
-            </button>
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+            <div style="min-width:0;">
+              <div class="game-title" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${game.name}</div>
+              <div class="game-pkg" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${game.pkg}</div>
+            </div>
+            <span class="preset-badge-${currentPreset.toLowerCase()}" style="font-family:var(--font-mono);font-size:10px;padding:2px 6px;border-radius:6px;background:var(--surface-2);">${currentPreset}</span>
           </div>
-          <div class="game-tile-actions">
-            <button class="btn-launch-game" data-pkg="${game.pkg}">▶ PLAY</button>
-            <button class="btn-remove-game" data-pkg="${game.pkg}">✕</button>
-          </div>
+          <button class="btn btn-primary inline-launch" data-pkg="${game.pkg}" style="margin-top:10px; width:100%; font-size:11px;">▶ PLAY</button>
         </div>
       `;
 
       gamesContainer.appendChild(item);
     });
 
-    // Wire preset dropdowns
-    gamesContainer.querySelectorAll(".select-preset").forEach((sel) => {
-      sel.addEventListener("change", async (e) => {
-        const pkg = sel.dataset.pkg;
-        const preset = sel.value;
-        const bbrBtn = sel.closest(".game-item")?.querySelector(".btn-toggle-bbr");
-        const bbr = bbrBtn ? bbrBtn.dataset.bbr : "0";
-        const res = await sendSocketCmd(`set_game_profile ${pkg} ${preset} ${bbr}`);
-        if (res) {
-          try {
-            const data = JSON.parse(res);
-            if (data.games) {
-              allGames = data.games;
-              applyFilter();
-              return;
-            }
-          } catch (_) {}
-        }
-        await loadGames();
-      });
+    // Tap card (outside buttons) opens the separate detail page.
+  gamesContainer.querySelectorAll(".game-item").forEach((item) => {
+    item.addEventListener("click", (e) => {
+      if (e.target.closest("button,input,select")) return;
+      openGameDetail(item.dataset.pkg);
     });
+  });
 
-    // Wire BBR toggle buttons
-    gamesContainer.querySelectorAll(".btn-toggle-bbr").forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
-        const pkg = btn.dataset.pkg;
-        const currentBbr = btn.dataset.bbr === "1";
-        const newBbr = !currentBbr ? "1" : "0";
-        const sel = btn.closest(".game-item")?.querySelector(".select-preset");
-        const preset = sel ? sel.value : "BALANCED";
-        btn.textContent = "...";
-        const res = await sendSocketCmd(`set_game_profile ${pkg} ${preset} ${newBbr}`);
-        if (res) {
-          try {
-            const data = JSON.parse(res);
-            if (data.games) {
-              allGames = data.games;
-              applyFilter();
-              return;
-            }
-          } catch (_) {}
-        }
-        await loadGames();
-      });
+  gamesContainer.querySelectorAll(".inline-launch").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (window._nativeBridge && typeof window._nativeBridge.launchGame === "function") {
+        window._nativeBridge.launchGame(btn.dataset.pkg);
+      } else {
+        alert("Gagal meluncurkan game. Pastikan package terinstall.");
+      }
     });
+  });
 
-    // Wire remove buttons
-    gamesContainer.querySelectorAll(".btn-remove-game").forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        const pkg = btn.dataset.pkg;
-        if (!confirm(`Hapus '${pkg}' dari daftar game FrameBoost?`)) return;
-        btn.textContent = "...";
-        const res = await sendSocketCmd(`remove_game ${pkg}`);
-        if (res) {
-          try {
-            const data = JSON.parse(res);
-            if (data.games) {
-              allGames = data.games;
-              applyFilter();
-              return;
-            }
-          } catch (_) {}
-        }
-        await loadGames();
-      });
-    });
-
-    // Wire Play / Launch buttons
-    gamesContainer.querySelectorAll(".btn-launch-game").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if (window._nativeBridge && typeof window._nativeBridge.triggerHaptic === "function") {
-          window._nativeBridge.triggerHaptic();
-        }
-        const pkg = btn.dataset.pkg;
-        if (window._nativeBridge && typeof window._nativeBridge.launchGame === "function") {
-          const ok = window._nativeBridge.launchGame(pkg);
-          if (!ok) alert("Gagal meluncurkan game. Pastikan package terinstall.");
-        } else {
-          execCmd(`monkey -p ${pkg} -c android.intent.category.LAUNCHER 1 2>/dev/null`);
-        }
-      });
-    });
   }
 
   function applyFilter() {
@@ -591,6 +515,92 @@
     );
     renderGamesList(filtered);
   }
+
+  const gamesListView = document.getElementById("games-list-view");
+  const gameDetailView = document.getElementById("game-detail-view");
+  let selectedGamePkg = "";
+
+  function openGameDetail(pkg) {
+    const game = (allGames || []).find((g) => g.pkg === pkg);
+    if (!game) return;
+    selectedGamePkg = pkg;
+    document.documentElement.dataset.profile = (game.preset || "balanced").toLowerCase();
+    const icon = document.getElementById("detail-game-icon");
+    const name = document.getElementById("detail-game-name");
+    const p = document.getElementById("detail-game-pkg");
+    if (icon) icon.textContent = (game.name || "?").trim().charAt(0).toUpperCase();
+    if (name) name.textContent = game.name || pkg;
+    if (p) p.textContent = pkg;
+    const bbrBtn = document.getElementById("btn-detail-bbr");
+    const bbrDesc = document.getElementById("bbr-status-desc");
+    const isBbr = !!game.auto_bbr;
+    if (bbrBtn) {
+      bbrBtn.textContent = isBbr ? "BBR ON" : "BBR OFF";
+      bbrBtn.classList.toggle("on", isBbr);
+      bbrBtn.classList.toggle("off", !isBbr);
+    }
+    if (bbrDesc) bbrDesc.textContent = isBbr ? "Applied on launch • Restored on exit" : "Kernel support verified • Off";
+    document.querySelectorAll(".detail-preset").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.preset === (game.preset || "").toLowerCase());
+    });
+    if (gamesListView) gamesListView.classList.add("hidden");
+    if (gameDetailView) gameDetailView.classList.remove("hidden");
+  }
+
+  function closeGameDetail() {
+    selectedGamePkg = "";
+    if (gameDetailView) gameDetailView.classList.add("hidden");
+    if (gamesListView) gamesListView.classList.remove("hidden");
+  }
+
+  document.getElementById("btn-close-game-detail")?.addEventListener("click", closeGameDetail);
+
+  document.querySelectorAll(".detail-preset").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!selectedGamePkg) return;
+      const preset = btn.dataset.preset.toUpperCase();
+      document.documentElement.dataset.profile = preset.toLowerCase();
+      const game = (allGames || []).find((g) => g.pkg === selectedGamePkg);
+      const bbr = game?.auto_bbr ? "1" : "0";
+      const res = await sendSocketCmd(`set_game_profile ${selectedGamePkg} ${preset} ${bbr}`);
+      try {
+        const data = JSON.parse(res);
+        if (data.games) allGames = data.games;
+      } catch (e) {}
+      await loadGames();
+      openGameDetail(selectedGamePkg);
+    });
+  });
+
+  document.getElementById("btn-detail-bbr")?.addEventListener("click", async () => {
+    if (!selectedGamePkg) return;
+    const game = (allGames || []).find((g) => g.pkg === selectedGamePkg);
+    if (!game) return;
+    const preset = (game.preset || "BALANCED").toUpperCase();
+    const newBbr = game.auto_bbr ? "0" : "1";
+    const res = await sendSocketCmd(`set_game_profile ${selectedGamePkg} ${preset} ${newBbr}`);
+    try {
+      const data = JSON.parse(res);
+      if (data.games) allGames = data.games;
+    } catch (e) {}
+    await loadGames();
+    openGameDetail(selectedGamePkg);
+  });
+
+  document.getElementById("btn-detail-launch")?.addEventListener("click", async (e) => {
+    if (!selectedGamePkg) return;
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    btn.textContent = "APPLYING...";
+    const res = await sendSocketCmd("apply_game");
+    let ok = false;
+    try { const data = JSON.parse(res); ok = data.status === "ok"; } catch (err) {}
+    btn.textContent = ok ? "✓ PROFILE APPLIED" : "✕ APPLY FAILED";
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.textContent = "Apply Profile";
+    }, 1800);
+  });
 
   async function loadGames() {
     if (previewMode) {
@@ -651,7 +661,7 @@
     btnScanGames.innerHTML = '<span>⟳</span> Refreshing installed games...';
     const res = await sendSocketCmd("scan_games");
     btnScanGames.disabled = false;
-    btnScanGames.innerHTML = '<span>⟳</span> Scan Device';
+    btnScanGames.innerHTML = '<span>⟳</span> Refresh installed games';
     if (res) {
       try {
         const data = JSON.parse(res);

@@ -18,14 +18,11 @@ mod rollback;
 mod snapshot;
 mod sysfs;
 
-use apply::{apply_profile, PROFILE_GAME, PROFILE_IDLE, PROFILE_WARN};
+use apply::{apply_profile, PROFILE_GAME};
 use daemon::{spawn_auto_daemon, DaemonState};
 use detect::GameDetector;
 use fps::measure_fps;
-use net::{
-    apply_bbr, measure_baseline, measure_bufferbloat, multi_target_ping, restore_stock_cc,
-    run_ping, NetCapability,
-};
+use net::{apply_bbr, measure_bufferbloat, multi_target_ping, restore_stock_cc, run_ping};
 use rollback::restore_all;
 use snapshot::StockSnapshot;
 use sysfs::{read_file, read_u32, run_cmd};
@@ -81,6 +78,7 @@ pub struct BatteryState {
 pub struct Snapshot {
     pub daemon_state: String,
     pub game_pkg: String,
+    pub game_preset: String,
     pub is_game: bool,
     pub fps: Option<f64>,
     pub p1_low_fps: Option<f64>,
@@ -232,6 +230,11 @@ fn take_snapshot(
     Snapshot {
         daemon_state: st_str,
         game_pkg: active_pkg.to_string(),
+        game_preset: if is_g {
+            crate::profile::GameProfile::for_package(&active_pkg).preset
+        } else {
+            String::new()
+        },
         is_game: is_g,
         fps: fps_rep.fps,
         p1_low_fps: fps_rep.p1_low_fps,
@@ -397,47 +400,14 @@ fn handle_client(
                     r.errors
                 )
             }
-            "apply_idle" => {
-                let r = apply_profile(&PROFILE_IDLE);
-                format!(
-                    r#"{{"status":"{}","profile":"{}","errors":{:?}}}"#,
-                    if r.success { "ok" } else { "fail" },
-                    r.profile,
-                    r.errors
-                )
-            }
-            "apply_warn" => {
-                let r = apply_profile(&PROFILE_WARN);
-                format!(
-                    r#"{{"status":"{}","profile":"{}","errors":{:?}}}"#,
-                    if r.success { "ok" } else { "fail" },
-                    r.profile,
-                    r.errors
-                )
-            }
             "restore_all" => match restore_all() {
                 Ok(msg) => format!(r#"{{"status":"ok","message":"{}"}}"#, msg),
                 Err(e) => format!(r#"{{"status":"error","message":"{}"}}"#, e),
             },
-            "get_stock" => {
-                if let Some(snap) = StockSnapshot::load() {
-                    serde_json::to_string(&snap).unwrap_or_default()
-                } else {
-                    r#"{"status":"none"}"#.to_string()
-                }
-            }
             "fps" => {
                 let pkg = GameDetector::get_foreground_pkg();
                 let rep = measure_fps(&pkg);
                 serde_json::to_string(&rep).unwrap_or_default()
-            }
-            "net_capability" => {
-                let cap = NetCapability::probe();
-                serde_json::to_string(&cap).unwrap_or_default()
-            }
-            "net_baseline" => {
-                let base = measure_baseline();
-                serde_json::to_string(&base).unwrap_or_default()
             }
             "net_ping" => {
                 let p = run_ping("8.8.8.8", 3);
@@ -451,21 +421,6 @@ fn handle_client(
                 Ok(_) => r#"{"status":"ok","mode":"westwood"}"#.to_string(),
                 Err(e) => format!(r#"{{"status":"error","message":"{}"}}"#, e),
             },
-            "net_ab_test" => {
-                // Measure stock
-                let _ = restore_stock_cc();
-                let p_stock = run_ping("1.1.1.1", 8);
-                // Measure BBR
-                let _ = apply_bbr();
-                let p_bbr = run_ping("1.1.1.1", 8);
-                // Restore stock
-                let _ = restore_stock_cc();
-                format!(
-                    r#"{{"stock":{},"bbr":{}}}"#,
-                    serde_json::to_string(&p_stock).unwrap_or_default(),
-                    serde_json::to_string(&p_bbr).unwrap_or_default()
-                )
-            }
             "stop" => {
                 running.store(false, Ordering::Relaxed);
                 let _ = restore_all();
