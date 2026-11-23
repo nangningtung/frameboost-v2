@@ -177,31 +177,23 @@ impl GameDetector {
         None
     }
 
-    /// Deteksi foreground package dengan 3 lapis fallback persis FrameBoost v1:
-    /// 1. dumpsys window mCurrentFocus
-    /// 2. dumpsys activity activities topResumedActivity
-    /// 3. dumpsys window mFocusedApp
+    /// Deteksi foreground package cepat & ringan (tanpa full dumpsys window):
+    /// 1. dumpsys window displays (mCurrentFocus / mFocusedApp)
+    /// 2. dumpsys activity top (ACTIVITY / topResumedActivity)
     pub fn get_foreground_pkg() -> String {
-        let win_dump = run_cmd("dumpsys", &["window"]);
+        // ponytail: window displays is 3x faster than full window dump and contains focus target
+        let win_dump = run_cmd("dumpsys", &["window", "displays"]);
         for line in win_dump.lines() {
-            if line.contains("mCurrentFocus") {
+            if line.contains("mCurrentFocus") || line.contains("mFocusedApp") {
                 if let Some(pkg) = Self::parse_pkg_from_line(line) {
                     return pkg;
                 }
             }
         }
 
-        let act_dump = run_cmd("dumpsys", &["activity", "activities"]);
+        let act_dump = run_cmd("dumpsys", &["activity", "top"]);
         for line in act_dump.lines() {
-            if line.contains("topResumedActivity") {
-                if let Some(pkg) = Self::parse_pkg_from_line(line) {
-                    return pkg;
-                }
-            }
-        }
-
-        for line in win_dump.lines() {
-            if line.contains("mFocusedApp") {
+            if line.contains("ACTIVITY") || line.contains("topResumedActivity") {
                 if let Some(pkg) = Self::parse_pkg_from_line(line) {
                     return pkg;
                 }
@@ -224,7 +216,10 @@ impl GameDetector {
 
     /// Get all third-party apps installed on the device (pm list packages -3)
     pub fn get_installed_user_apps() -> Vec<String> {
-        let out = run_cmd("pm", &["list", "packages", "-3"]);
+        let mut out = run_cmd("/system/bin/pm", &["list", "packages", "-3"]);
+        if out.is_empty() {
+            out = run_cmd("/system/bin/cmd", &["package", "list", "packages", "-3"]);
+        }
         let mut apps = Vec::new();
         for line in out.lines() {
             let trimmed = line.trim();
@@ -426,19 +421,9 @@ impl GameDetector {
             }
         }
 
-        // 2. Scan all user-installed 3rd-party apps with cmd game list-modes
-        let apps = Self::get_installed_user_apps();
-        for pkg in apps {
-            if self.is_registered(&pkg) {
-                continue;
-            }
-            let res = run_cmd("cmd", &["game", "list-modes", &pkg]);
-            if res.contains("available game modes:") || res.contains("current mode:") {
-                if !newly_detected.contains(&pkg) {
-                    newly_detected.push(pkg);
-                }
-            }
-        }
+        // Do not probe every installed package with `cmd game list-modes`.
+        // That turns scan into one slow shell call per app. Installed-package
+        // filtering happens in list_all_games; dumpsys game remains fast path.
 
         // Register and persist newly detected games
         for pkg in &newly_detected {
@@ -451,13 +436,14 @@ impl GameDetector {
         newly_detected
     }
 
-    /// List all games categorized with metadata for WebUI
+    /// List only game profiles whose packages are installed on device.
     pub fn list_all_games(&self) -> Vec<GameEntry> {
+        let installed: HashSet<String> = Self::get_installed_user_apps().into_iter().collect();
         let mut map: HashMap<String, GameEntry> = HashMap::new();
 
         // 1. Builtin games
         for (pkg, name) in BUILTIN_GAMES {
-            if !self.disabled_games.contains(*pkg) {
+            if installed.contains(*pkg) && !self.disabled_games.contains(*pkg) {
                 let prof = GameProfile::for_package(pkg);
                 map.insert(
                     pkg.to_string(),
@@ -475,7 +461,7 @@ impl GameDetector {
 
         // 2. Config.sh games (jika belum ada di builtin)
         for pkg in &self.config_games {
-            if !self.disabled_games.contains(pkg) {
+            if installed.contains(pkg) && !self.disabled_games.contains(pkg) {
                 let prof = GameProfile::for_package(pkg);
                 let name = BUILTIN_GAMES
                     .iter()
@@ -498,7 +484,7 @@ impl GameDetector {
 
         // 3. Auto-detected / auto-learned games
         for pkg in &self.auto_games {
-            if !self.disabled_games.contains(pkg) {
+            if installed.contains(pkg) && !self.disabled_games.contains(pkg) {
                 let prof = GameProfile::for_package(pkg);
                 let name = BUILTIN_GAMES
                     .iter()
@@ -521,6 +507,9 @@ impl GameDetector {
 
         // 4. Manual games (user additions always take highest precedence)
         for pkg in &self.manual_games {
+            if !installed.contains(pkg) {
+                continue;
+            }
             let prof = GameProfile::for_package(pkg);
             let name = BUILTIN_GAMES
                 .iter()

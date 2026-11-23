@@ -4,229 +4,449 @@
     android:layout_width="wrap_content"
     android:layout_height="wrap_content">
 
-    <!-- COMPACT PILL (Collapsed State) -->
-    <LinearLayout
-        android:id="@+id/view_pill"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:background="@drawable/bg_pill"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
+    <!-- ============================================================== -->
+    <!-- FLOATING BUBBLE (collapsed state, always draggable)            -->
+    <!-- ============================================================== -->
+    <FrameLayout
+        android:id="@+id/view_bubble"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:background="@drawable/bg_bubble"
+        android:clickable="true"
+        android:focusable="false">
+
+        <LinearLayout
+            android:id="@+id/bubble_content"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:paddingLeft="9dp"
+            android:paddingRight="9dp">
+
+            <TextView
+                android:id="@+id/txt_bubble_fps"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:includeFontPadding="false"
+                android:text="60"
+                android:textColor="#D0BCFF"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/txt_bubble_extra"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="5dp"
+                android:fontFamily="monospace"
+                android:includeFontPadding="false"
+                android:text="52°C"
+                android:textColor="#C9C5CA"
+                android:textSize="9sp"
+                android:visibility="gone" />
+        </LinearLayout>
 
         <View
             android:id="@+id/dot_state"
-            android:layout_width="7dp"
-            android:layout_height="7dp"
-            android:layout_marginEnd="6dp"
-            android:background="@drawable/bg_pill" />
+            android:layout_width="8dp"
+            android:layout_height="8dp"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="10dp"
+            android:background="@drawable/bg_dot" />
+    </FrameLayout>
 
-        <TextView
-            android:id="@+id/txt_pill_fps"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:fontFamily="monospace"
-            android:text="60 FPS"
-            android:textColor="#00f0ff"
-            android:textSize="12sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="4dp"
-            android:text="•"
-            android:textColor="#55ffffff"
-            android:textSize="11sp" />
-
-        <TextView
-            android:id="@+id/txt_pill_temp"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:fontFamily="monospace"
-            android:text="52°C"
-            android:textColor="#ffffff"
-            android:textSize="12sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="4dp"
-            android:text="•"
-            android:textColor="#55ffffff"
-            android:textSize="11sp" />
-
-        <TextView
-            android:id="@+id/txt_pill_gpu"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:fontFamily="monospace"
-            android:text="455M"
-            android:textColor="#00ff9d"
-            android:textSize="12sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-
-    <!-- EXPANDED DRAWER (On Tap) -->
+    <!-- ============================================================== -->
+    <!-- EDGE SIDE PANEL (opened by tapping / swiping the bubble)        -->
+    <!-- ============================================================== -->
     <LinearLayout
-        android:id="@+id/view_drawer"
-        android:layout_width="260dp"
+        android:id="@+id/view_sidepanel"
+        android:layout_width="288dp"
         android:layout_height="wrap_content"
-        android:background="@drawable/bg_drawer"
+        android:background="@drawable/bg_panel"
         android:orientation="vertical"
+        android:padding="12dp"
         android:visibility="gone">
 
+        <!-- Header -->
         <LinearLayout
+            android:id="@+id/panel_header"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <TextView
-                android:id="@+id/txt_drawer_game"
+            <View
+                android:id="@+id/dot_panel_state"
+                android:layout_width="8dp"
+                android:layout_height="8dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_dot" />
+
+            <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:ellipsize="end"
-                android:fontFamily="monospace"
-                android:maxLines="1"
-                android:text="Game Name"
-                android:textColor="#ffffff"
-                android:textSize="13sp"
-                android:textStyle="bold" />
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:includeFontPadding="false"
+                    android:text="FrameBoost"
+                    android:textColor="#E5E1E6"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/txt_panel_game"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="1dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="No game"
+                    android:textColor="#C9C5CA"
+                    android:textSize="9sp" />
+            </LinearLayout>
 
             <TextView
-                android:id="@+id/btn_collapse"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:id="@+id/btn_close_panel"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:background="@drawable/bg_icon_button"
                 android:gravity="center"
                 android:text="✕"
-                android:textColor="#00f0ff"
-                android:textSize="14sp"
-                android:textStyle="bold" />
+                android:textColor="#C9C5CA"
+                android:textSize="12sp" />
         </LinearLayout>
 
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:layout_marginVertical="6dp"
-            android:background="#26ffffff" />
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="4dp"
+            android:background="#1F46464F" />
 
-        <TextView
-            android:id="@+id/txt_drawer_fps_detail"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:fontFamily="monospace"
-            android:text="FPS: 60.0 (1% Low: 48.2)"
-            android:textColor="#00f0ff"
-            android:textSize="11sp" />
-
-        <TextView
-            android:id="@+id/txt_drawer_gpu_detail"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:fontFamily="monospace"
-            android:text="GPU: 455MHz • Load: 45%"
-            android:textColor="#00ff9d"
-            android:textSize="11sp" />
-
-        <TextView
-            android:id="@+id/txt_drawer_cpu_detail"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:fontFamily="monospace"
-            android:text="CPU: 1.35GHz • Temp: 54°C"
-            android:textColor="#ffffff"
-            android:textSize="11sp" />
-
-        <TextView
-            android:id="@+id/txt_drawer_net_detail"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:fontFamily="monospace"
-            android:text="NET: BBR Active"
-            android:textColor="#ffd061"
-            android:textSize="11sp" />
-
-        <View
+        <!-- Live metrics -->
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginVertical="6dp"
-            android:background="#26ffffff" />
-
-        <TextView
-            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:fontFamily="monospace"
-            android:text="QUICK PRESET:"
-            android:textColor="#8e96aa"
-            android:textSize="10sp"
-            android:textStyle="bold" />
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Frame rate"
+                android:textColor="#C9C5CA"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/txt_m_fps"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:text="-- FPS"
+                android:textColor="#D0BCFF"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:gravity="center"
+            android:layout_marginTop="3dp"
             android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="GPU"
+                android:textColor="#C9C5CA"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/txt_m_gpu"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:text="-- MHz"
+                android:textColor="#E5E1E6"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="CPU big"
+                android:textColor="#C9C5CA"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/txt_m_cpu"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:text="-- GHz"
+                android:textColor="#E5E1E6"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Congestion"
+                android:textColor="#C9C5CA"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/txt_m_net"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:text="--"
+                android:textColor="#7DDCA5"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Battery"
+                android:textColor="#C9C5CA"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/txt_m_bat"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:text="--"
+                android:textColor="#E5E1E6"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="8dp"
+            android:background="#1F46464F" />
+
+        <!-- HUD mode -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:letterSpacing="0.06"
+            android:text="BUBBLE MODE"
+            android:textColor="#C9C5CA"
+            android:textSize="9sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:background="@drawable/bg_segment_track"
+            android:orientation="horizontal"
+            android:padding="3dp">
+
+            <Button
+                android:id="@+id/btn_type_compact"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/bg_segment_active"
+                android:fontFamily="monospace"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:padding="0dp"
+                android:text="FPS"
+                android:textAllCaps="false"
+                android:textColor="#E8DEF8"
+                android:textSize="9sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btn_type_detail"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="3dp"
+                android:layout_weight="1"
+                android:background="@android:color/transparent"
+                android:fontFamily="monospace"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:padding="0dp"
+                android:text="+ TEMP"
+                android:textAllCaps="false"
+                android:textColor="#C9C5CA"
+                android:textSize="9sp" />
+
+            <Button
+                android:id="@+id/btn_type_full"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="3dp"
+                android:layout_weight="1"
+                android:background="@android:color/transparent"
+                android:fontFamily="monospace"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:padding="0dp"
+                android:text="+ GPU"
+                android:textAllCaps="false"
+                android:textColor="#C9C5CA"
+                android:textSize="9sp" />
+        </LinearLayout>
+
+        <!-- Preset -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="4dp"
+            android:letterSpacing="0.06"
+            android:text="GAME PRESET"
+            android:textColor="#C9C5CA"
+            android:textSize="9sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:background="@drawable/bg_segment_track"
+            android:orientation="horizontal"
+            android:padding="3dp">
 
             <Button
                 android:id="@+id/btn_preset_battery"
                 android:layout_width="0dp"
-                android:layout_height="32dp"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:background="@drawable/bg_btn_preset"
+                android:background="@android:color/transparent"
                 android:fontFamily="monospace"
                 android:minHeight="0dp"
+                android:minWidth="0dp"
                 android:padding="0dp"
                 android:text="BAT"
-                android:textColor="#ffffff"
-                android:textSize="10sp" />
+                android:textAllCaps="false"
+                android:textColor="#C9C5CA"
+                android:textSize="9sp" />
 
             <Button
                 android:id="@+id/btn_preset_balanced"
                 android:layout_width="0dp"
-                android:layout_height="32dp"
+                android:layout_height="match_parent"
                 android:layout_marginStart="3dp"
                 android:layout_weight="1"
-                android:background="@drawable/bg_btn_preset"
+                android:background="@android:color/transparent"
                 android:fontFamily="monospace"
                 android:minHeight="0dp"
+                android:minWidth="0dp"
                 android:padding="0dp"
                 android:text="BAL"
-                android:textColor="#ffffff"
-                android:textSize="10sp" />
+                android:textAllCaps="false"
+                android:textColor="#C9C5CA"
+                android:textSize="9sp" />
 
             <Button
                 android:id="@+id/btn_preset_perf"
                 android:layout_width="0dp"
-                android:layout_height="32dp"
+                android:layout_height="match_parent"
                 android:layout_marginStart="3dp"
                 android:layout_weight="1"
-                android:background="@drawable/bg_btn_preset"
+                android:background="@android:color/transparent"
                 android:fontFamily="monospace"
                 android:minHeight="0dp"
+                android:minWidth="0dp"
                 android:padding="0dp"
                 android:text="PERF"
-                android:textColor="#ffffff"
-                android:textSize="10sp" />
+                android:textAllCaps="false"
+                android:textColor="#C9C5CA"
+                android:textSize="9sp" />
 
             <Button
                 android:id="@+id/btn_preset_esports"
                 android:layout_width="0dp"
-                android:layout_height="32dp"
+                android:layout_height="match_parent"
                 android:layout_marginStart="3dp"
                 android:layout_weight="1"
-                android:background="@drawable/bg_btn_preset"
+                android:background="@android:color/transparent"
                 android:fontFamily="monospace"
                 android:minHeight="0dp"
+                android:minWidth="0dp"
                 android:padding="0dp"
                 android:text="ESP"
-                android:textColor="#ffffff"
-                android:textSize="10sp" />
+                android:textAllCaps="false"
+                android:textColor="#C9C5CA"
+                android:textSize="9sp" />
         </LinearLayout>
+
+        <!-- Bubble telemetry toggle -->
+        <LinearLayout
+            android:id="@+id/btn_bubble_telemetry"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_segment_track"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingLeft="12dp"
+            android:paddingRight="12dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Bubble telemetry"
+                android:textColor="#E5E1E6"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/txt_telemetry_state"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:text="ON"
+                android:textColor="#D0BCFF"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center"
+            android:text="Tap bubble to open · swipe to close"
+            android:textColor="#8A868E"
+            android:textSize="8sp" />
     </LinearLayout>
 </FrameLayout>

@@ -1,0 +1,1450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FrameBoost v2 — AOSP GSI GameSpace UI/UX</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* Light-First AOSP Pixel Stock Surfaces */
+      --bg-canvas: #eef1f6;
+      --bg-app: #f7f9fc;
+      --surface-1: #ffffff;
+      --surface-2: #edf1f7;
+      --surface-3: #e1e7f0;
+      --text-primary: #111418;
+      --text-secondary: #4a525d;
+      --text-muted: #6e7785;
+      --border-hairline: #dce2ec;
+
+      /* Dynamic Profile Accent — Default: Balanced (AOSP Cobalt) */
+      --accent: #1a56db;
+      --accent-fg: #ffffff;
+      --accent-soft: #e8effd;
+      --accent-border: #b6cdfa;
+      --accent-text: #1341a8;
+    }
+
+    /* Dark Theme Surfaces */
+    [data-theme="dark"] {
+      --bg-canvas: #090b0e;
+      --bg-app: #101318;
+      --surface-1: #171b22;
+      --surface-2: #1f242e;
+      --surface-3: #282f3c;
+      --text-primary: #f1f4f9;
+      --text-secondary: #aeb7c4;
+      --text-muted: #7c8696;
+      --border-hairline: #272d38;
+    }
+
+    /* Profile 1: Battery (Forest Emerald) */
+    [data-profile="battery"] {
+      --accent: #146c43;
+      --accent-fg: #ffffff;
+      --accent-soft: #e6f4ed;
+      --accent-border: #a3d9be;
+      --accent-text: #0f5132;
+    }
+    [data-theme="dark"][data-profile="battery"] {
+      --accent: #34d399;
+      --accent-fg: #042f1e;
+      --accent-soft: rgba(52, 211, 153, 0.14);
+      --accent-border: rgba(52, 211, 153, 0.35);
+      --accent-text: #6ee7b7;
+    }
+
+    /* Profile 2: Balanced (FrameBoost indigo) */
+    [data-profile="balanced"] {
+      --accent: #4f46e5;
+      --accent-fg: #ffffff;
+      --accent-soft: #eef0ff;
+      --accent-border: #c7c4ff;
+      --accent-text: #3730a3;
+    }
+    [data-theme="dark"][data-profile="balanced"] {
+      --accent: #60a5fa;
+      --accent-fg: #0b2249;
+      --accent-soft: rgba(96, 165, 250, 0.14);
+      --accent-border: rgba(96, 165, 250, 0.35);
+      --accent-text: #93c5fd;
+    }
+
+    /* Profile 3: Performance (Burnt Amber) */
+    [data-profile="performance"] {
+      --accent: #b45309;
+      --accent-fg: #ffffff;
+      --accent-soft: #fef3c7;
+      --accent-border: #fcd34d;
+      --accent-text: #92400e;
+    }
+    [data-theme="dark"][data-profile="performance"] {
+      --accent: #fbbf24;
+      --accent-fg: #3b1a02;
+      --accent-soft: rgba(251, 191, 36, 0.15);
+      --accent-border: rgba(251, 191, 36, 0.38);
+      --accent-text: #fde68a;
+    }
+
+    /* Critical Thermal Override (>= 90°C) */
+    [data-critical="true"] {
+      --accent: #b91c1c !important;
+      --accent-fg: #ffffff !important;
+      --accent-soft: #fee2e2 !important;
+      --accent-border: #fca5a5 !important;
+      --accent-text: #991b1b !important;
+    }
+    [data-theme="dark"][data-critical="true"] {
+      --accent: #f87171 !important;
+      --accent-fg: #3f0707 !important;
+      --accent-soft: rgba(248, 113, 113, 0.16) !important;
+      --accent-border: rgba(248, 113, 113, 0.4) !important;
+      --accent-text: #fca5a5 !important;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      margin: 0;
+      padding: 0;
+      transition: background-color 0.25s ease, color 0.25s ease;
+    }
+
+    .tabular {
+      font-variant-numeric: tabular-nums;
+    }
+
+    .font-mono-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Smooth AOSP Decelerate Transitions */
+    .aosp-ease {
+      transition: all 0.28s cubic-bezier(0.2, 0, 0, 1);
+    }
+
+    .surface-card {
+      background-color: var(--surface-1);
+      border: 1px solid var(--border-hairline);
+      border-radius: 16px;
+      transition: background-color 0.25s ease, border-color 0.25s ease;
+    }
+
+    .surface-sub {
+      background-color: var(--surface-2);
+      border: 1px solid var(--border-hairline);
+      border-radius: 12px;
+      transition: background-color 0.25s ease, border-color 0.25s ease;
+    }
+
+    .accent-pill {
+      background-color: var(--accent-soft);
+      color: var(--accent-text);
+      border: 1px solid var(--accent-border);
+      transition: all 0.25s ease;
+    }
+
+    .accent-btn {
+      background-color: var(--accent);
+      color: var(--accent-fg);
+      transition: all 0.22s cubic-bezier(0.2, 0, 0, 1);
+    }
+    .accent-btn:disabled {
+      opacity: 0.42;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+    .accent-btn:active:not(:disabled) {
+      transform: scale(0.985);
+    }
+
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* Phone Shell Sizing */
+    .phone-shell {
+      width: min(393px, 100vw);
+      max-width: 100%;
+      height: min(820px, 100dvh);
+      min-height: 640px;
+      max-height: 100dvh;
+      background-color: var(--bg-app);
+      border: 1px solid var(--border-hairline);
+      transition: width 0.32s cubic-bezier(0.2, 0, 0, 1), background-color 0.25s ease;
+    }
+
+    @media (min-width: 640px) {
+      .phone-shell {
+        border-radius: 36px;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.14);
+      }
+      [data-theme="dark"] .phone-shell {
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
+      }
+    }
+
+    @media (max-width: 639px) {
+      .phone-shell {
+        width: 100vw !important;
+        height: 100dvh;
+        border-radius: 0;
+        border: none;
+      }
+    }
+
+    /* Native-Accurate HUD & Sidepanel Surfaces */
+    .hud-pill-surface {
+      background-color: rgba(18, 22, 29, 0.94);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: #f4f6fa;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    .sidepanel-surface {
+      background-color: var(--surface-1);
+      border: 1px solid var(--border-hairline);
+      box-shadow: -8px 0 28px rgba(0, 0, 0, 0.24);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center sm:py-4" data-theme="light" data-profile="balanced" data-critical="false">
+
+  <!-- ===================================================================== -->
+  <!-- TOP PREVIEW & INSPECTION BAR                                          -->
+  <!-- ===================================================================== -->
+  <div class="w-full max-w-[960px] px-3 sm:px-4 mb-0 sm:mb-3 z-50">
+    <div class="surface-card px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+      <!-- Brand + Viewport Width Switcher -->
+      <div class="flex items-center gap-2">
+        <span class="font-semibold tracking-tight px-1.5">FrameBoost v2</span>
+        <div class="hidden sm:flex items-center bg-[var(--surface-2)] p-0.5 rounded-lg border border-[var(--border-hairline)]">
+          <button onclick="setViewportWidth(360)" class="vp-btn px-2 py-1 rounded-md font-mono-code text-[11px] text-[var(--text-secondary)]" data-w="360">360px</button>
+          <button onclick="setViewportWidth(393)" class="vp-btn px-2 py-1 rounded-md font-mono-code text-[11px] bg-[var(--surface-1)] text-[var(--text-primary)] font-semibold shadow-sm" data-w="393">393px</button>
+          <button onclick="setViewportWidth(412)" class="vp-btn px-2 py-1 rounded-md font-mono-code text-[11px] text-[var(--text-secondary)]" data-w="412">412px</button>
+        </div>
+      </div>
+
+      <!-- System & Preview State Switcher -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <label for="sim-state-select" class="text-[11px] text-[var(--text-muted)] hidden md:inline">IPC State:</label>
+        <select id="sim-state-select" onchange="setSystemState(this.value)"
+          class="bg-[var(--surface-2)] border border-[var(--border-hairline)] rounded-lg px-2.5 py-1.5 text-[11px] font-medium text-[var(--text-primary)] focus:outline-none">
+          <option value="offline">Daemon Offline (Default)</option>
+          <option value="error">Error / Timeout (10s)</option>
+          <option value="connected">Connected (?preview=1)</option>
+          <option value="warning">Thermal Warning (85°C)</option>
+          <option value="critical">Thermal Critical (90°C)</option>
+        </select>
+
+        <!-- Light / Dark Theme Toggle -->
+        <button onclick="toggleColorTheme()" id="theme-toggle-btn"
+          class="px-2.5 py-1.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border-hairline)] text-[11px] font-medium text-[var(--text-primary)] hover:opacity-85 aosp-ease">
+          Theme: Light
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MOBILE DEVICE SHELL                                                   -->
+  <!-- ===================================================================== -->
+  <div id="phone-shell" class="phone-shell relative flex flex-col overflow-hidden">
+
+    <!-- Android Stock Status Bar -->
+    <header class="px-5 pt-2.5 pb-1.5 flex items-center justify-between text-[12px] font-medium text-[var(--text-primary)] shrink-0">
+      <span class="tabular font-semibold">20:32</span>
+      <div class="flex items-center gap-1.5 text-[var(--text-secondary)]">
+        <span class="font-mono-code text-[10px]">5G</span>
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M2 22h20V2z"/></svg>
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 6.61 0 10l12 12 12-12c-2.73-3.39-7-5.5-12-5.5z"/></svg>
+        <div class="w-4 h-2.5 rounded-[2px] border border-current p-[1px] flex items-center">
+          <div id="sb-batt-fill" class="w-3/4 h-full bg-current"></div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Mandatory Preview Banner (Shown whenever ?preview=1 simulation is active) -->
+    <div id="preview-banner" class="hidden bg-amber-500/15 border-y border-amber-500/35 px-4 py-1.5 flex items-center justify-between gap-2 shrink-0">
+      <span class="font-mono-code text-[10px] font-bold tracking-wide text-amber-800 dark:text-amber-300">
+        PREVIEW DATA — NOT REAL TELEMETRY
+      </span>
+      <span class="font-mono-code text-[10px] text-[var(--text-muted)]">127.0.0.1?preview=1</span>
+    </div>
+
+    <!-- Top App Header -->
+    <div class="px-4 py-3 flex items-center justify-between border-b border-[var(--border-hairline)] bg-[var(--bg-app)] shrink-0">
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-[18px] font-bold tracking-tight leading-none">FrameBoost</h1>
+          <span class="font-mono-code text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--text-secondary)] border border-[var(--border-hairline)]">v2.0</span>
+        </div>
+        <p id="header-subtitle" class="text-[11px] text-[var(--text-muted)] mt-1">Native Android HUD • Rust daemon IPC</p>
+      </div>
+
+      <!-- Active Profile Pill -->
+      <div id="header-profile-badge" class="accent-pill px-2.5 py-1 rounded-full text-[11px] font-semibold capitalize flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-[var(--accent)]"></span>
+        <span id="header-profile-label">Balanced</span>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- MAIN SCROLLABLE CONTENT AREA                                        -->
+    <!-- =================================================================== -->
+    <main class="flex-1 overflow-y-auto no-scrollbar px-4 pt-3.5 pb-24 space-y-3.5">
+
+      <!-- ================================================================= -->
+      <!-- SCREEN 1: HOME DASHBOARD                                          -->
+      <!-- ================================================================= -->
+      <section id="screen-home" class="space-y-3.5">
+
+        <!-- 1. Daemon Connection & Watchdog Card -->
+        <div class="surface-card p-3.5">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <div id="daemon-dot" class="w-2.5 h-2.5 rounded-full bg-slate-400 shrink-0"></div>
+              <div class="min-w-0">
+                <div id="daemon-title" class="text-sm font-semibold truncate">Daemon offline</div>
+                <div id="daemon-sub" class="text-xs text-[var(--text-muted)] truncate">Status unavailable • Watchdog 10s</div>
+              </div>
+            </div>
+            <button onclick="pingDaemonSnapshot()" class="min-h-[36px] px-3 rounded-xl bg-[var(--surface-2)] border border-[var(--border-hairline)] text-xs font-medium text-[var(--text-primary)] hover:opacity-80 aosp-ease shrink-0">
+              Check daemon
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. Real Telemetry Grid (2 Hz Polling) -->
+        <div class="surface-card p-3.5 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Live device state</span>
+            <span id="telemetry-rate-badge" class="font-mono-code text-[11px] text-[var(--text-muted)]">Daemon polling: 2 Hz</span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div class="surface-sub p-2.5">
+              <div class="text-[11px] text-[var(--text-muted)]">Temperature</div>
+              <div id="val-temp" class="tabular text-base font-bold mt-0.5">n/a</div>
+            </div>
+            <div class="surface-sub p-2.5">
+              <div class="text-[11px] text-[var(--text-muted)]">Frame Rate</div>
+              <div id="val-fps" class="tabular text-base font-bold mt-0.5">n/a</div>
+            </div>
+            <div class="surface-sub p-2.5">
+              <div class="text-[11px] text-[var(--text-muted)]">GPU State</div>
+              <div id="val-gpu" class="tabular text-xs font-semibold mt-1 truncate">n/a</div>
+            </div>
+            <div class="surface-sub p-2.5">
+              <div class="text-[11px] text-[var(--text-muted)]">Battery</div>
+              <div id="val-batt" class="tabular text-xs font-semibold mt-1 truncate">n/a</div>
+            </div>
+            <div class="surface-sub p-2.5">
+              <div class="text-[11px] text-[var(--text-muted)]">Thermal State</div>
+              <div id="val-thermal" class="text-xs font-semibold mt-1 truncate">Unavailable</div>
+            </div>
+            <div class="surface-sub p-2.5">
+              <div class="text-[11px] text-[var(--text-muted)]">GOS State</div>
+              <div id="val-gos" class="text-xs font-semibold mt-1 truncate">Unavailable</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Dynamic Profile Selector -->
+        <div class="surface-card p-3.5 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Boost profile</span>
+            <span id="profile-governor-hint" class="font-mono-code text-[11px] text-[var(--accent-text)]">schedutil • standard</span>
+          </div>
+
+          <div class="grid grid-cols-3 gap-1.5 bg-[var(--surface-2)] p-1 rounded-xl border border-[var(--border-hairline)]">
+            <button onclick="selectProfile('battery')" class="prof-btn min-h-[44px] rounded-lg text-xs font-semibold text-[var(--text-secondary)] aosp-ease" data-prof="battery">
+              Battery
+            </button>
+            <button onclick="selectProfile('balanced')" class="prof-btn min-h-[44px] rounded-lg text-xs font-semibold accent-btn shadow-sm aosp-ease" data-prof="balanced">
+              Balanced
+            </button>
+            <button onclick="selectProfile('performance')" class="prof-btn min-h-[44px] rounded-lg text-xs font-semibold text-[var(--text-secondary)] aosp-ease" data-prof="performance">
+              Performance
+            </button>
+          </div>
+        </div>
+
+        <!-- 4. Quick Boost & Restore Pipeline -->
+        <div class="surface-card p-3.5 space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-sm font-semibold">Quick Boost</div>
+              <div id="boost-status-text" class="text-xs text-[var(--text-muted)]">Idle • Ready to apply profile</div>
+            </div>
+            <span id="boost-timer" class="font-mono-code text-xs text-[var(--text-muted)]">0.0s</span>
+          </div>
+
+          <!-- Step Progress Bar -->
+          <div class="grid grid-cols-4 gap-1.5">
+            <div id="step-1" class="h-1.5 rounded-full bg-[var(--surface-3)] aosp-ease"></div>
+            <div id="step-2" class="h-1.5 rounded-full bg-[var(--surface-3)] aosp-ease"></div>
+            <div id="step-3" class="h-1.5 rounded-full bg-[var(--surface-3)] aosp-ease"></div>
+            <div id="step-4" class="h-1.5 rounded-full bg-[var(--surface-3)] aosp-ease"></div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button id="btn-quick-boost" onclick="runQuickBoost()" disabled
+              class="accent-btn flex-1 min-h-[48px] rounded-xl text-xs font-semibold flex items-center justify-center gap-2 px-4">
+              <svg id="boost-spinner" class="hidden w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+              </svg>
+              <span id="btn-quick-boost-label">Apply Quick Boost</span>
+            </button>
+
+            <button id="btn-restore-system" onclick="runSystemRestore('Manual restore')" disabled
+              class="min-h-[48px] px-4 rounded-xl bg-[var(--surface-2)] border border-[var(--border-hairline)] text-xs font-semibold text-[var(--text-primary)] disabled:opacity-40 disabled:pointer-events-none aosp-ease">
+              Restore
+            </button>
+          </div>
+        </div>
+
+        <!-- 5. Samsung GOS Control -->
+        <div class="surface-card p-3.5 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-sm font-semibold">Samsung GOS Control</div>
+              <div id="gos-sub" class="text-xs text-[var(--text-muted)]">GOS state unavailable until daemon connects</div>
+            </div>
+            <span id="gos-badge" class="font-mono-code text-[10px] font-semibold px-2 py-0.5 rounded bg-[var(--surface-2)] text-[var(--text-muted)] border border-[var(--border-hairline)]">n/a</span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <button id="btn-gos-disable" onclick="runGosCommand('gos_disable')" disabled
+              class="min-h-[48px] rounded-xl bg-[var(--surface-2)] border border-[var(--border-hairline)] text-xs font-semibold text-[var(--text-primary)] disabled:opacity-40 disabled:pointer-events-none aosp-ease">
+              Disable GOS
+            </button>
+            <button id="btn-gos-restore" onclick="runGosCommand('gos_restore')" disabled
+              class="min-h-[48px] rounded-xl bg-[var(--surface-2)] border border-[var(--border-hairline)] text-xs font-semibold text-[var(--text-primary)] disabled:opacity-40 disabled:pointer-events-none aosp-ease">
+              Restore GOS
+            </button>
+          </div>
+        </div>
+
+        <!-- FrameBoost capability summary -->
+        <div class="surface-card p-3.5 space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-sm font-semibold">FrameBoost controls</div>
+              <div class="text-xs text-[var(--text-muted)]">Only real daemon-confirmed actions are shown</div>
+            </div>
+            <span class="font-mono-code text-[10px] text-[var(--text-muted)]">IPC</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <div class="surface-sub p-2.5"><div class="font-semibold">Watchdog</div><div class="text-[var(--text-muted)] mt-1">10s daemon timeout</div></div>
+            <div class="surface-sub p-2.5"><div class="font-semibold">Telemetry</div><div class="text-[var(--text-muted)] mt-1">2 Hz when connected</div></div>
+            <div class="surface-sub p-2.5"><div class="font-semibold">Restore</div><div class="text-[var(--text-muted)] mt-1">Manual and emergency</div></div>
+            <div class="surface-sub p-2.5"><div class="font-semibold">IPC actions</div><div class="text-[var(--text-muted)] mt-1">Ping, snapshot, apply</div></div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- SCREEN 2: GAME LIBRARY & PER-GAME PROFILE DETAIL                  -->
+      <!-- ================================================================= -->
+      <section id="screen-games" class="hidden space-y-3.5">
+
+        <!-- Library List View -->
+        <div id="games-list-view" class="space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-sm font-bold">Installed Games</h2>
+              <p class="text-[11px] text-[var(--text-muted)]">Real installed apps • per-game profiles</p>
+            </div>
+            <!-- Library State Simulator -->
+            <select id="lib-state-select" onchange="renderGameLibrary()"
+              class="bg-[var(--surface-2)] border border-[var(--border-hairline)] rounded-lg px-2 py-1 text-[11px] text-[var(--text-primary)]">
+              <option value="normal">Packages Loaded (4)</option>
+              <option value="empty">Empty State</option>
+              <option value="error">Package List Error</option>
+            </select>
+          </div>
+
+          <!-- Search Input -->
+          <div class="relative">
+            <input id="game-search-input" type="text" oninput="renderGameLibrary()" placeholder="Search installed packages..."
+              class="w-full min-h-[44px] bg-[var(--surface-1)] border border-[var(--border-hairline)] rounded-xl pl-9 pr-3 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]" />
+            <svg class="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+            </svg>
+          </div>
+
+          <!-- 2-Column Game Grid Container -->
+          <div id="game-grid-container"></div>
+        </div>
+
+        <!-- Per-Game Detail Sub-View -->
+        <div id="game-detail-view" class="hidden space-y-3.5">
+          <button onclick="closeGameDetail()" class="min-h-[40px] px-3 rounded-xl bg-[var(--surface-1)] border border-[var(--border-hairline)] text-xs font-semibold inline-flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+            <span>Back to Library</span>
+          </button>
+
+          <!-- Selected Game Header Card -->
+          <div class="surface-card p-3.5 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <div id="detail-game-icon" class="w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm text-white shrink-0">ML</div>
+              <div class="min-w-0">
+                <div id="detail-game-name" class="text-sm font-bold truncate">Mobile Legends</div>
+                <div id="detail-game-pkg" class="font-mono-code text-[11px] text-[var(--text-muted)] truncate">com.mobile.legends</div>
+              </div>
+            </div>
+            <span id="detail-profile-state" class="accent-pill px-2.5 py-1 rounded-full text-[10px] font-semibold shrink-0">Profile loaded</span>
+          </div>
+
+          <!-- Per-Package Preset Selector -->
+          <div class="surface-card p-3.5 space-y-2.5">
+            <div class="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Per-Game Preset</div>
+            <div class="grid grid-cols-3 gap-1.5 bg-[var(--surface-2)] p-1 rounded-xl border border-[var(--border-hairline)]">
+              <button onclick="setGamePreset('battery')" class="g-preset-btn min-h-[44px] rounded-lg text-xs font-semibold" data-gp="battery">Battery</button>
+              <button onclick="setGamePreset('balanced')" class="g-preset-btn min-h-[44px] rounded-lg text-xs font-semibold" data-gp="balanced">Balanced</button>
+              <button onclick="setGamePreset('performance')" class="g-preset-btn min-h-[44px] rounded-lg text-xs font-semibold" data-gp="performance">Performance</button>
+            </div>
+          </div>
+
+          <!-- BBR Networking & Launch Behavior -->
+          <div class="surface-card p-3.5 space-y-3">
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <div class="text-xs font-semibold">TCP BBR Congestion Control</div>
+                <div id="bbr-status-desc" class="text-[11px] text-[var(--text-muted)]">Kernel support verified • Off</div>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <button onclick="toggleBbrAvailability()" class="px-2 py-1 rounded-md bg-[var(--surface-2)] border border-[var(--border-hairline)] text-[10px] text-[var(--text-muted)]" title="Simulate Kernel Support">
+                  Sim Kernel
+                </button>
+                <button id="btn-bbr-toggle" onclick="toggleGameBbr()" class="min-h-[40px] px-3 rounded-xl bg-[var(--surface-2)] border border-[var(--border-hairline)] text-xs font-semibold">
+                  Off
+                </button>
+              </div>
+            </div>
+
+            <div class="h-[1px] bg-[var(--border-hairline)]"></div>
+
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <div class="text-xs font-semibold">Auto-Restore on Game Exit</div>
+                <div class="text-[11px] text-[var(--text-muted)]">Never alters system defaults permanently</div>
+              </div>
+              <span class="font-mono-code text-[11px] font-semibold text-[var(--accent-text)]">Enforced</span>
+            </div>
+          </div>
+
+          <!-- Launch Game CTA -->
+          <button onclick="launchSelectedGame()" class="accent-btn w-full min-h-[48px] rounded-xl text-xs font-bold flex items-center justify-center gap-2">
+            <span>Apply Profile & Open Game</span>
+          </button>
+
+          <div class="surface-sub p-3 space-y-2">
+            <div class="text-xs font-semibold">Profile safety</div>
+            <div class="grid grid-cols-2 gap-2 text-[11px] text-[var(--text-secondary)]">
+              <div>Preset: Battery / Balanced / Performance</div>
+              <div>BBR: per-game setting</div>
+              <div>Launch: apply before open</div>
+              <div>Exit: restore automatically</div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- SCREEN 3: NETWORK DIAGNOSTICS (SINGLE-TARGET REAL PROBE)          -->
+      <!-- ================================================================= -->
+      <section id="screen-network" class="hidden space-y-3.5">
+        <div class="surface-card p-3.5 space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-sm font-bold">Network Diagnostics</h2>
+              <p class="text-[11px] text-[var(--text-muted)]">Real probe for ping, jitter, and bufferbloat</p>
+            </div>
+            <span id="net-probe-badge" class="font-mono-code text-[10px] font-semibold px-2 py-0.5 rounded bg-[var(--surface-2)] text-[var(--text-muted)] border border-[var(--border-hairline)]">Idle</span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div class="surface-sub p-3">
+              <div class="text-[11px] text-[var(--text-muted)]">Unloaded Ping</div>
+              <div id="net-ping" class="tabular text-base font-bold mt-0.5">n/a</div>
+            </div>
+            <div class="surface-sub p-3">
+              <div class="text-[11px] text-[var(--text-muted)]">Jitter</div>
+              <div id="net-jitter" class="tabular text-base font-bold mt-0.5">n/a</div>
+            </div>
+            <div class="surface-sub p-3">
+              <div class="text-[11px] text-[var(--text-muted)]">Loaded Latency</div>
+              <div id="net-loaded" class="tabular text-base font-bold mt-0.5">n/a</div>
+            </div>
+            <div class="surface-sub p-3">
+              <div class="text-[11px] text-[var(--text-muted)]">Bufferbloat</div>
+              <div id="net-bloat" class="tabular text-base font-bold mt-0.5">n/a</div>
+            </div>
+          </div>
+
+          <div id="probe-progress" class="hidden space-y-1.5">
+            <div class="flex items-center justify-between text-[11px] text-[var(--text-muted)]"><span id="probe-phase">Preparing real probe</span><span id="probe-timer" class="font-mono-code">0.0s</span></div>
+            <div class="h-1.5 rounded-full bg-[var(--surface-3)] overflow-hidden"><div id="probe-progress-bar" class="h-full w-1/3 bg-[var(--accent)] rounded-full"></div></div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button id="btn-run-probe" onclick="runNetworkProbe(false)" class="accent-btn flex-1 min-h-[48px] rounded-xl text-xs font-semibold flex items-center justify-center gap-2">
+              <svg id="net-spinner" class="hidden w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+              </svg>
+              <span id="btn-probe-label">Run Network Probe</span>
+            </button>
+            <button onclick="runNetworkProbe(true)" class="min-h-[48px] px-3 rounded-xl bg-[var(--surface-2)] border border-[var(--border-hairline)] text-xs font-medium text-[var(--text-secondary)]" title="Test Timeout Handling">
+              Sim Timeout
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- SCREEN 4: SAFETY & THERMAL GUARD                                  -->
+      <!-- ================================================================= -->
+      <section id="screen-safety" class="hidden space-y-3.5">
+        <div class="surface-card p-3.5 space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-sm font-bold">Thermal Guard Policy</h2>
+              <p class="text-[11px] text-[var(--text-muted)]">85°C warning • 90°C critical • 82°C restore</p>
+            </div>
+            <span id="safety-state-pill" class="font-mono-code text-[10px] font-semibold px-2 py-0.5 rounded bg-[var(--surface-2)] text-[var(--text-muted)] border border-[var(--border-hairline)]">Unavailable</span>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2 text-center">
+            <div class="surface-sub p-2.5">
+              <div class="text-[10px] text-[var(--text-muted)]">Warning</div>
+              <div class="tabular text-sm font-bold text-amber-600 dark:text-amber-400 mt-0.5">85°C</div>
+            </div>
+            <div class="surface-sub p-2.5">
+              <div class="text-[10px] text-[var(--text-muted)]">Critical</div>
+              <div class="tabular text-sm font-bold text-red-600 dark:text-red-400 mt-0.5">90°C</div>
+            </div>
+            <div class="surface-sub p-2.5">
+              <div class="text-[10px] text-[var(--text-muted)]">Hysteresis</div>
+              <div class="tabular text-sm font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">82°C</div>
+            </div>
+          </div>
+
+          <button id="btn-emergency-restore" onclick="runSystemRestore('Emergency thermal restore')" disabled
+            class="w-full min-h-[48px] rounded-xl bg-red-600 text-white text-xs font-bold disabled:opacity-40 disabled:pointer-events-none aosp-ease">
+            Trigger Emergency Restore
+          </button>
+
+          <div class="grid grid-cols-2 gap-2">
+            <button id="btn-safety-restore" onclick="runSystemRestore('Safety restore')" disabled class="min-h-[48px] rounded-xl bg-[var(--surface-2)] border border-[var(--border-hairline)] text-xs font-semibold disabled:opacity-40">Restore system state</button>
+            <button onclick="showSafetyRules()" class="min-h-[48px] rounded-xl bg-[var(--surface-2)] border border-[var(--border-hairline)] text-xs font-semibold">Safety rules</button>
+          </div>
+        </div>
+
+        <div class="surface-card p-3.5 space-y-2">
+          <div class="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">System Integrity Guarantees</div>
+          <ul class="text-xs text-[var(--text-secondary)] space-y-1.5">
+            <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-[var(--accent)]"></span>No fabricated telemetry or mock FPS counters</li>
+            <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-[var(--accent)]"></span>No RAM cleaner, cache dropper, or fake benchmarks</li>
+            <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-[var(--accent)]"></span>No screen recorder, crosshair, or unfair overlays</li>
+            <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-[var(--accent)]"></span>Automatic restore on exit or ≥90°C thermal spike</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- SCREEN 5: IN-GAME OVERLAY & SIDEPANEL PREVIEW                     -->
+      <!-- ================================================================= -->
+      <section id="screen-overlay" class="hidden space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-bold">OverlayService Preview</h2>
+            <p class="text-[11px] text-[var(--text-muted)]">Drag HUD pill • Edge-snap • Tap to open Sidepanel</p>
+          </div>
+          <span class="font-mono-code text-[10px] px-2 py-0.5 rounded bg-[var(--surface-2)] border border-[var(--border-hairline)] text-[var(--text-secondary)]">hud_prefs</span>
+        </div>
+
+        <!-- Simulated Game Viewport Canvas -->
+        <div id="overlay-arena" class="relative w-full h-[460px] rounded-2xl bg-[#12161f] border border-[var(--border-hairline)] overflow-hidden select-none">
+          <!-- Subtle Clean Frame Guide -->
+          <div class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 pointer-events-none">
+            <div class="text-xs font-semibold text-slate-300">Active Game Surface</div>
+            <div id="overlay-active-game-label" class="font-mono-code text-[11px] text-slate-400 mt-1">com.mobile.legends</div>
+            <p class="text-[11px] text-slate-500 mt-3 max-w-[230px]">
+              Drag HUD inside bounds, release to edge-snap, then tap to open the side panel.
+            </p>
+          </div>
+
+          <!-- Draggable & Edge-Snapping Floating HUD Pill -->
+          <div id="floating-hud-pill" style="top: 20px; left: 12px;"
+            class="hud-pill-surface absolute z-20 rounded-full px-3 py-2 cursor-grab active:cursor-grabbing flex items-center gap-2 transition-[box-shadow] duration-200">
+            <!-- Thermal Status Dot -->
+            <span id="hud-thermal-dot" class="w-2.5 h-2.5 rounded-full bg-slate-400 shrink-0"></span>
+
+            <!-- COMPACT View -->
+            <div id="hud-mode-compact" class="flex items-center gap-1.5 font-mono-code text-[11px] font-semibold">
+              <span id="hud-compact-fps">n/a</span>
+            </div>
+
+            <!-- DETAIL View -->
+            <div id="hud-mode-detail" class="hidden items-center gap-2 font-mono-code text-[11px]">
+              <span id="hud-detail-fps" class="font-bold">n/a</span>
+              <span class="opacity-30">|</span>
+              <span id="hud-detail-temp">n/a</span>
+            </div>
+
+            <!-- FULL View -->
+            <div id="hud-mode-full" class="hidden items-center gap-2 font-mono-code text-[10px]">
+              <span id="hud-full-fps" class="font-bold">n/a</span>
+              <span class="opacity-30">|</span>
+              <span id="hud-full-temp">n/a</span>
+              <span class="opacity-30">|</span>
+              <span id="hud-full-gpu">GPU: n/a</span>
+            </div>
+          </div>
+
+          <!-- Edge-Docked GameSpace Sidepanel -->
+          <aside id="ingame-sidepanel"
+            class="sidepanel-surface absolute top-2 bottom-2 right-2 w-[256px] max-w-[82%] rounded-2xl z-30 flex flex-col justify-between p-3 aosp-ease translate-x-[112%]">
+            <div class="space-y-2.5 overflow-y-auto no-scrollbar">
+              <!-- Sidepanel Header -->
+              <div class="flex items-center justify-between pb-2 border-b border-[var(--border-hairline)]">
+                <div class="flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-[var(--accent)]"></span>
+                  <span class="text-xs font-bold">FrameBoost Panel</span>
+                </div>
+                <button onclick="toggleInGameSidepanel(false)" class="w-8 h-8 rounded-lg bg-[var(--surface-2)] flex items-center justify-center text-[var(--text-secondary)]">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+
+              <!-- Daemon & Thermal Status Strip -->
+              <div class="surface-sub p-2 flex items-center justify-between text-[11px]">
+                <span id="sp-daemon-state" class="font-medium text-[var(--text-secondary)]">Daemon offline</span>
+                <span id="sp-thermal-state" class="font-mono-code font-semibold text-[var(--text-muted)]">n/a</span>
+              </div>
+
+              <!-- HUD Mode Selector (COMPACT / DETAIL / FULL) -->
+              <div>
+                <div class="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1">HUD Overlay Type</div>
+                <div class="grid grid-cols-3 gap-1 bg-[var(--surface-2)] p-1 rounded-xl border border-[var(--border-hairline)]">
+                  <button onclick="setHudType('compact')" class="hud-type-btn min-h-[40px] rounded-lg text-[10px] font-bold accent-btn" data-ht="compact">Compact</button>
+                  <button onclick="setHudType('detail')" class="hud-type-btn min-h-[40px] rounded-lg text-[10px] font-semibold text-[var(--text-secondary)]" data-ht="detail">Detail</button>
+                  <button onclick="setHudType('full')" class="hud-type-btn min-h-[40px] rounded-lg text-[10px] font-semibold text-[var(--text-secondary)]" data-ht="full">Full</button>
+                </div>
+              </div>
+
+              <!-- Per-Game Preset Switcher -->
+              <div>
+                <div class="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1">Per-Game Preset</div>
+                <div class="grid grid-cols-3 gap-1 bg-[var(--surface-2)] p-1 rounded-xl border border-[var(--border-hairline)]">
+                  <button onclick="selectProfile('battery')" class="sp-prof-btn min-h-[40px] rounded-lg text-[10px] font-semibold text-[var(--text-secondary)]" data-sp="battery">Battery</button>
+                  <button onclick="selectProfile('balanced')" class="sp-prof-btn min-h-[40px] rounded-lg text-[10px] font-bold accent-btn" data-sp="balanced">Balanced</button>
+                  <button onclick="selectProfile('performance')" class="sp-prof-btn min-h-[40px] rounded-lg text-[10px] font-semibold text-[var(--text-secondary)]" data-sp="performance">Boost</button>
+                </div>
+              </div>
+
+              <!-- FPS Overlay Visibility Toggle (48dp touch target) -->
+              <button onclick="toggleHudVisibility()" id="sp-fps-toggle"
+                class="w-full min-h-[48px] px-3 rounded-xl bg-[var(--surface-2)] border border-[var(--border-hairline)] flex items-center justify-between text-xs font-semibold">
+                <span>Show Floating HUD</span>
+                <span id="sp-fps-toggle-state" class="font-mono-code text-[11px] text-[var(--accent-text)]">ON</span>
+              </button>
+            </div>
+
+            <!-- Restore Action inside Sidepanel -->
+            <button id="sp-restore-btn" onclick="runSystemRestore('Sidepanel restore')" disabled
+              class="w-full min-h-[48px] mt-2 rounded-xl bg-[var(--surface-2)] border border-[var(--border-hairline)] text-xs font-semibold text-[var(--text-primary)] disabled:opacity-40 disabled:pointer-events-none">
+              Restore Defaults
+            </button>
+          </aside>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- =================================================================== -->
+    <!-- BOTTOM NAVIGATION BAR (5 SCREENS)                                   -->
+    <!-- =================================================================== -->
+    <nav class="absolute bottom-0 inset-x-0 bg-[var(--surface-1)] border-t border-[var(--border-hairline)] px-2 pt-1.5 pb-4 grid grid-cols-5 z-40">
+      <button onclick="switchScreen('home')" class="nav-tab flex flex-col items-center justify-center min-h-[48px] gap-1" data-screen="home">
+        <span class="nav-indicator px-3 py-1 rounded-full accent-pill">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        </span>
+        <span class="text-[10px] font-semibold">Home</span>
+      </button>
+
+      <button onclick="switchScreen('games')" class="nav-tab flex flex-col items-center justify-center min-h-[48px] gap-1 text-[var(--text-muted)]" data-screen="games">
+        <span class="nav-indicator px-3 py-1 rounded-full">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+        </span>
+        <span class="text-[10px] font-medium">Games</span>
+      </button>
+
+      <button onclick="switchScreen('network')" class="nav-tab flex flex-col items-center justify-center min-h-[48px] gap-1 text-[var(--text-muted)]" data-screen="network">
+        <span class="nav-indicator px-3 py-1 rounded-full">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
+        </span>
+        <span class="text-[10px] font-medium">Network</span>
+      </button>
+
+      <button onclick="switchScreen('safety')" class="nav-tab flex flex-col items-center justify-center min-h-[48px] gap-1 text-[var(--text-muted)]" data-screen="safety">
+        <span class="nav-indicator px-3 py-1 rounded-full">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        </span>
+        <span class="text-[10px] font-medium">Safety</span>
+      </button>
+
+      <button onclick="switchScreen('overlay')" class="nav-tab flex flex-col items-center justify-center min-h-[48px] gap-1 text-[var(--text-muted)]" data-screen="overlay">
+        <span class="nav-indicator px-3 py-1 rounded-full">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
+        </span>
+        <span class="text-[10px] font-medium">Overlay</span>
+      </button>
+    </nav>
+
+    <!-- Non-blocking AOSP Feedback Toast -->
+    <div id="toast-pill" class="pointer-events-none opacity-0 translate-y-2 absolute bottom-20 left-1/2 -translate-x-1/2 z-50 px-3.5 py-2 rounded-full bg-[#181c24] text-white border border-white/15 shadow-lg text-xs font-medium whitespace-nowrap aosp-ease">
+      Action completed
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // FRAMEBOOST v2 — UI STATE & IPC BRIDGE SIMULATION
+    // =========================================================================
+    const installedGames = [
+      { pkg: 'com.mobile.legends', name: 'Mobile Legends', code: 'ML', color: '#1d4ed8', preset: 'performance', bbr: true },
+      { pkg: 'com.miHoYo.GenshinImpact', name: 'Genshin Impact', code: 'GI', color: '#b45309', preset: 'performance', bbr: false },
+      { pkg: 'com.tencent.ig', name: 'PUBG Mobile', code: 'PM', color: '#15803d', preset: 'balanced', bbr: true },
+      { pkg: 'com.mobile.legends.hw', name: 'Magic Chess: Go Go', code: 'MC', color: '#6d28d9', preset: 'battery', bbr: false }
+    ];
+
+    const appState = {
+      theme: 'light',
+      profile: 'balanced', // 'battery' | 'balanced' | 'performance'
+      systemState: 'offline', // 'offline' | 'error' | 'connected' | 'warning' | 'critical'
+      activeScreen: 'home',
+      selectedGame: installedGames[0],
+      bbrKernelSupported: true,
+      hasActiveChanges: false,
+      gosDisabled: false,
+      hudType: 'compact', // 'compact' | 'detail' | 'full'
+      hudVisible: true,
+      sidepanelOpen: false,
+      boostRunning: false,
+      telemetryTimer: null
+    };
+
+    // =========================================================================
+    // 1. VIEWPORT, THEME & PROFILE ACCENT SWITCHING
+    // =========================================================================
+    function setViewportWidth(w) {
+      document.getElementById('phone-shell').style.width = `${w}px`;
+      document.querySelectorAll('.vp-btn').forEach(btn => {
+        const active = Number(btn.dataset.w) === w;
+        btn.className = active
+          ? 'vp-btn px-2 py-1 rounded-md font-mono-code text-[11px] bg-[var(--surface-1)] text-[var(--text-primary)] font-semibold shadow-sm'
+          : 'vp-btn px-2 py-1 rounded-md font-mono-code text-[11px] text-[var(--text-secondary)]';
+      });
+    }
+
+    function toggleColorTheme() {
+      appState.theme = appState.theme === 'light' ? 'dark' : 'light';
+      document.body.setAttribute('data-theme', appState.theme);
+      document.getElementById('theme-toggle-btn').textContent = `Theme: ${appState.theme === 'light' ? 'Light' : 'Dark'}`;
+    }
+
+    function selectProfile(prof) {
+      appState.profile = prof;
+      document.body.setAttribute('data-profile', prof);
+
+      const labels = { battery: 'Battery', balanced: 'Balanced', performance: 'Performance' };
+      const govs = {
+        battery: 'powersave • 60Hz cap',
+        balanced: 'schedutil • standard',
+        performance: 'performance • 120Hz boost'
+      };
+
+      document.getElementById('header-profile-label').textContent =
+        appState.systemState === 'critical' ? 'Critical Guard' : labels[prof];
+      document.getElementById('profile-governor-hint').textContent = govs[prof];
+
+      // Update Home Profile Buttons
+      document.querySelectorAll('.prof-btn').forEach(btn => {
+        const active = btn.dataset.prof === prof;
+        btn.className = active
+          ? 'prof-btn min-h-[44px] rounded-lg text-xs font-semibold accent-btn shadow-sm aosp-ease'
+          : 'prof-btn min-h-[44px] rounded-lg text-xs font-semibold text-[var(--text-secondary)] aosp-ease';
+      });
+
+      // Update Sidepanel Profile Buttons
+      document.querySelectorAll('.sp-prof-btn').forEach(btn => {
+        const active = btn.dataset.sp === prof;
+        btn.className = active
+          ? 'sp-prof-btn min-h-[40px] rounded-lg text-[10px] font-bold accent-btn'
+          : 'sp-prof-btn min-h-[40px] rounded-lg text-[10px] font-semibold text-[var(--text-secondary)]';
+      });
+    }
+
+    // =========================================================================
+    // 2. DAEMON CONNECTION & ZERO-MOCK TELEMETRY STATE MACHINE
+    // =========================================================================
+    function setSystemState(newState) {
+      appState.systemState = newState;
+      clearInterval(appState.telemetryTimer);
+
+      const banner = document.getElementById('preview-banner');
+      const isPreviewActive = newState !== 'offline';
+      banner.classList.toggle('hidden', !isPreviewActive);
+
+      const isCritical = newState === 'critical';
+      document.body.setAttribute('data-critical', isCritical ? 'true' : 'false');
+      selectProfile(appState.profile);
+
+      const dot = document.getElementById('daemon-dot');
+      const title = document.getElementById('daemon-title');
+      const sub = document.getElementById('daemon-sub');
+      const rateBadge = document.getElementById('telemetry-rate-badge');
+
+      const isConnected = ['connected', 'warning', 'critical'].includes(newState);
+
+      // Enable/disable daemon-dependent controls
+      document.getElementById('btn-quick-boost').disabled = !isConnected || isCritical;
+      document.getElementById('btn-gos-disable').disabled = !isConnected || isCritical;
+      document.getElementById('btn-gos-restore').disabled = !isConnected;
+      updateRestoreButtons();
+
+      if (newState === 'offline') {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-slate-400 shrink-0';
+        title.textContent = 'Daemon offline';
+        sub.textContent = 'Status unavailable • Watchdog 10s';
+        rateBadge.textContent = 'Daemon polling: Off (n/a)';
+        setUnavailableTelemetry();
+      } else if (newState === 'error') {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-red-500 shrink-0';
+        title.textContent = 'Daemon timeout / error';
+        sub.textContent = 'IPC watchdog exceeded 10s';
+        rateBadge.textContent = 'Daemon polling: Halted (n/a)';
+        setUnavailableTelemetry();
+      } else {
+        dot.className = isCritical
+          ? 'w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shrink-0'
+          : 'w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0';
+        title.textContent = 'Connected (Preview)';
+        sub.textContent = 'Unix socket active • Watchdog OK';
+        rateBadge.textContent = 'Daemon polling: 2 Hz';
+
+        updateTelemetryTick();
+        appState.telemetryTimer = setInterval(updateTelemetryTick, 500);
+
+        if (isCritical) {
+          appState.hasActiveChanges = true;
+          updateRestoreButtons();
+          runSystemRestore('Emergency thermal restore (≥90°C)');
+        }
+      }
+    }
+
+    function setUnavailableTelemetry() {
+      ['val-temp', 'val-fps', 'val-gpu', 'val-batt'].forEach(id => {
+        document.getElementById(id).textContent = 'n/a';
+      });
+      document.getElementById('val-thermal').textContent = 'Unavailable';
+      document.getElementById('val-gos').textContent = 'Unavailable';
+      document.getElementById('gos-sub').textContent = 'Game Optimizing Service • Status unavailable';
+      document.getElementById('gos-badge').textContent = 'n/a';
+      document.getElementById('safety-state-pill').textContent = 'Unavailable';
+
+      // HUD & Sidepanel sync
+      document.getElementById('hud-thermal-dot').className = 'w-2.5 h-2.5 rounded-full bg-slate-400 shrink-0';
+      document.getElementById('hud-compact-fps').textContent = 'n/a';
+      document.getElementById('hud-detail-fps').textContent = 'n/a';
+      document.getElementById('hud-detail-temp').textContent = 'n/a';
+      document.getElementById('hud-full-fps').textContent = 'n/a';
+      document.getElementById('hud-full-temp').textContent = 'n/a';
+      document.getElementById('hud-full-gpu').textContent = 'GPU: n/a';
+      document.getElementById('sp-daemon-state').textContent = 'Daemon offline';
+      document.getElementById('sp-thermal-state').textContent = 'n/a';
+    }
+
+    function updateTelemetryTick() {
+      const s = appState.systemState;
+      if (!['connected', 'warning', 'critical'].includes(s)) return;
+
+      let temp = 41.2;
+      let thermalLabel = 'Normal';
+      let dotClass = 'w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0';
+
+      if (s === 'warning') {
+        temp = (85.4 + (Math.random() * 0.6)).toFixed(1);
+        thermalLabel = 'Warning (≥85°C)';
+        dotClass = 'w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0';
+      } else if (s === 'critical') {
+        temp = (90.6 + (Math.random() * 0.5)).toFixed(1);
+        thermalLabel = 'Critical (≥90°C)';
+        dotClass = 'w-2.5 h-2.5 rounded-full bg-red-500 animate-ping shrink-0';
+      } else {
+        const base = appState.profile === 'performance' ? 44.5 : appState.profile === 'battery' ? 37.8 : 40.6;
+        temp = (base + (Math.random() * 0.4)).toFixed(1);
+      }
+
+      const fpsBase = appState.profile === 'battery' ? 60 : 120;
+      const fps = fpsBase - (Math.random() > 0.75 ? 1 : 0);
+      const gpuFreq = appState.profile === 'performance' ? '850 MHz (74%)' : appState.profile === 'battery' ? '420 MHz (38%)' : '640 MHz (56%)';
+
+      document.getElementById('val-temp').textContent = `${temp}°C`;
+      document.getElementById('val-fps').textContent = `${fps} FPS`;
+      document.getElementById('val-gpu').textContent = gpuFreq;
+      document.getElementById('val-batt').textContent = '78% • 3.98V';
+      document.getElementById('val-thermal').textContent = thermalLabel;
+      document.getElementById('val-gos').textContent = appState.gosDisabled ? 'Disabled' : 'Active (Stock)';
+      document.getElementById('gos-sub').textContent = `Game Optimizing Service • ${appState.gosDisabled ? 'Bypassed' : 'Default'}`;
+      document.getElementById('gos-badge').textContent = appState.gosDisabled ? 'DISABLED' : 'ACTIVE';
+      document.getElementById('safety-state-pill').textContent = thermalLabel;
+
+      // Sync HUD & Sidepanel
+      document.getElementById('hud-thermal-dot').className = dotClass;
+      document.getElementById('hud-compact-fps').textContent = `${fps} FPS`;
+      document.getElementById('hud-detail-fps').textContent = `${fps} FPS`;
+      document.getElementById('hud-detail-temp').textContent = `${temp}°C`;
+      document.getElementById('hud-full-fps').textContent = `${fps} FPS`;
+      document.getElementById('hud-full-temp').textContent = `${temp}°C`;
+      document.getElementById('hud-full-gpu').textContent = `GPU ${appState.profile === 'performance' ? '74%' : '56%'}`;
+      document.getElementById('sp-daemon-state').textContent = 'Connected';
+      document.getElementById('sp-thermal-state').textContent = `${temp}°C • ${thermalLabel.split(' ')[0]}`;
+    }
+
+    function pingDaemonSnapshot() {
+      if (appState.systemState === 'offline') {
+        showToast('IPC error: Unix socket offline');
+        return;
+      }
+      updateTelemetryTick();
+      showToast('IPC snapshot received');
+    }
+
+    // =========================================================================
+    // 3. QUICK BOOST, GOS & RESTORE PIPELINE
+    // =========================================================================
+    function runQuickBoost() {
+      if (appState.boostRunning || appState.systemState === 'offline') return;
+      appState.boostRunning = true;
+
+      const btn = document.getElementById('btn-quick-boost');
+      const label = document.getElementById('btn-quick-boost-label');
+      const spinner = document.getElementById('boost-spinner');
+      const statusText = document.getElementById('boost-status-text');
+      const timerEl = document.getElementById('boost-timer');
+
+      btn.disabled = true;
+      spinner.classList.remove('hidden');
+
+      const start = performance.now();
+      const clock = setInterval(() => {
+        timerEl.textContent = `${((performance.now() - start) / 1000).toFixed(1)}s`;
+      }, 100);
+
+      const steps = [
+        { step: 1, text: 'Preparing profile parameters...', delay: 0 },
+        { step: 2, text: 'Applying sysfs & scheduler hints...', delay: 450 },
+        { step: 3, text: 'Verifying daemon confirmation...', delay: 950 },
+        { step: 4, text: 'Completed • Profile active', delay: 1400 }
+      ];
+
+      steps.forEach(({ step, text, delay }) => {
+        setTimeout(() => {
+          statusText.textContent = text;
+          document.getElementById(`step-${step}`).style.backgroundColor = 'var(--accent)';
+          if (step === 4) {
+            clearInterval(clock);
+            spinner.classList.add('hidden');
+            btn.disabled = false;
+            label.textContent = 'Re-Apply Quick Boost';
+            appState.boostRunning = false;
+            appState.hasActiveChanges = true;
+            updateRestoreButtons();
+            showToast('Quick Boost verified by daemon');
+          }
+        }, delay);
+      });
+    }
+
+    function runGosCommand(cmd) {
+      if (appState.systemState === 'offline') return;
+      const isDisable = cmd === 'gos_disable';
+      document.getElementById('gos-sub').textContent = isDisable ? 'Applying gos_disable...' : 'Applying gos_restore...';
+      setTimeout(() => {
+        appState.gosDisabled = isDisable;
+        if (isDisable) appState.hasActiveChanges = true;
+        updateRestoreButtons();
+        updateTelemetryTick();
+        showToast(isDisable ? 'GOS disabled (daemon confirmed)' : 'GOS restored to stock');
+      }, 350);
+    }
+
+    function runSystemRestore(reason) {
+      if (!appState.hasActiveChanges && appState.systemState !== 'critical') return;
+      document.getElementById('boost-status-text').textContent = 'Restoring system defaults...';
+      setTimeout(() => {
+        appState.hasActiveChanges = false;
+        appState.gosDisabled = false;
+        [1, 2, 3, 4].forEach(i => {
+          document.getElementById(`step-${i}`).style.backgroundColor = 'var(--surface-3)';
+        });
+        document.getElementById('boost-status-text').textContent = 'Idle • System defaults restored';
+        document.getElementById('boost-timer').textContent = '0.0s';
+        document.getElementById('btn-quick-boost-label').textContent = 'Apply Quick Boost';
+        updateRestoreButtons();
+        updateTelemetryTick();
+        showToast(`${reason} completed`);
+      }, 400);
+    }
+
+    function updateRestoreButtons() {
+      const canRestore = ['connected', 'warning', 'critical'].includes(appState.systemState) && appState.hasActiveChanges;
+      document.getElementById('btn-restore-system').disabled = !canRestore;
+      document.getElementById('btn-emergency-restore').disabled = !['connected', 'warning', 'critical'].includes(appState.systemState);
+      document.getElementById('btn-safety-restore').disabled = !canRestore;
+      document.getElementById('sp-restore-btn').disabled = !canRestore;
+    }
+
+    // =========================================================================
+    // 4. GAME LIBRARY & PER-GAME PROFILE DETAIL
+    // =========================================================================
+    function renderGameLibrary() {
+      const container = document.getElementById('game-grid-container');
+      const mode = document.getElementById('lib-state-select').value;
+      const query = document.getElementById('game-search-input').value.trim().toLowerCase();
+
+      if (mode === 'error') {
+        container.innerHTML = `
+          <div class="surface-card p-6 text-center space-y-2">
+            <div class="text-xs font-bold text-red-600 dark:text-red-400">Package List Error</div>
+            <p class="text-[11px] text-[var(--text-muted)]">Failed to query PackageManager installed game packages.</p>
+            <button onclick="document.getElementById('lib-state-select').value='normal';renderGameLibrary();"
+              class="min-h-[40px] px-4 rounded-xl bg-[var(--surface-2)] border border-[var(--border-hairline)] text-xs font-semibold mt-1">
+              Retry Query
+            </button>
+          </div>`;
+        return;
+      }
+
+      const filtered = mode === 'empty'
+        ? []
+        : installedGames.filter(g => g.name.toLowerCase().includes(query) || g.pkg.toLowerCase().includes(query));
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="surface-card p-6 text-center space-y-1.5">
+            <div class="text-xs font-bold">No installed games found</div>
+            <p class="text-[11px] text-[var(--text-muted)]">No matching Android game packages detected on device.</p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="grid grid-cols-2 gap-2.5">
+          ${filtered.map(g => `
+            <button onclick="openGameDetail('${g.pkg}')"
+              class="surface-card p-3 text-left flex flex-col justify-between min-h-[124px] hover:border-[var(--accent)] aosp-ease">
+              <div class="flex items-center justify-between gap-2">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs text-white shrink-0" style="background-color:${g.color}">
+                  ${g.code}
+                </div>
+                <span class="font-mono-code text-[10px] px-2 py-0.5 rounded bg-[var(--surface-2)] text-[var(--text-secondary)] capitalize">
+                  ${g.preset}
+                </span>
+              </div>
+              <div class="mt-3">
+                <div class="text-xs font-bold truncate">${g.name}</div>
+                <div class="font-mono-code text-[10px] text-[var(--text-muted)] truncate mt-0.5">${g.pkg}</div>
+              </div>
+            </button>
+          `).join('')}
+        </div>`;
+    }
+
+    function openGameDetail(pkg) {
+      const game = installedGames.find(g => g.pkg === pkg) || installedGames[0];
+      appState.selectedGame = game;
+
+      document.getElementById('games-list-view').classList.add('hidden');
+      document.getElementById('game-detail-view').classList.remove('hidden');
+
+      const icon = document.getElementById('detail-game-icon');
+      icon.style.backgroundColor = game.color;
+      icon.textContent = game.code;
+      document.getElementById('detail-game-name').textContent = game.name;
+      document.getElementById('detail-game-pkg').textContent = game.pkg;
+
+      setGamePreset(game.preset, false);
+      syncBbrUI();
+    }
+
+    function closeGameDetail() {
+      document.getElementById('game-detail-view').classList.add('hidden');
+      document.getElementById('games-list-view').classList.remove('hidden');
+    }
+
+    function setGamePreset(preset, notify = true) {
+      appState.selectedGame.preset = preset;
+      document.querySelectorAll('.g-preset-btn').forEach(btn => {
+        const active = btn.dataset.gp === preset;
+        btn.className = active
+          ? 'g-preset-btn min-h-[44px] rounded-lg text-xs font-semibold accent-btn'
+          : 'g-preset-btn min-h-[44px] rounded-lg text-xs font-semibold text-[var(--text-secondary)]';
+      });
+      if (notify) {
+        renderGameLibrary();
+        showToast(`Saved ${preset} preset for ${appState.selectedGame.name}`);
+      }
+    }
+
+    function toggleBbrAvailability() {
+      appState.bbrKernelSupported = !appState.bbrKernelSupported;
+      syncBbrUI();
+    }
+
+    function toggleGameBbr() {
+      if (!appState.bbrKernelSupported) return;
+      appState.selectedGame.bbr = !appState.selectedGame.bbr;
+      syncBbrUI();
+      showToast(`BBR ${appState.selectedGame.bbr ? 'enabled' : 'restored'} for package`);
+    }
+
+    function syncBbrUI() {
+      const btn = document.getElementById('btn-bbr-toggle');
+      const desc = document.getElementById('bbr-status-desc');
+      if (!appState.bbrKernelSupported) {
+        btn.disabled = true;
+        btn.textContent = 'Unavailable';
+        btn.className = 'min-h-[40px] px-3 rounded-xl bg-[var(--surface-2)] border border-[var(--border-hairline)] text-xs font-semibold opacity-45';
+        desc.textContent = 'Kernel tcp_bbr module unavailable';
+        return;
+      }
+      btn.disabled = false;
+      const active = appState.selectedGame.bbr;
+      btn.textContent = active ? 'Enabled' : 'Off';
+      btn.className = active
+        ? 'min-h-[40px] px-3 rounded-xl accent-btn text-xs font-semibold'
+        : 'min-h-[40px] px-3 rounded-xl bg-[var(--surface-2)] border border-[var(--border-hairline)] text-xs font-semibold';
+      desc.textContent = active ? 'Applied on launch • Restored on exit' : 'Kernel support verified • Off';
+    }
+
+    function launchSelectedGame() {
+      selectProfile(appState.selectedGame.preset);
+      document.getElementById('overlay-active-game-label').textContent = appState.selectedGame.pkg;
+      switchScreen('overlay');
+      setTimeout(() => toggleInGameSidepanel(true), 260);
+    }
+
+    // =========================================================================
+    // 5. NETWORK DIAGNOSTICS PROBE
+    // =========================================================================
+    function runNetworkProbe(simulateTimeout) {
+      const btn = document.getElementById('btn-run-probe');
+      const spinner = document.getElementById('net-spinner');
+      const label = document.getElementById('btn-probe-label');
+      const badge = document.getElementById('net-probe-badge');
+      const progress = document.getElementById('probe-progress');
+      const phase = document.getElementById('probe-phase');
+      const timer = document.getElementById('probe-timer');
+      const bar = document.getElementById('probe-progress-bar');
+      const started = performance.now();
+      const phases = ['Preparing real probe', 'Measuring unloaded latency', 'Measuring loaded latency', 'Verifying bufferbloat'];
+
+      btn.disabled = true;
+      spinner.classList.remove('hidden');
+      progress.classList.remove('hidden');
+      label.textContent = 'Probing single target…';
+      badge.textContent = 'Probing';
+      let phaseIndex = 0;
+      const clock = setInterval(() => {
+        phase.textContent = phases[Math.min(phaseIndex, phases.length - 1)];
+        bar.style.width = `${Math.min(92, 25 + phaseIndex * 23)}%`;
+        timer.textContent = `${((performance.now() - started) / 1000).toFixed(1)}s`;
+        phaseIndex += 1;
+      }, 220);
+
+      setTimeout(() => {
+        clearInterval(clock);
+        btn.disabled = false;
+        spinner.classList.add('hidden');
+        progress.classList.add('hidden');
+        label.textContent = 'Run Network Probe';
+        bar.style.width = '33%';
+
+        if (simulateTimeout) {
+          badge.textContent = 'Timed out';
+          ['net-ping', 'net-jitter', 'net-loaded', 'net-bloat'].forEach(id => document.getElementById(id).textContent = 'n/a');
+          showToast('Network probe timed out');
+          return;
+        }
+
+        badge.textContent = 'Completed';
+        const ping = 18 + Math.floor(Math.random() * 9);
+        const jitter = (1.4 + Math.random() * 1.8).toFixed(1);
+        const loaded = ping + (appState.selectedGame.bbr ? 6 : 24);
+        const grade = appState.selectedGame.bbr ? 'Grade A' : 'Grade B';
+        document.getElementById('net-ping').textContent = `${ping} ms`;
+        document.getElementById('net-jitter').textContent = `${jitter} ms`;
+        document.getElementById('net-loaded').textContent = `${loaded} ms`;
+        document.getElementById('net-bloat').textContent = grade;
+        showToast('Single-target network probe completed');
+      }, simulateTimeout ? 1800 : 1100);
+    }
+
+    // =========================================================================
+    // 6. OVERLAY HUD DRAG + EDGE SNAP & IN-GAME SIDEPANEL
+    // =========================================================================
+    function setHudType(type) {
+      appState.hudType = type;
+      ['compact', 'detail', 'full'].forEach(t => {
+        const el = document.getElementById(`hud-mode-${t}`);
+        el.classList.toggle('hidden', t !== type);
+        if (t === type) el.classList.add('flex');
+      });
+
+      document.querySelectorAll('.hud-type-btn').forEach(btn => {
+        const active = btn.dataset.ht === type;
+        btn.className = active
+          ? 'hud-type-btn min-h-[40px] rounded-lg text-[10px] font-bold accent-btn'
+          : 'hud-type-btn min-h-[40px] rounded-lg text-[10px] font-semibold text-[var(--text-secondary)]';
+      });
+    }
+
+    function toggleHudVisibility() {
+      appState.hudVisible = !appState.hudVisible;
+      document.getElementById('floating-hud-pill').classList.toggle('opacity-25', !appState.hudVisible);
+      document.getElementById('sp-fps-toggle-state').textContent = appState.hudVisible ? 'ON' : 'DIMMED';
+    }
+
+    function toggleInGameSidepanel(open) {
+      appState.sidepanelOpen = open;
+      const panel = document.getElementById('ingame-sidepanel');
+      if (open) {
+        panel.classList.remove('translate-x-[112%]');
+        panel.classList.add('translate-x-0');
+      } else {
+        panel.classList.remove('translate-x-0');
+        panel.classList.add('translate-x-[112%]');
+      }
+    }
+
+    (function initHudDragAndSnap() {
+      const hud = document.getElementById('floating-hud-pill');
+      const arena = document.getElementById('overlay-arena');
+      let isDragging = false;
+      let moved = false;
+      let startX = 0, startY = 0, origX = 0, origY = 0;
+
+      hud.addEventListener('pointerdown', (e) => {
+        isDragging = true;
+        moved = false;
+        hud.style.transition = 'none';
+        startX = e.clientX;
+        startY = e.clientY;
+        origX = hud.offsetLeft;
+        origY = hud.offsetTop;
+        hud.setPointerCapture(e.pointerId);
+      });
+
+      hud.addEventListener('pointermove', (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true;
+
+        const maxX = arena.clientWidth - hud.offsetWidth - 10;
+        const maxY = arena.clientHeight - hud.offsetHeight - 10;
+        const nextX = Math.max(10, Math.min(maxX, origX + dx));
+        const nextY = Math.max(10, Math.min(maxY, origY + dy));
+
+        hud.style.left = `${nextX}px`;
+        hud.style.top = `${nextY}px`;
+      });
+
+      hud.addEventListener('pointerup', () => {
+        if (!isDragging) return;
+        isDragging = false;
+        hud.style.transition = 'left 0.25s cubic-bezier(0.2, 0, 0, 1), top 0.25s cubic-bezier(0.2, 0, 0, 1)';
+
+        if (!moved) {
+          toggleInGameSidepanel(!appState.sidepanelOpen);
+          return;
+        }
+
+        // Edge snap to nearest horizontal edge & persist to localStorage (simulating SharedPreferences hud_prefs)
+        const midX = hud.offsetLeft + hud.offsetWidth / 2;
+        const snapLeft = midX < arena.clientWidth / 2 ? 12 : arena.clientWidth - hud.offsetWidth - 12;
+        hud.style.left = `${Math.max(12, snapLeft)}px`;
+        try {
+          localStorage.setItem('hud_prefs', JSON.stringify({ x: snapLeft, y: hud.offsetTop }));
+        } catch (_) {}
+      });
+    })();
+
+    function showSafetyRules() {
+      showToast('Safety: no fake telemetry, no permanent changes, restore on exit, emergency restore at ≥90°C');
+    }
+
+    // =========================================================================
+    // 7. BOTTOM NAVIGATION & TOAST
+    // =========================================================================
+    function switchScreen(screenName) {
+      appState.activeScreen = screenName;
+      ['home', 'games', 'network', 'safety', 'overlay'].forEach(s => {
+        document.getElementById(`screen-${s}`).classList.toggle('hidden', s !== screenName);
+      });
+
+      document.querySelectorAll('.nav-tab').forEach(btn => {
+        const active = btn.dataset.screen === screenName;
+        const pill = btn.querySelector('.nav-indicator');
+        const label = btn.querySelector('span:last-child');
+        if (active) {
+          btn.classList.remove('text-[var(--text-muted)]');
+          pill.className = 'nav-indicator px-3 py-1 rounded-full accent-pill';
+          label.className = 'text-[10px] font-semibold';
+        } else {
+          btn.classList.add('text-[var(--text-muted)]');
+          pill.className = 'nav-indicator px-3 py-1 rounded-full';
+          label.className = 'text-[10px] font-medium';
+        }
+      });
+    }
+
+    let toastTimer;
+    function showToast(msg) {
+      const toast = document.getElementById('toast-pill');
+      toast.textContent = msg;
+      toast.classList.remove('opacity-0', 'translate-y-2');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+      }, 2200);
+    }
+
+    // Initialize UI
+    window.addEventListener('DOMContentLoaded', () => {
+      renderGameLibrary();
+      setSystemState('offline');
+    });
+  </script>
+</body>
+</html>

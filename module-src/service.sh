@@ -10,11 +10,11 @@ done
 DAEMON="$MODDIR/system/bin/frameboostd"
 chmod 755 "$DAEMON"
 
-# Watchdog loop
+# Single-instance watchdog. Do not start duplicate daemons from repeated module hooks.
 while true; do
     if ! pidof frameboostd >/dev/null 2>&1; then
         rm -f /data/local/tmp/frameboost.sock
         "$DAEMON" >/data/local/tmp/frameboostd.log 2>&1 &
     fi
-    sleep 5
+    sleep 10
 done

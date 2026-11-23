@@ -1,7 +1,7 @@
 SKIPUNZIP=0
 
 ui_print "****************************************"
-ui_print "*    FrameBoost A50 - Game Space v2.2  *"
+ui_print "*    FrameBoost A50 - Game Space v2.3  *"
 ui_print "* Native Rust Daemon + Game Space APK  *"
 ui_print "****************************************"
 
@@ -21,8 +21,8 @@ if [ -f "$MODPATH/FrameBoost-GameSpace.apk" ]; then
     appops set com.a50.frameboost.hud SYSTEM_ALERT_WINDOW allow >/dev/null 2>&1
 fi
 
-ui_print "- Daemon: Native Rust ARM64 (437KB)"
-ui_print "- App: FrameBoost Game Space Launcher (46KB)"
+ui_print "- Daemon: Native Rust ARM64"
+ui_print "- App: FrameBoost Game Space Launcher"
 ui_print "- Overlay: Real-time In-Game Floating HUD"
 ui_print "- Engine: BBR Ping Booster + Real Framestats"
 ui_print "- Selesai! Buka aplikasi FrameBoost di launcher Anda"

@@ -2,45 +2,9 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>FrameBoost Console</title>
-  <link rel="stylesheet" href="style.css?v=2.0.5">
-  <style>
-    /* Insets & Docked Layout overrides (bypass all external CSS caching) */
-    .hud-header {
-      padding-top: calc(var(--inset-top, 38px) + 8px) !important;
-    }
-    
-    .hud-nav {
-      position: fixed !important;
-      bottom: 0 !important;
-      left: 0 !important;
-      right: 0 !important;
-      transform: none !important;
-      width: 100% !important;
-      max-width: 100% !important;
-      border-radius: 0 !important;
-      border-left: none !important;
-      border-right: none !important;
-      border-bottom: none !important;
-      border-top: 1px solid rgba(255, 255, 255, 0.12) !important;
-      background: #0d0f17 !important;
-      padding: 6px 12px calc(var(--inset-bottom, 48px) + 8px) 12px !important;
-      box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.7) !important;
-      z-index: 100 !important;
-    }
-
-    .nav-tab {
-      min-height: 44px !important;
-      min-width: 58px !important;
-      border-radius: 12px !important;
-      padding: 6px 12px !important;
-    }
-
-    .hud-main {
-      padding-bottom: calc(var(--inset-bottom, 48px) + 88px) !important;
-    }
-  </style>
+  <link rel="stylesheet" href="style.css?v=2.4.0">
 </head>
 <body>
   <div class="app-container">
@@ -58,6 +22,14 @@
         <span class="state-label" id="state-label">IDLE</span>
       </div>
     </header>
+
+    <div id="preview-banner" class="preview-banner hidden" role="status">PREVIEW DATA — NOT REAL TELEMETRY</div>
+    <div id="operation-status" class="operation-status hidden" role="status" aria-live="polite">
+      <span class="operation-spinner" aria-hidden="true"></span>
+      <div class="operation-copy"><strong>Working</strong><span>Preparing test…</span></div>
+      <span class="operation-time">0s</span>
+      <div class="operation-progress" aria-hidden="true"><i></i></div>
+    </div>
 
     <!-- Tab Panels Container -->
     <main class="hud-main">
@@ -130,6 +102,36 @@
           </div>
         </div>
 
+        <!-- Battery Telemetry Card -->
+        <div class="battery-card">
+          <div class="battery-header">
+            <div class="battery-title">BATTERY TELEMETRY</div>
+            <div class="battery-status-badge" id="batt-status-badge">Discharging</div>
+          </div>
+          <div class="battery-grid">
+            <div class="battery-col">
+              <span class="battery-meta-label">CAPACITY</span>
+              <div class="battery-meta-val"><strong id="batt-capacity">--%</strong></div>
+            </div>
+            <div class="battery-col">
+              <span class="battery-meta-label">CURRENT</span>
+              <div class="battery-meta-val" id="batt-current">-- mA</div>
+            </div>
+            <div class="battery-col">
+              <span class="battery-meta-label">VOLTAGE</span>
+              <div class="battery-meta-val" id="batt-voltage">-- V</div>
+            </div>
+            <div class="battery-col">
+              <span class="battery-meta-label">TEMP</span>
+              <div class="battery-meta-val" id="batt-temp">--°C</div>
+            </div>
+            <div class="battery-col">
+              <span class="battery-meta-label">POWER</span>
+              <div class="battery-meta-val highlight" id="batt-power">-- W</div>
+            </div>
+          </div>
+        </div>
+
         <!-- Quick Boost Action -->
         <div class="action-card">
           <div class="action-info">
@@ -151,8 +153,8 @@
         <div class="games-toolbar">
           <input type="text" id="game-search-input" class="hud-search-input" placeholder="Search game or package...">
           <div class="games-actions-row">
-            <button id="btn-scan-games" class="btn btn-secondary" style="flex:1;">
-              <span>⟳</span> Scan Device
+            <button id="btn-scan-games" class="btn btn-secondary" style="flex:1;" title="Refresh installed games">
+              <span>⟳</span> Refresh installed games
             </button>
             <button id="btn-toggle-add-drawer" class="btn btn-primary" style="flex:1;">
               <span>+</span> Add Custom
@@ -184,57 +186,183 @@
       <!-- 3. NETWORK TAB -->
       <section class="tab-panel" id="tab-network">
         <div class="section-header">
-          <h2>Ping Booster</h2>
-          <span class="sub-hint">BBR TCP low-latency engine</span>
+          <h2>Network Command Center</h2>
+          <span class="sub-hint">Multi-Target Ping • Jitter • Bufferbloat • BBR</span>
         </div>
 
+        <!-- Target Switcher Chips -->
+        <div class="target-chips-row">
+          <button class="target-chip active" id="chip-gw" data-target="gw">
+            <span class="chip-dot"></span>
+            <span class="chip-name">GATEWAY</span>
+            <span class="chip-val" id="chip-gw-val">--</span>
+          </button>
+          <button class="target-chip" id="chip-cf" data-target="1.1.1.1">
+            <span class="chip-dot"></span>
+            <span class="chip-name">CLOUDFLARE</span>
+            <span class="chip-val" id="chip-cf-val">--</span>
+          </button>
+          <button class="target-chip" id="chip-gg" data-target="8.8.8.8">
+            <span class="chip-dot"></span>
+            <span class="chip-name">GOOGLE</span>
+            <span class="chip-val" id="chip-gg-val">--</span>
+          </button>
+          <button class="target-chip" id="chip-custom" data-target="custom">
+            <span class="chip-dot"></span>
+            <span class="chip-name">CUSTOM</span>
+            <span class="chip-val" id="chip-custom-val">--</span>
+          </button>
+        </div>
+
+        <!-- Custom Host Input Drawer (expandable) -->
+        <div class="custom-target-box hidden" id="custom-target-box">
+          <input type="text" id="custom-target-input" class="custom-host-input" placeholder="e.g. 1.0.0.1 or sg.game.server.com" />
+          <button class="hud-btn primary" id="btn-set-custom-target">Probe</button>
+        </div>
+
+        <!-- Multi-Target Ping: all targets at once -->
+        <div class="multi-ping-card">
+          <div class="section-sub-header">
+            <div>
+              <span class="bufferbloat-title">MULTI-TARGET PING</span>
+              <div class="bufferbloat-desc">Gateway, Cloudflare, Google, dan custom sekaligus</div>
+            </div>
+            <button class="hud-btn outline" id="btn-multi-ping">Test All</button>
+          </div>
+          <div class="multi-ping-list" id="multi-ping-list">
+            <button class="multi-ping-row active" data-target="gateway">
+              <span class="mp-name">GATEWAY</span>
+              <span class="mp-host" id="mp-gw-host">--</span>
+              <span class="mp-val" id="mp-gw-val">--</span>
+              <span class="mp-sub" id="mp-gw-sub">--</span>
+            </button>
+            <button class="multi-ping-row" data-target="1.1.1.1">
+              <span class="mp-name">CLOUDFLARE</span>
+              <span class="mp-host" id="mp-cf-host">1.1.1.1</span>
+              <span class="mp-val" id="mp-cf-val">--</span>
+              <span class="mp-sub" id="mp-cf-sub">--</span>
+            </button>
+            <button class="multi-ping-row" data-target="8.8.8.8">
+              <span class="mp-name">GOOGLE</span>
+              <span class="mp-host" id="mp-gg-host">8.8.8.8</span>
+              <span class="mp-val" id="mp-gg-val">--</span>
+              <span class="mp-sub" id="mp-gg-sub">--</span>
+            </button>
+            <button class="multi-ping-row" data-target="custom">
+              <span class="mp-name">CUSTOM</span>
+              <span class="mp-host" id="mp-custom-host">not set</span>
+              <span class="mp-val" id="mp-custom-val">--</span>
+              <span class="mp-sub" id="mp-custom-sub">--</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Main Real-Time Telemetry Display -->
         <div class="net-stat-card">
           <div class="net-header-row">
             <div>
-              <span class="meta-label">INTERFACE</span>
-              <div class="meta-val" id="net-iface">wlan0</div>
+              <span class="meta-label">TARGET / IFACE</span>
+              <div class="meta-val"><span id="net-target-display">1.1.1.1</span> • <span id="net-iface">wlan0</span></div>
             </div>
             <div class="align-right">
-              <span class="meta-label">GATEWAY</span>
-              <div class="meta-val" id="net-gw">192.168.1.1</div>
+              <span class="meta-label">STATUS</span>
+              <div class="meta-val"><span class="badge active" id="net-health-badge">STABLE</span></div>
             </div>
           </div>
 
+          <!-- Hero Ping Gauge & Canvas Graph -->
           <div class="net-ping-display">
-            <div class="ping-circle">
+            <div class="ping-circle" id="ping-circle-el">
               <span class="ping-num" id="net-ping-val">--</span>
-              <span class="ping-unit">ms</span>
+              <span class="ping-unit">ms RTT</span>
             </div>
-            <div class="ping-meta">
-              <div>Jitter: <strong id="net-jitter">-- ms</strong></div>
-              <div>Loss: <strong id="net-loss">0%</strong></div>
-              <div>Engine: <strong id="net-cc-badge">westwood</strong></div>
+            <div class="ping-graph-wrapper">
+              <div class="canvas-header">
+                <span class="meta-label">PING TIMELINE</span>
+                <span class="meta-label" id="net-live-jitter">Jitter: -- ms</span>
+              </div>
+              <canvas id="net-ping-canvas" class="net-ping-canvas" height="60"></canvas>
+            </div>
+          </div>
+
+          <!-- 8-Metric Statistical Grid -->
+          <div class="net-metrics-grid">
+            <div class="net-metric-item">
+              <span class="metric-label">MIN</span>
+              <strong class="metric-val" id="stat-min">-- ms</strong>
+            </div>
+            <div class="net-metric-item">
+              <span class="metric-label">AVG</span>
+              <strong class="metric-val" id="stat-avg">-- ms</strong>
+            </div>
+            <div class="net-metric-item">
+              <span class="metric-label">MAX</span>
+              <strong class="metric-val" id="stat-max">-- ms</strong>
+            </div>
+            <div class="net-metric-item">
+              <span class="metric-label">JITTER</span>
+              <strong class="metric-val highlight" id="stat-jitter">-- ms</strong>
+            </div>
+            <div class="net-metric-item">
+              <span class="metric-label">P50 (MED)</span>
+              <strong class="metric-val" id="stat-p50">-- ms</strong>
+            </div>
+            <div class="net-metric-item">
+              <span class="metric-label">P95</span>
+              <strong class="metric-val" id="stat-p95">-- ms</strong>
+            </div>
+            <div class="net-metric-item">
+              <span class="metric-label">P99</span>
+              <strong class="metric-val" id="stat-p99">-- ms</strong>
+            </div>
+            <div class="net-metric-item">
+              <span class="metric-label">LOSS</span>
+              <strong class="metric-val" id="stat-loss">0%</strong>
             </div>
           </div>
         </div>
 
+        <!-- Controls -->
         <div class="net-controls">
           <div class="btn-group">
             <button class="hud-btn secondary" id="btn-net-stock">Stock (Westwood)</button>
             <button class="hud-btn primary" id="btn-net-bbr">Enable BBR</button>
           </div>
-          <button class="hud-btn outline full-w" id="btn-net-benchmark">Run 5-packet A/B Test</button>
-        </div>
-
-        <div class="benchmark-result hidden" id="bench-box">
-          <div class="bench-title">A/B BENCHMARK RESULT</div>
-          <div class="bench-grid">
-            <div class="bench-col">
-              <span class="bench-label">Stock Westwood</span>
-              <div class="bench-val" id="bench-stock-val">-- ms</div>
-            </div>
-            <div class="bench-vs">VS</div>
-            <div class="bench-col">
-              <span class="bench-label">BBR Engine</span>
-              <div class="bench-val highlight" id="bench-bbr-val">-- ms</div>
-            </div>
+          <div class="btn-group">
+            <button class="hud-btn outline full-w" id="btn-quick-ping">Quick Probe (3 pkts)</button>
           </div>
         </div>
+
+        <!-- Bufferbloat Diagnostic Card -->
+        <div class="bufferbloat-card">
+          <div class="section-sub-header">
+            <div>
+              <span class="bufferbloat-title">BUFFERBLOAT DIAGNOSTIC</span>
+              <div class="bufferbloat-desc">Uji latency saat beban jaringan (unloaded vs loaded)</div>
+            </div>
+            <span class="badge" id="bufferbloat-badge">READY</span>
+          </div>
+          <div class="bufferbloat-grid">
+            <div class="bb-col">
+              <span class="bb-label">Unloaded</span>
+              <div class="bb-val" id="bb-unloaded-val">-- ms</div>
+            </div>
+            <div class="bb-col">
+              <span class="bb-label">Loaded</span>
+              <div class="bb-val" id="bb-loaded-val">-- ms</div>
+            </div>
+            <div class="bb-col">
+              <span class="bb-label">Delta (Lag)</span>
+              <div class="bb-val highlight" id="bb-delta-val">-- ms</div>
+            </div>
+            <div class="bb-col">
+              <span class="bb-label">Grade</span>
+              <div class="bb-val grade" id="bb-grade-val">--</div>
+            </div>
+          </div>
+          <button class="hud-btn secondary full-w" id="btn-run-bufferbloat" style="margin-top: 10px;">Run Bufferbloat Test</button>
+        </div>
+
       </section>
 
       <!-- 4. SETTINGS TAB -->
@@ -272,6 +400,18 @@
 
         <div class="restore-card">
           <div class="restore-info">
+            <div class="restore-title">Samsung GOS (Game Optimizing Service)</div>
+            <div class="restore-desc">Nonaktifkan GOS agar tidak membatasi FPS. Restore untuk kembalikan.</div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="hud-btn danger" id="btn-gos-disable" style="flex:1;">DISABLE GOS</button>
+            <button class="hud-btn" id="btn-gos-restore" style="flex:1;">RESTORE GOS</button>
+          </div>
+          <div id="gos-status" style="margin-top:6px; font-family:var(--font-mono); font-size:11px; color:var(--text-sub);">Status: --</div>
+        </div>
+
+        <div class="restore-card">
+          <div class="restore-info">
             <div class="restore-title">Emergency Stock Restore</div>
             <div class="restore-desc">Kembalikan seluruh parameter GPU, CPU, dan Network ke kondisi pabrik</div>
           </div>
@@ -279,34 +419,147 @@
         </div>
 
         <div class="daemon-meta-card">
-          <div>Daemon: <strong>frameboostd v2.0.0</strong></div>
+          <div>Daemon: <strong>frameboostd v2.0.0 (Native Rust)</strong> <span id="daemon-status">CHECKING</span></div>
           <div>Uptime: <span id="daemon-uptime">0s</span></div>
           <div>Stock Snapshot: <span id="snapshot-status">SAVED</span></div>
+        </div>
+
+        <!-- Attributions & Open Source Credits -->
+        <div class="attribution-card">
+          <div class="setting-title" style="color: var(--accent-cyan); margin-bottom: 4px;">Open Source & Community Credits</div>
+          <div class="setting-desc" style="margin-bottom: 12px;">
+            FrameBoost mengadaptasi pola arsitektur low-overhead dari komunitas terbukti:
+          </div>
+          <div class="credit-list">
+            <div class="credit-item">
+              <span class="credit-badge">GPL-3.0 • China</span>
+              <strong>shadow3aaa/fas-rs</strong>
+              <div class="credit-desc">Konsep Frame-Aware Scheduling, native Rust daemon, dan non-blocking SurfaceFlinger frame timing.</div>
+            </div>
+            <div class="credit-item">
+              <span class="credit-badge">CoolApk • China</span>
+              <strong>Scene 6 / 7 (YuKongA)</strong>
+              <div class="credit-desc">Inspirasi layout telemetry kompak, multi-profil game, dan pemantauan status hardware Exynos.</div>
+            </div>
+            <div class="credit-item">
+              <span class="credit-badge">Apache-2.0</span>
+              <strong>revws/ror</strong>
+              <div class="credit-desc">Arsitektur floating WindowManager bubble & retractable drawer, single-window lifecycle, dan touch feedback.</div>
+            </div>
+            <div class="credit-item">
+              <span class="credit-badge">MIT</span>
+              <strong>MaheshSharan/FrameX-Android</strong>
+              <div class="credit-desc">Desain safety snapshot, auto-restore stock saat keluar game, dan deteksi kapabilitas perangkat.</div>
+            </div>
+            <div class="credit-item">
+              <span class="credit-badge">MIT</span>
+              <strong>rdevz-ph/FPS-Meter-Android</strong>
+              <div class="credit-desc">Desain telemetry pill compact MSI Afterburner / Samsung Perf Z dan draggable snap edge.</div>
+            </div>
+            <div class="credit-item">
+              <span class="credit-badge">Apache-2.0</span>
+              <strong>Liliya2727/AZenith</strong>
+              <div class="credit-desc">Pola Game Space landscape, sidepanel in-game, quick preset, thermal safety state, network/battery status.</div>
+            </div>
+            <div class="credit-item">
+              <span class="credit-badge">Apache-2.0</span>
+              <strong>AxionAOSP / DerpFest GameSpace</strong>
+              <div class="credit-desc">Pola AOSP GameSpace, game library, per-game profile, launch hygiene, dan safety settings.</div>
+            </div>
+            <div class="credit-item">
+              <span class="credit-badge">AGPL / MIT</span>
+              <strong>yuroyami/PINGY & cloudflare/bbperf</strong>
+              <div class="credit-desc">Pengukuran jitter RFC 3550, statistical percentiles (P50/P95/P99), dan bufferbloat delta grading.</div>
+            </div>
+            <div class="credit-item">
+              <span class="credit-badge">Apache-2.0</span>
+              <strong>kanaodnd/Stellar-Tweaks</strong>
+              <div class="credit-desc">Arsitektur daemon modular, deteksi game event-driven TaskStackListener, state cache, toast native via Binder.</div>
+            </div>
+            <div class="credit-item">
+              <span class="credit-badge">GPL-3.0</span>
+              <strong>Aibeto/ChiRiScene</strong>
+              <div class="credit-desc">Konsep FAS (frame-aware scheduling) dan CLG load governor via eBPF (referensi, tidak diadopsi di kernel 4.14).</div>
+            </div>
+            <div class="credit-item">
+              <span class="credit-badge">GPL-3.0</span>
+              <strong>imacte/yumi</strong>
+              <div class="credit-desc">Arsitektur dual-thread monitor+scheduler dan probe eBPF sched_switch/queueBuffer (referensi konsep).</div>
+            </div>
+            <div class="credit-item">
+              <span class="credit-badge">MIT</span>
+              <strong>Dreamucxe/GameCore</strong>
+              <div class="credit-desc">Filosofi "readings not theatre", edge-snap, thermal dot, quick sheet, per-game profile fields, n/a convention.</div>
+            </div>
+            <div class="credit-item">
+              <span class="credit-badge">Community</span>
+              <strong>Muimex11</strong>
+              <div class="credit-desc">Panel Samsung: GOS disable/restore, RAM Plus off, Max Boost, thermal override.</div>
+            </div>
+            <div class="credit-item">
+              <span class="credit-badge">MIT</span>
+              <strong>hotsuper901/dlss5android (MSJ GFX)</strong>
+              <div class="credit-desc">Detection honesty (UNKNOWN_NO_PERMISSION), thread safety, per-game presets Battery/Balanced/Competitive.</div>
+            </div>
+            <div class="credit-item">
+              <span class="credit-badge">GPL-2.0</span>
+              <strong>FreshROMs/exynos9610_mint</strong>
+              <div class="credit-desc">Referensi kernel Exynos 9610 & path sysfs hardware A50.</div>
+            </div>
+            <div class="credit-item">
+              <span class="credit-badge">GPL-3.0</span>
+              <strong>NetizenNemo/Aether_OptExt & cinitdev/AppOpt</strong>
+              <div class="credit-desc">Rust thread affinity, eBPF sched_process_exec tracepoint, CPU core binding (referensi konsep).</div>
+            </div>
+          </div>
         </div>
       </section>
     </main>
 
-    <!-- Bottom Navigation Bar (Pill HUD Style) -->
+    <!-- Bottom Navigation Bar (Material You pill indicator) -->
     <nav class="hud-nav">
       <button class="nav-tab active" data-tab="tab-home">
-        <span class="nav-icon">⬢</span>
+        <span class="nav-indicator">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 11.2 12 4l8 7.2V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z"/>
+          </svg>
+        </span>
         <span class="nav-label">HOME</span>
       </button>
       <button class="nav-tab" data-tab="tab-games">
-        <span class="nav-icon">◈</span>
+        <span class="nav-indicator">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="4" y="4" width="6.5" height="6.5" rx="2"/>
+            <rect x="13.5" y="4" width="6.5" height="6.5" rx="2"/>
+            <rect x="4" y="13.5" width="6.5" height="6.5" rx="2"/>
+            <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="2"/>
+          </svg>
+        </span>
         <span class="nav-label">GAMES</span>
       </button>
       <button class="nav-tab" data-tab="tab-network">
-        <span class="nav-icon">▲</span>
+        <span class="nav-indicator">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M8.1 16.4a5.5 5.5 0 0 1 7.8 0"/>
+            <path d="M12 20h.01"/>
+            <path d="M4.9 12.9a10 10 0 0 1 14.2 0"/>
+            <path d="M1.4 9.4a15.2 15.2 0 0 1 21.2 0"/>
+          </svg>
+        </span>
         <span class="nav-label">PING</span>
       </button>
       <button class="nav-tab" data-tab="tab-settings">
-        <span class="nav-icon">⚙</span>
+        <span class="nav-indicator">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3l7 3v6c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z"/>
+            <path d="M9 12l2 2 4-4"/>
+          </svg>
+        </span>
         <span class="nav-label">SAFETY</span>
       </button>
     </nav>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=2.4.0"></script>
 </body>
 </html>

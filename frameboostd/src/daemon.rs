@@ -189,12 +189,13 @@ impl AutoDaemon {
                     // 3. Anti-redup: lock brightness to manual mode (prevent palm from covering ambient light sensor)
                     let _ = run_cmd("settings", &["put", "system", "screen_brightness_mode", "0"]);
 
-                    // 4. Game Launch Hygiene: drop pagecache & renice process
-                    let _ = fs::write("/proc/sys/vm/drop_caches", "3");
+                    // ponytail: never drop_caches on game launch; causes eMMC I/O stalls and startup freeze
+                    // 4. Renice game process(es) safely without blocking
                     let pid_out = run_cmd("pidof", &[&self.current_game]);
-                    let pid = pid_out.trim();
-                    if !pid.is_empty() {
-                        let _ = run_cmd("renice", &["-n", "-10", "-p", pid]);
+                    for p in pid_out.split_whitespace() {
+                        if !p.is_empty() {
+                            let _ = run_cmd("renice", &["-n", "-10", "-p", p]);
+                        }
                     }
 
                     // 5. Auto-BBR for online titles
@@ -225,6 +226,7 @@ impl AutoDaemon {
 pub fn spawn_auto_daemon(
     running: Arc<AtomicBool>,
     state_sink: Arc<AtomicU8>,
+    game_sink: Arc<RwLock<String>>,
     detector: Arc<RwLock<GameDetector>>,
 ) -> thread::JoinHandle<()> {
     thread::spawn(move || {
@@ -232,6 +234,7 @@ pub fn spawn_auto_daemon(
         while running.load(Ordering::Relaxed) {
             let st = daemon.tick();
             state_sink.store(st as u8, Ordering::Relaxed);
+            *game_sink.write().unwrap() = daemon.current_game.clone();
             thread::sleep(Duration::from_millis(POLL_MS));
         }
         // Restore stock when daemon shuts down

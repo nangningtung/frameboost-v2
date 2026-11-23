@@ -6,13 +6,20 @@ import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
 import android.webkit.JavascriptInterface;
+import android.webkit.WebView;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.drawable.Drawable;
+import android.util.Base64;
+import java.io.ByteArrayOutputStream;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.InputStreamReader;
 
 public class WebAppInterface {
-    private Context context;
+    private final Context context;
+    private final android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
 
     public WebAppInterface(Context context) {
         this.context = context;
@@ -22,8 +29,8 @@ public class WebAppInterface {
     public String exec(String cmd) {
         if (cmd == null || cmd.isEmpty()) return "";
 
-        // Fast path 1: Reading snapshot JSON directly from memory without spawning shell
-        if (cmd.contains("cat /data/local/tmp/frameboost-snapshot.json")) {
+        // Fast path 1: Reading snapshot JSON
+        if (cmd.contains("frameboost-snapshot.json")) {
             File f = new File("/data/local/tmp/frameboost-snapshot.json");
             if (f.exists() && f.canRead()) {
                 try (BufferedReader br = new BufferedReader(new FileReader(f))) {
@@ -33,34 +40,17 @@ public class WebAppInterface {
                     return sb.toString();
                 } catch (Exception ignored) {}
             }
+            String snap = IpcClient.sendCommand("snapshot");
+            return snap != null ? snap : "";
         }
 
-        // Fast path 2: Socket command sent directly via LocalSocket without spawning nc
-        if (cmd.contains("nc -U /data/local/tmp/frameboost.sock")) {
-            int p1 = cmd.indexOf("\"");
-            int p2 = cmd.lastIndexOf("\\n\"");
-            if (p1 != -1 && p2 > p1) {
-                String sockCmd = cmd.substring(p1 + 1, p2);
-                String res = IpcClient.sendCommand(sockCmd);
-                if (res != null) return res;
-            }
+        // Fast path 2: Socket command
+        if (cmd.contains("frameboost.sock")) {
+            String snap = IpcClient.sendCommand("snapshot");
+            return snap != null ? snap : "";
         }
 
-        // Fallback: execute via su
-        try {
-            Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", cmd});
-            BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                if (sb.length() > 0) sb.append("\n");
-                sb.append(line);
-            }
-            p.waitFor();
-            return sb.toString();
-        } catch (Exception e) {
-            return "";
-        }
+        return "";
     }
 
     @JavascriptInterface
@@ -68,6 +58,21 @@ public class WebAppInterface {
         if (sockCmd == null || sockCmd.isEmpty()) return "";
         String res = IpcClient.sendCommand(sockCmd);
         return res != null ? res : "";
+    }
+
+    @JavascriptInterface
+    public void sendSocketAsync(String sockCmd, String callbackName) {
+        if (sockCmd == null || sockCmd.isEmpty() || callbackName == null || callbackName.isEmpty()) return;
+        new Thread(() -> {
+            String res = IpcClient.sendCommand(sockCmd);
+            String json = org.json.JSONObject.quote(res != null ? res : "");
+            mainHandler.post(() -> {
+                if (context instanceof android.app.Activity) {
+                    android.webkit.WebView webView = ((android.app.Activity) context).findViewById(R.id.webview);
+                    if (webView != null) webView.evaluateJavascript(callbackName + "(" + json + ");", null);
+                }
+            });
+        }, "frameboost-ipc").start();
     }
 
     @JavascriptInterface
@@ -82,6 +87,23 @@ public class WebAppInterface {
                 }
             }
         } catch (Exception ignored) {}
+    }
+
+    @JavascriptInterface
+    public String getAppIcon(String pkg) {
+        if (pkg == null || pkg.isEmpty()) return "";
+        try {
+            Drawable drawable = context.getPackageManager().getApplicationIcon(pkg);
+            int size = 96;
+            Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+            drawable.setBounds(0, 0, size, size);
+            drawable.draw(new Canvas(bitmap));
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
+            return "data:image/png;base64," + Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP);
+        } catch (Exception ignored) {
+            return "";
+        }
     }
 
     @JavascriptInterface

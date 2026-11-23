@@ -6,6 +6,7 @@ import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.WebChromeClient;
@@ -21,12 +22,13 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Cyberpunk dark system bars
+        // Stock GSI light system bars
         Window window = getWindow();
         window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-        window.setStatusBarColor(Color.parseColor("#08090d"));
-        window.setNavigationBarColor(Color.parseColor("#0d0f17"));
+        window.setStatusBarColor(Color.parseColor("#101114"));
+        window.setNavigationBarColor(Color.parseColor("#101114"));
+        window.getDecorView().setSystemUiVisibility(0);
 
         setContentView(R.layout.activity_main);
 
@@ -42,8 +44,15 @@ public class MainActivity extends Activity {
         settings.setDisplayZoomControls(false);
         settings.setSupportZoom(false);
 
-        webView.setBackgroundColor(Color.parseColor("#08090d"));
-        webView.setWebChromeClient(new WebChromeClient());
+        webView.setBackgroundColor(Color.parseColor("#101114"));
+        WebView.setWebContentsDebuggingEnabled(true);
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onConsoleMessage(android.webkit.ConsoleMessage cm) {
+                android.util.Log.d("WebConsole", cm.message() + " (" + cm.sourceId() + ":" + cm.lineNumber() + ")");
+                return true;
+            }
+        });
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {

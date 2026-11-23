@@ -33,19 +33,14 @@
   const tempGpu = document.getElementById("temp-gpu");
   const daemonUptime = document.getElementById("daemon-uptime");
   const snapshotStatus = document.getElementById("snapshot-status");
+  const daemonStatus = document.getElementById("daemon-status");
   const frametimeCanvas = document.getElementById("frametime-canvas");
   const fpsLiveLabel = document.getElementById("fps-live-label");
 
   // Elements: Network
   const netIface = document.getElementById("net-iface");
   const netGw = document.getElementById("net-gw");
-  const netPingVal = document.getElementById("net-ping-val");
-  const netJitter = document.getElementById("net-jitter");
-  const netLoss = document.getElementById("net-loss");
-  const netCcBadge = document.getElementById("net-cc-badge");
-  const benchBox = document.getElementById("bench-results");
-  const benchStockVal = document.getElementById("bench-stock-val");
-  const benchBbrVal = document.getElementById("bench-bbr-val");
+  const netCcBadge = document.getElementById("net-cc-badge") || document.getElementById("net-health-badge");
 
   // Elements: Game Library
   const gamesContainer = document.getElementById("games-container");
@@ -57,6 +52,12 @@
   const customPkgInput = document.getElementById("custom-pkg-input");
   const btnSubmitAddGame = document.getElementById("btn-submit-add-game");
   const btnCancelAddGame = document.getElementById("btn-cancel-add-game");
+
+  // Local development preview only. It never runs in the APK/production WebUI.
+  const previewAllowed = location.hostname === "localhost" || location.hostname === "127.0.0.1";
+  const previewParams = new URLSearchParams(location.search);
+  const previewMode = previewAllowed && previewParams.has("preview");
+  const previewState = (previewParams.get("state") || "").toUpperCase();
 
   // State
   let allGames = [];
@@ -132,8 +133,8 @@
     ctx.lineTo(startX, h);
     ctx.closePath();
     const grad = ctx.createLinearGradient(0, 0, 0, h);
-    grad.addColorStop(0, "rgba(0, 240, 255, 0.25)");
-    grad.addColorStop(1, "rgba(0, 240, 255, 0.0)");
+    grad.addColorStop(0, "rgba(208, 188, 255, 0.25)");
+    grad.addColorStop(1, "rgba(208, 188, 255, 0.0)");
     ctx.fillStyle = grad;
     ctx.fill();
 
@@ -146,7 +147,7 @@
       if (idx === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     });
-    ctx.strokeStyle = "#00f0ff";
+    ctx.strokeStyle = "#d0bcff";
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
@@ -168,6 +169,10 @@
         target.classList.add("active");
         if (tab.dataset.tab === "tab-games") {
           loadGames();
+        }
+        if (tab.dataset.tab === "tab-network" && !multiPingDone) {
+          multiPingDone = true;
+          runMultiPing();
         }
       }
     });
@@ -194,19 +199,34 @@
     return null;
   }
 
-  async function sendSocketCmd(cmd) {
+  let ipcSeq = 0;
+  function sendSocketCmd(cmd) {
+    if (window._nativeBridge && typeof window._nativeBridge.sendSocketAsync === "function") {
+      return new Promise((resolve) => {
+        const callback = `window.__frameboostIpc[${++ipcSeq}]`;
+        window.__frameboostIpc = window.__frameboostIpc || {};
+        window.__frameboostIpc[ipcSeq] = (value) => {
+          delete window.__frameboostIpc[ipcSeq];
+          resolve(value || null);
+        };
+        window._nativeBridge.sendSocketAsync(cmd, callback);
+      });
+    }
     if (window._nativeBridge && typeof window._nativeBridge.sendSocket === "function") {
-      const res = window._nativeBridge.sendSocket(cmd);
-      return res || null;
+      return Promise.resolve(window._nativeBridge.sendSocket(cmd) || null);
     }
     const shell = `printf "${cmd}\\n" | nc -U /data/local/tmp/frameboost.sock 2>/dev/null`;
-    const res = await execCmd(shell);
-    return res;
+    return execCmd(shell);
   }
 
   // Update UI with snapshot data
   function renderSnapshot(data) {
     if (!data) return;
+
+    if (daemonStatus) {
+      daemonStatus.textContent = "ONLINE";
+      daemonStatus.className = "badge active";
+    }
 
     // State
     const st = data.daemon_state || "IDLE";
@@ -235,7 +255,7 @@
     if (heroStutterGov) {
       if (data.is_game) {
         heroStutterGov.textContent = `RAM: Anti-Stutter (ZRAM 10) • DND ON`;
-        heroStutterGov.style.color = "#00ff9d";
+        heroStutterGov.style.color = "#7ddca5";
         heroStutterGov.style.borderColor = "rgba(0, 255, 157, 0.4)";
       } else {
         heroStutterGov.textContent = `RAM: Stock (ZRAM 130)`;
@@ -253,14 +273,42 @@
     tempLittle.textContent = `${Math.round((data.temp_little_mc || 0) / 1000)}°`;
     tempGpu.textContent = `${Math.round((data.temp_gpu_mc || 0) / 1000)}°`;
 
+    // Battery Telemetry
+    if (data.battery) {
+      const b = data.battery;
+      const battCapEl = document.getElementById("batt-capacity");
+      const battStatusEl = document.getElementById("batt-status-badge");
+      const battCurrentEl = document.getElementById("batt-current");
+      const battVoltageEl = document.getElementById("batt-voltage");
+      const battTempEl = document.getElementById("batt-temp");
+      const battPowerEl = document.getElementById("batt-power");
+
+      if (battCapEl) battCapEl.textContent = `${b.capacity_pct || 0}%`;
+      if (battStatusEl) {
+        battStatusEl.textContent = b.status || "Discharging";
+        battStatusEl.className = "battery-status-badge";
+        if (b.status === "Charging") battStatusEl.classList.add("charging");
+      }
+      if (battCurrentEl) {
+        const sign = b.current_now_ma > 0 ? "+" : "";
+        battCurrentEl.textContent = `${sign}${b.current_now_ma || 0} mA`;
+      }
+      if (battVoltageEl) {
+        const volts = ((b.voltage_now_mv || 0) / 1000).toFixed(2);
+        battVoltageEl.textContent = `${volts} V`;
+      }
+      if (battTempEl) battTempEl.textContent = `${(b.temp_c || 0).toFixed(1)}°C`;
+      if (battPowerEl) battPowerEl.textContent = `${(b.power_w || 0).toFixed(2)} W`;
+    }
+
     // Daemon Meta
-    daemonUptime.textContent = `${data.daemon_uptime_s || 0}s`;
-    snapshotStatus.textContent = data.stock_saved ? "SAVED" : "NONE";
+    if (daemonUptime) daemonUptime.textContent = `${data.daemon_uptime_s || 0}s`;
+    if (snapshotStatus) snapshotStatus.textContent = data.stock_saved ? "SAVED" : "NONE";
 
     // Net Meta
     if (data.net) {
-      if (data.net.interface) netIface.textContent = data.net.interface;
-      if (data.net.congestion_control) netCcBadge.textContent = data.net.congestion_control;
+      if (data.net.interface && netIface) netIface.textContent = data.net.interface;
+      if (data.net.congestion_control && netCcBadge) netCcBadge.textContent = data.net.congestion_control;
     }
 
     // Highlight active game card if tab-games is open
@@ -284,43 +332,83 @@
   }
 
   // Telemetry Poller
+  let telemetryVisible = true;
+  document.addEventListener("visibilitychange", () => {
+    telemetryVisible = document.visibilityState === "visible";
+  });
+
+  function setDaemonOffline() {
+    if (stateLabel) stateLabel.textContent = "OFFLINE";
+    if (stateDot) stateDot.className = "state-dot crit";
+    if (heroGame) heroGame.textContent = "Daemon offline";
+    if (heroTemp) heroTemp.textContent = "--°";
+    if (heroGpuClk) heroGpuClk.textContent = "--M";
+    if (heroCpuClk) heroCpuClk.textContent = "--M";
+    if (daemonStatus) daemonStatus.textContent = "OFFLINE";
+    if (daemonStatus) daemonStatus.className = "badge danger";
+  }
+
   async function pollTelemetry() {
-    let raw = await execCmd("cat /data/local/tmp/frameboost-snapshot.json 2>/dev/null");
-    if (raw && typeof raw === "string") {
-      try {
-        const snap = JSON.parse(raw);
-        renderSnapshot(snap);
-      } catch (e) {
-        // partial read ignored
-      }
-    } else {
-      // Mock data for preview in browser without KernelSU
+    if (!telemetryVisible) return;
+    if (previewMode) {
+      const state = ["IDLE", "GAME", "WARN", "CRIT"].includes(previewState) ? previewState : "GAME";
       const mock = {
-        daemon_state: "IDLE",
-        game_pkg: "com.mobile.legends",
-        is_game: true,
-        temp_big_mc: 48000,
+        daemon_state: state,
+        game_pkg: state === "IDLE" ? "" : "com.tencent.ig",
+        is_game: state !== "IDLE",
+        temp_big_mc: state === "CRIT" ? 91000 : state === "WARN" ? 86000 : 48000,
         temp_little_mc: 41000,
         temp_gpu_mc: 42000,
+        fps: state === "IDLE" ? 0 : 58.4,
+        p1_low_fps: state === "IDLE" ? 0 : 49.2,
         gpu: {
-          governor: "Interactive",
-          min_clock: 260000,
-          current_clock: 385000,
-          busy_pct: 18.0,
+          governor: state === "IDLE" ? "Interactive" : "Booster",
+          min_clock: state === "IDLE" ? 260000 : 455000,
+          current_clock: state === "IDLE" ? 385000 : 572000,
+          busy_pct: state === "IDLE" ? 18.0 : 64.0,
         },
         cpu: {
           little: { gov: "energy_adaptive", min_freq: 702000, cur_freq: 1222000 },
-          big: { gov: "energy_adaptive", min_freq: 1040000, cur_freq: 1508000 },
+          big: { gov: state === "IDLE" ? "energy_adaptive" : "performance", min_freq: 1040000, cur_freq: 1508000 },
         },
         net: {
           interface: "wlan0",
-          congestion_control: "westwood",
+          congestion_control: "bbr",
+        },
+        battery: {
+          status: "Discharging",
+          capacity_pct: 74,
+          current_now_ma: -420,
+          voltage_now_mv: 3820,
+          temp_c: 31.2,
+          power_w: 1.61,
         },
         daemon_uptime_s: 128,
         stock_saved: true,
       };
+      const banner = document.getElementById("preview-banner");
+      if (banner) banner.classList.remove("hidden");
       renderSnapshot(mock);
+      return;
     }
+    let raw = await sendSocketCmd("snapshot");
+    if (!raw) {
+      raw = await execCmd("cat /data/local/tmp/frameboost-snapshot.json 2>/dev/null");
+    }
+    if (raw && typeof raw === "string") {
+      try {
+        const snap = JSON.parse(raw);
+        renderSnapshot(snap);
+        if (daemonStatus) {
+          daemonStatus.textContent = "ONLINE";
+          daemonStatus.className = "badge active";
+        }
+        return;
+      } catch (e) {
+        // partial read ignored
+      }
+    }
+    setDaemonOffline();
   }
 
   setInterval(pollTelemetry, 1000);
@@ -336,7 +424,7 @@
       gamesContainer.innerHTML = `
         <div style="text-align:center; padding:30px 10px; color:var(--text-dim); font-family:var(--font-mono); font-size:12px;">
           Tidak ada game yang cocok.<br>
-          <span style="font-size:10px; color:var(--text-sub);">Gunakan tombol 'Scan Device' atau '+ Add Custom' di atas.</span>
+          <span style="font-size:10px; color:var(--text-sub);">Hanya aplikasi game yang terpasang di device ditampilkan.</span>
         </div>`;
       return;
     }
@@ -371,29 +459,32 @@
       const isBbr = !!game.auto_bbr;
       const currentPreset = (game.preset || "BALANCED").toUpperCase();
 
+      const initial = (game.name || "?").trim().charAt(0).toUpperCase();
+      const hue = (game.pkg.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 360);
       item.innerHTML = `
-        <div class="game-item-top">
-          <div class="game-info" style="flex:1; min-width:0;">
-            <div class="game-title" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${game.name}</div>
-            <div class="game-pkg" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${game.pkg}</div>
-            <div class="game-chips">
-              <span class="chip-sm ${sourceClass}">${sourceLabel}</span>
-              <span class="chip-sm">${game.profile || "Balanced 455M"}</span>
-            </div>
-          </div>
-          <button class="btn-launch-game" data-pkg="${game.pkg}" title="Mainkan Game">▶ PLAY</button>
-          <button class="btn-remove-game" data-pkg="${game.pkg}" title="Hapus dari daftar">✕</button>
+        <div class="game-tile-cover" style="background: linear-gradient(135deg, hsl(${hue}, 60%, 25%), hsl(${(hue+60)%360}, 50%, 15%));">
+          <div class="game-tile-initial">${initial}</div>
+          <div class="game-tile-source ${sourceClass}">${sourceLabel}</div>
         </div>
-        <div class="game-tune-row">
-          <select class="select-preset" data-pkg="${game.pkg}">
-            <option value="BATTERY" ${currentPreset === "BATTERY" ? "selected" : ""}>🔋 Battery (385M)</option>
-            <option value="BALANCED" ${currentPreset === "BALANCED" ? "selected" : ""}>⚡ Balanced (455M)</option>
-            <option value="PERFORMANCE" ${currentPreset === "PERFORMANCE" ? "selected" : ""}>🚀 Performance (572M)</option>
-            <option value="ESPORTS" ${currentPreset === "ESPORTS" ? "selected" : ""}>🔥 Esports (683M)</option>
-          </select>
-          <button class="btn-toggle-bbr ${isBbr ? "active" : ""}" data-pkg="${game.pkg}" data-bbr="${isBbr ? "1" : "0"}">
-            ${isBbr ? "🌐 BBR: ON" : "🌐 BBR: OFF"}
-          </button>
+        <div class="game-tile-body">
+          <div class="game-title" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${game.name}</div>
+          <div class="game-pkg" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${game.pkg}</div>
+          <div class="game-tile-profile">${game.profile || "Balanced 455M"}</div>
+          <div class="game-tune-row">
+            <select class="select-preset" data-pkg="${game.pkg}">
+              <option value="BATTERY" ${currentPreset === "BATTERY" ? "selected" : ""}>🔋 Battery</option>
+              <option value="BALANCED" ${currentPreset === "BALANCED" ? "selected" : ""}>⚡ Balanced</option>
+              <option value="PERFORMANCE" ${currentPreset === "PERFORMANCE" ? "selected" : ""}>🚀 Performance</option>
+              <option value="ESPORTS" ${currentPreset === "ESPORTS" ? "selected" : ""}>🔥 Esports</option>
+            </select>
+            <button class="btn-toggle-bbr ${isBbr ? "active" : ""}" data-pkg="${game.pkg}" data-bbr="${isBbr ? "1" : "0"}">
+              ${isBbr ? "BBR ON" : "BBR OFF"}
+            </button>
+          </div>
+          <div class="game-tile-actions">
+            <button class="btn-launch-game" data-pkg="${game.pkg}">▶ PLAY</button>
+            <button class="btn-remove-game" data-pkg="${game.pkg}">✕</button>
+          </div>
         </div>
       `;
 
@@ -502,6 +593,16 @@
   }
 
   async function loadGames() {
+    if (previewMode) {
+      allGames = [
+        { pkg: "com.tencent.ig", name: "PUBG Mobile", source: "builtin", profile: "Booster 572M • CPU4 1.50G", auto_bbr: true, preset: "PERFORMANCE" },
+        { pkg: "com.mobile.legends", name: "Mobile Legends: Bang Bang", source: "builtin", profile: "Booster 455M • CPU4 1.35G", auto_bbr: false, preset: "BALANCED" },
+        { pkg: "com.dts.freefireth", name: "Free Fire", source: "auto", profile: "Dynamic 385M • CPU4 1.25G", auto_bbr: false, preset: "BATTERY" },
+        { pkg: "com.miHoYo.Yuanshen", name: "Genshin Impact", source: "manual", profile: "Booster 683M • CPU4 1.50G", auto_bbr: true, preset: "ESPORTS" }
+      ];
+      applyFilter();
+      return;
+    }
     const res = await sendSocketCmd("list_games");
     if (res) {
       try {
@@ -515,15 +616,11 @@
         console.error("parse games error:", e);
       }
     }
-    // Fallback if daemon not responding
-    allGames = [
-      { pkg: "com.mobile.legends", name: "Mobile Legends: Bang Bang", source: "builtin", profile: "Booster 455M • CPU4 1.35G" },
-      { pkg: "com.mobilechess.gp", name: "Auto Chess", source: "auto", profile: "Booster 455M • CPU4 1.35G" },
-      { pkg: "com.tencent.ig", name: "PUBG Mobile", source: "builtin", profile: "Booster 572M • CPU4 1.50G" },
-      { pkg: "com.dts.freefireth", name: "Free Fire", source: "builtin", profile: "Dynamic 385M • CPU4 1.25G" },
-      { pkg: "com.miHoYo.Yuanshen", name: "Genshin Impact", source: "builtin", profile: "Booster 683M • CPU4 1.50G" }
-    ];
-    applyFilter();
+    // Daemon offline: do not show fake or uninstalled game entries.
+    allGames = [];
+    if (gamesContainer) {
+      gamesContainer.innerHTML = '<div style="text-align:center; padding:30px 10px; color:var(--text-dim); font-family:var(--font-mono); font-size:12px;">Daemon offline.<br><span style="font-size:10px; color:var(--text-sub);">Start frameboostd and reload.</span></div>';
+    }
   }
 
   async function loadInstalledApps() {
@@ -551,7 +648,7 @@
   // Scan device button
   btnScanGames?.addEventListener("click", async () => {
     btnScanGames.disabled = true;
-    btnScanGames.innerHTML = '<span>⟳</span> Scanning...';
+    btnScanGames.innerHTML = '<span>⟳</span> Refreshing installed games...';
     const res = await sendSocketCmd("scan_games");
     btnScanGames.disabled = false;
     btnScanGames.innerHTML = '<span>⟳</span> Scan Device';
@@ -643,7 +740,8 @@
     }, 500);
   });
 
-  // Action: Network Stock (Westwood)
+
+  // Action: Network BBR & Stock
   const btnNetStock = document.getElementById("btn-net-stock");
   btnNetStock?.addEventListener("click", async () => {
     btnNetStock.textContent = "APPLYING...";
@@ -651,7 +749,6 @@
     setTimeout(() => (btnNetStock.textContent = "Stock (Westwood)"), 1000);
   });
 
-  // Action: Network BBR
   const btnNetBbr = document.getElementById("btn-net-bbr");
   btnNetBbr?.addEventListener("click", async () => {
     btnNetBbr.textContent = "APPLYING...";
@@ -659,32 +756,459 @@
     setTimeout(() => (btnNetBbr.textContent = "Enable BBR"), 1000);
   });
 
-  // Action: A/B Benchmark
-  const btnBenchmark = document.getElementById("btn-benchmark");
-  btnBenchmark?.addEventListener("click", async () => {
-    btnBenchmark.textContent = "Testing...";
-    btnBenchmark.disabled = true;
+  // Action: Network Command Center (Ping Engine)
+  let activeTarget = "1.1.1.1";
+  const pingSamplesHistory = [];
+  const MAX_PING_SAMPLES = 30;
 
-    const res = await sendSocketCmd("net_ab_test");
-    btnBenchmark.textContent = "Run 5-packet A/B Test";
-    btnBenchmark.disabled = false;
+  const netTargetDisplay = document.getElementById("net-target-display");
+  const netHealthBadge = document.getElementById("net-health-badge");
+  const netLiveJitter = document.getElementById("net-live-jitter");
+  const netPingCanvas = document.getElementById("net-ping-canvas");
+  const pingCircleEl = document.getElementById("ping-circle-el");
 
-    if (res && typeof res === "string") {
+  const statMin = document.getElementById("stat-min");
+  const statAvg = document.getElementById("stat-avg");
+  const statMax = document.getElementById("stat-max");
+  const statJitter = document.getElementById("stat-jitter");
+  const statP50 = document.getElementById("stat-p50");
+  const statP95 = document.getElementById("stat-p95");
+  const statP99 = document.getElementById("stat-p99");
+  const statLoss = document.getElementById("stat-loss");
+
+  const chipGwVal = document.getElementById("chip-gw-val");
+  const chipCfVal = document.getElementById("chip-cf-val");
+  const chipGgVal = document.getElementById("chip-gg-val");
+  const chipCustomVal = document.getElementById("chip-custom-val");
+
+  const btnMultiPing = document.getElementById("btn-multi-ping");
+  const multiPingRows = document.querySelectorAll(".multi-ping-row");
+  const mpRefs = {
+    gateway: {
+      host: document.getElementById("mp-gw-host"),
+      val: document.getElementById("mp-gw-val"),
+      sub: document.getElementById("mp-gw-sub"),
+    },
+    cloudflare: {
+      host: document.getElementById("mp-cf-host"),
+      val: document.getElementById("mp-cf-val"),
+      sub: document.getElementById("mp-cf-sub"),
+    },
+    google: {
+      host: document.getElementById("mp-gg-host"),
+      val: document.getElementById("mp-gg-val"),
+      sub: document.getElementById("mp-gg-sub"),
+    },
+    custom: {
+      host: document.getElementById("mp-custom-host"),
+      val: document.getElementById("mp-custom-val"),
+      sub: document.getElementById("mp-custom-sub"),
+    },
+  };
+  let gatewayHost = "192.168.1.1";
+  let lastMultiPing = null;
+  let multiPingDone = false;
+  let activeMultiKey = "gateway";
+
+  const customTargetBox = document.getElementById("custom-target-box");
+  const customTargetInput = document.getElementById("custom-target-input");
+  const btnSetCustomTarget = document.getElementById("btn-set-custom-target");
+
+  const targetChips = document.querySelectorAll(".target-chip");
+  targetChips.forEach((chip) => {
+    chip.addEventListener("click", () => {
+      targetChips.forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+      const targetType = chip.dataset.target;
+      if (targetType === "custom") {
+        customTargetBox.classList.remove("hidden");
+        if (customTargetInput.value.trim()) {
+          activeTarget = customTargetInput.value.trim();
+        }
+      } else {
+        customTargetBox.classList.add("hidden");
+        if (targetType === "gw") {
+          activeTarget = gatewayHost;
+        } else {
+          activeTarget = targetType;
+        }
+      }
+      if (netTargetDisplay) netTargetDisplay.textContent = activeTarget;
+      runProbe(activeTarget, 3);
+    });
+  });
+
+  btnSetCustomTarget?.addEventListener("click", () => {
+    const customHost = customTargetInput.value.trim();
+    if (customHost) {
+      activeTarget = customHost;
+      if (netTargetDisplay) netTargetDisplay.textContent = activeTarget;
+      runProbe(activeTarget, 3);
+    }
+  });
+
+  function renderPingTimeline(samples) {
+    if (!netPingCanvas) return;
+    const ctx = netPingCanvas.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = netPingCanvas.getBoundingClientRect();
+    const w = rect.width || 280;
+    const h = 60;
+
+    if (netPingCanvas.width !== Math.floor(w * dpr) || netPingCanvas.height !== Math.floor(h * dpr)) {
+      netPingCanvas.width = Math.floor(w * dpr);
+      netPingCanvas.height = Math.floor(h * dpr);
+    }
+
+    ctx.save();
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, w, h);
+
+    if (!samples || samples.length === 0) {
+      ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
+      ctx.font = "10px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("No ping samples yet", w / 2, h / 2 + 3);
+      ctx.restore();
+      return;
+    }
+
+    const maxPing = Math.max(80, ...samples) * 1.15;
+    const step = w / Math.max(samples.length - 1, 1);
+
+    // 50ms reference line
+    const ref50Y = h - (50 / maxPing) * (h - 10);
+    ctx.strokeStyle = "rgba(255, 208, 97, 0.3)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(0, ref50Y);
+    ctx.lineTo(w, ref50Y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Path
+    ctx.beginPath();
+    samples.forEach((val, idx) => {
+      const x = idx * step;
+      const y = h - (val / maxPing) * (h - 10);
+      if (idx === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = "#d0bcff";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Sample dots
+    samples.forEach((val, idx) => {
+      const x = idx * step;
+      const y = h - (val / maxPing) * (h - 10);
+      ctx.fillStyle = val < 35 ? "#7ddca5" : val < 75 ? "#f4b77a" : "#ffb4ab";
+      ctx.beginPath();
+      ctx.arc(x, y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    ctx.restore();
+  }
+
+  const netPingValEl = document.getElementById("net-ping-val");
+
+  function setActionState(button, busyText, busy) {
+    if (!button) return;
+    button.disabled = busy;
+    button.classList.toggle("is-busy", busy);
+    if (busy) {
+      button.dataset.readyText = button.textContent;
+      button.textContent = busyText;
+    } else if (button.dataset.readyText) {
+      button.textContent = button.dataset.readyText;
+      delete button.dataset.readyText;
+    }
+  }
+
+  let progressTimer = null;
+  let progressStarted = 0;
+
+  function showProgress(label, detail) {
+    const node = document.getElementById("operation-status");
+    if (!node) return;
+    clearInterval(progressTimer);
+    progressStarted = Date.now();
+    node.classList.remove("hidden");
+    node.querySelector("strong").textContent = label;
+    node.querySelector(".operation-copy span").textContent = detail;
+    node.querySelector(".operation-time").textContent = "0s";
+    node.querySelector(".operation-progress i").style.width = "8%";
+    progressTimer = setInterval(() => {
+      const seconds = Math.floor((Date.now() - progressStarted) / 1000);
+      node.querySelector(".operation-time").textContent = `${seconds}s`;
+      node.querySelector(".operation-progress i").style.width = `${Math.min(92, 8 + seconds * 5)}%`;
+    }, 250);
+  }
+
+  function hideProgress() {
+    clearInterval(progressTimer);
+    progressTimer = null;
+    document.getElementById("operation-status")?.classList.add("hidden");
+  }
+
+  function withTimeout(promise, ms) {
+    return Promise.race([
+      promise,
+      new Promise((resolve) => setTimeout(() => resolve(null), ms)),
+    ]);
+  }
+
+  async function runProbe(host, count = 3) {
+    setActionState(btnQuickPing, "Testing…", true);
+    showProgress("Testing connection", `${count} probes • ${host}`);
+    if (netPingValEl) netPingValEl.textContent = "…";
+    try {
+      const res = await withTimeout(sendSocketCmd(`net_ping ${host} ${count}`), 10000);
+      if (res && typeof res === "string") {
+        try {
+          const p = JSON.parse(res);
+          applyPingResult(p);
+        } catch (e) {
+          console.error("parse ping error:", e);
+        }
+      } else {
+        if (netPingValEl) netPingValEl.textContent = "--";
+        if (netHealthBadge) {
+          netHealthBadge.textContent = "OFFLINE";
+          netHealthBadge.className = "badge danger";
+        }
+      }
+    } finally {
+      setActionState(btnQuickPing, "Testing…", false);
+      hideProgress();
+    }
+  }
+
+  function applyPingResult(p) {
+    if (netPingValEl) netPingValEl.textContent = Math.round(p.avg_ms || 0);
+    if (statMin) statMin.textContent = `${(p.min_ms || 0).toFixed(1)} ms`;
+    if (statAvg) statAvg.textContent = `${(p.avg_ms || 0).toFixed(1)} ms`;
+    if (statMax) statMax.textContent = `${(p.max_ms || 0).toFixed(1)} ms`;
+    if (statJitter) statJitter.textContent = `${(p.jitter_ms || 0).toFixed(1)} ms`;
+    if (statP50) statP50.textContent = `${(p.p50_ms || 0).toFixed(1)} ms`;
+    if (statP95) statP95.textContent = `${(p.p95_ms || 0).toFixed(1)} ms`;
+    if (statP99) statP99.textContent = `${(p.p99_ms || 0).toFixed(1)} ms`;
+    if (statLoss) statLoss.textContent = `${Math.round(p.loss_pct || 0)}%`;
+    if (netLiveJitter) netLiveJitter.textContent = `Jitter: ${(p.jitter_ms || 0).toFixed(1)} ms`;
+
+    // Health badge
+    if (netHealthBadge) {
+      if (p.loss_pct > 10.0) {
+        netHealthBadge.textContent = "PACKET LOSS";
+        netHealthBadge.className = "badge danger";
+      } else if (p.jitter_ms > 20.0 || (p.spike_ms && p.spike_ms > 40.0)) {
+        netHealthBadge.textContent = "JITTER SPIKE";
+        netHealthBadge.className = "badge danger";
+      } else if (p.avg_ms < 40.0) {
+        netHealthBadge.textContent = "OPTIMAL";
+        netHealthBadge.className = "badge active";
+      } else {
+        netHealthBadge.textContent = "STABLE";
+        netHealthBadge.className = "badge";
+      }
+    }
+
+    // Color code circle
+    if (pingCircleEl) {
+      if (p.avg_ms < 35) pingCircleEl.style.borderColor = "var(--accent-green)";
+      else if (p.avg_ms < 75) pingCircleEl.style.borderColor = "var(--accent-cyan)";
+      else pingCircleEl.style.borderColor = "var(--accent-red)";
+    }
+
+    if (p.samples && p.samples.length > 0) {
+      p.samples.forEach((s) => {
+        pingSamplesHistory.push(s);
+        if (pingSamplesHistory.length > MAX_PING_SAMPLES) pingSamplesHistory.shift();
+      });
+      renderPingTimeline(pingSamplesHistory);
+    }
+
+    if (p.host) updateChipForHost(p.host, p.avg_ms);
+  }
+
+  function formatPingValue(v) {
+    return Number.isFinite(v) && v > 0 ? `${Math.round(v)} ms` : "--";
+  }
+
+  function updateChipForHost(host, avgMs) {
+    if (!host) return;
+    const text = formatPingValue(avgMs);
+    if (host === gatewayHost) {
+      if (chipGwVal) chipGwVal.textContent = text;
+    } else if (host === "1.1.1.1") {
+      if (chipCfVal) chipCfVal.textContent = text;
+    } else if (host === "8.8.8.8") {
+      if (chipGgVal) chipGgVal.textContent = text;
+    } else if (chipCustomVal) {
+      chipCustomVal.textContent = text;
+    }
+  }
+
+  function formatMultiSub(p) {
+    if (!p || !p.host) return "--";
+    return `${Math.round(p.loss_pct || 0)}% loss • ${(p.jitter_ms || 0).toFixed(1)} j`;
+  }
+
+  function renderMultiPing(data) {
+    const entries = [
+      ["gateway", data.gateway],
+      ["cloudflare", data.cloudflare],
+      ["google", data.google],
+      ["custom", data.custom],
+    ];
+
+    entries.forEach(([key, p]) => {
+      const refs = mpRefs[key];
+      if (!refs) return;
+      if (!p || !p.host) {
+        if (key === "custom") {
+          refs.host.textContent = "not set";
+          refs.val.textContent = "--";
+          refs.sub.textContent = "--";
+        }
+        return;
+      }
+      if (key === "gateway") gatewayHost = p.host;
+      refs.host.textContent = p.host;
+      refs.val.textContent = formatPingValue(p.avg_ms);
+      refs.sub.textContent = formatMultiSub(p);
+      updateChipForHost(p.host, p.avg_ms);
+    });
+  }
+
+  async function runMultiPing() {
+    if (!btnMultiPing) return;
+    const customHost = customTargetInput ? customTargetInput.value.trim() : "";
+    setActionState(btnMultiPing, "Testing…", true);
+    showProgress("Multi-target ping", `Gateway, Cloudflare, Google${customHost ? ", " + customHost : ""}`);
+    try {
+      const cmd = customHost ? `net_multi_ping 3 ${customHost}` : "net_multi_ping 3";
+      const res = await withTimeout(sendSocketCmd(cmd), 30000);
+      if (res && typeof res === "string") {
+        try {
+          const data = JSON.parse(res);
+          lastMultiPing = data;
+          if (data.gateway && data.gateway.host) gatewayHost = data.gateway.host;
+          renderMultiPing(data);
+
+          const entry = multiEntryForRow(activeMultiKey);
+          if (entry && entry.host) {
+            activeTarget = entry.host;
+            if (netTargetDisplay) netTargetDisplay.textContent = activeTarget;
+            applyPingResult(entry);
+          }
+        } catch (e) {
+          console.error("parse multi ping error:", e);
+        }
+      } else if (netHealthBadge) {
+        netHealthBadge.textContent = "OFFLINE";
+        netHealthBadge.className = "badge danger";
+      }
+    } finally {
+      setActionState(btnMultiPing, "Testing…", false);
+      hideProgress();
+    }
+  }
+
+  function multiEntryForRow(key) {
+    if (!lastMultiPing) return null;
+    if (key === "gateway") return lastMultiPing.gateway;
+    if (key === "cloudflare") return lastMultiPing.cloudflare;
+    if (key === "google") return lastMultiPing.google;
+    return lastMultiPing.custom;
+  }
+
+  multiPingRows.forEach((row) => {
+    row.addEventListener("click", () => {
+      const key = row.dataset.target;
+      if (key === "custom") {
+        const host = customTargetInput ? customTargetInput.value.trim() : "";
+        if (!host) {
+          customTargetBox?.classList.remove("hidden");
+          customTargetInput?.focus();
+          return;
+        }
+        activeTarget = host;
+      } else if (key === "gateway") {
+        activeTarget = gatewayHost;
+      } else {
+        activeTarget = key;
+      }
+
+      multiPingRows.forEach((r) => r.classList.toggle("active", r === row));
+      activeMultiKey = key;
+      const chipTarget = key === "gateway" ? "gw" : key;
+      targetChips.forEach((c) => c.classList.toggle("active", c.dataset.target === chipTarget));
+
+      if (netTargetDisplay) netTargetDisplay.textContent = activeTarget;
+      const entry = multiEntryForRow(key);
+      if (entry && entry.host) applyPingResult(entry);
+    });
+  });
+
+  btnMultiPing?.addEventListener("click", () => {
+    multiPingDone = true;
+    runMultiPing();
+  });
+
+  // Quick Probe Button
+  const btnQuickPing = document.getElementById("btn-quick-ping");
+  btnQuickPing?.addEventListener("click", () => runProbe(activeTarget, 3));
+
+  // Bufferbloat Test
+  const btnRunBufferbloat = document.getElementById("btn-run-bufferbloat");
+  const bbUnloadedVal = document.getElementById("bb-unloaded-val");
+  const bbLoadedVal = document.getElementById("bb-loaded-val");
+  const bbDeltaVal = document.getElementById("bb-delta-val");
+  const bbGradeVal = document.getElementById("bb-grade-val");
+  const bufferbloatBadge = document.getElementById("bufferbloat-badge");
+
+  btnRunBufferbloat?.addEventListener("click", async () => {
+    setActionState(btnRunBufferbloat, "Measuring…", true);
+    showProgress("Measuring bufferbloat", "Idle latency, then loaded latency");
+    if (bufferbloatBadge) {
+      bufferbloatBadge.textContent = "TESTING";
+      bufferbloatBadge.className = "badge danger";
+    }
+
+    try {
+      const res = await withTimeout(sendSocketCmd(`net_bufferbloat ${activeTarget}`), 30000);
+      if (res && typeof res === "string") {
       try {
-        const data = JSON.parse(res);
-        if (data.stock && data.bbr) {
-          benchStockVal.textContent = `${data.stock.avg_ms.toFixed(1)} ms`;
-          benchBbrVal.textContent = `${data.bbr.avg_ms.toFixed(1)} ms`;
-          benchBox.classList.remove("hidden");
+        const bb = JSON.parse(res);
+        if (bbUnloadedVal) bbUnloadedVal.textContent = `${bb.unloaded_avg_ms} ms`;
+        if (bbLoadedVal) bbLoadedVal.textContent = `${bb.loaded_avg_ms} ms`;
+        if (bbDeltaVal) bbDeltaVal.textContent = `+${bb.delta_ms} ms`;
+        if (bbGradeVal) bbGradeVal.textContent = bb.grade;
+        if (bufferbloatBadge) {
+          bufferbloatBadge.textContent = bb.delta_ms < 35 ? "GRADE " + bb.grade.charAt(0) : "BUFFERBLOAT";
+          bufferbloatBadge.className = bb.delta_ms < 35 ? "badge active" : "badge danger";
         }
       } catch (e) {
-        console.error("parse bench error:", e);
+        console.error("parse bufferbloat error:", e);
       }
     } else {
-      // Mock demo preview
-      benchStockVal.textContent = "86.3 ms";
-      benchBbrVal.textContent = "78.5 ms (-9%)";
-      benchBox.classList.remove("hidden");
+      if (bbUnloadedVal) bbUnloadedVal.textContent = "-- ms";
+      if (bbLoadedVal) bbLoadedVal.textContent = "-- ms";
+      if (bbDeltaVal) bbDeltaVal.textContent = "-- ms";
+      if (bbGradeVal) bbGradeVal.textContent = "--";
+      if (bufferbloatBadge) {
+        bufferbloatBadge.textContent = "OFFLINE";
+        bufferbloatBadge.className = "badge danger";
+      }
+    }
+    } finally {
+      setActionState(btnRunBufferbloat, "Measuring…", false);
+      hideProgress();
     }
   });
 
@@ -692,10 +1216,39 @@
   const btnRestore = document.getElementById("btn-emergency-restore");
   btnRestore?.addEventListener("click", async () => {
     if (!confirm("Kembalikan seluruh setting GPU, CPU, dan Network ke stock?")) return;
+    if (!confirm("Konfirmasi terakhir: restore semua setting sekarang?")) return;
     btnRestore.textContent = "RESTORING...";
     await sendSocketCmd("restore_all");
     setTimeout(() => (btnRestore.textContent = "RESTORE ALL STOCK"), 1500);
   });
+
+  // Action: Samsung GOS Disable/Restore
+  const btnGosDisable = document.getElementById("btn-gos-disable");
+  const btnGosRestore = document.getElementById("btn-gos-restore");
+  const gosStatus = document.getElementById("gos-status");
+  async function refreshGosStatus() {
+    const res = await sendSocketCmd("gos_status");
+    if (res && typeof res === "string") {
+      try {
+        const j = JSON.parse(res);
+        if (gosStatus) gosStatus.textContent = "Status: " + (j.disabled ? "DISABLED" : "ENABLED");
+      } catch (e) {}
+    }
+  }
+  btnGosDisable?.addEventListener("click", async () => {
+    if (!confirm("Nonaktifkan Samsung Game Optimizing Service?")) return;
+    btnGosDisable.textContent = "DISABLING...";
+    await sendSocketCmd("gos_disable");
+    btnGosDisable.textContent = "DISABLE GOS";
+    refreshGosStatus();
+  });
+  btnGosRestore?.addEventListener("click", async () => {
+    btnGosRestore.textContent = "RESTORING...";
+    await sendSocketCmd("gos_restore");
+    btnGosRestore.textContent = "RESTORE GOS";
+    refreshGosStatus();
+  });
+  refreshGosStatus();
 
   // Floating HUD Controller
   function updateHudToggleState() {
@@ -737,3 +1290,4 @@
 
   updateHudToggleState();
 })();
+

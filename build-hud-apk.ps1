@@ -17,6 +17,7 @@ New-Item -ItemType Directory -Path "$buildDir\gen", "$buildDir\obj" -Force | Out
 
 Write-Host "=== 3. Compile Android resources (aapt2 compile) ==="
 & "$bt\aapt2.exe" compile --dir "$appDir\res" -o "$buildDir\resources.zip"
+if ($LASTEXITCODE -ne 0) { throw "aapt2 compile failed" }
 
 Write-Host "=== 4. Link resources & generate R.java (aapt2 link) ==="
 & "$bt\aapt2.exe" link -I $plat `
@@ -26,14 +27,17 @@ Write-Host "=== 4. Link resources & generate R.java (aapt2 link) ==="
     --target-sdk-version 36 `
     --java "$buildDir\gen" `
     -o "$buildDir\unaligned.apk"
+if ($LASTEXITCODE -ne 0) { throw "aapt2 link failed" }
 
 Write-Host "=== 5. Compile Java classes (javac) ==="
 $javaFiles = Get-ChildItem -Path "$appDir\src\com\a50\frameboost\hud\*.java", "$buildDir\gen\com\a50\frameboost\hud\*.java" | Select-Object -ExpandProperty FullName
 javac --release 17 -cp "$plat;$buildDir\gen" $javaFiles -d "$buildDir\obj"
+if ($LASTEXITCODE -ne 0) { throw "javac failed" }
 
 Write-Host "=== 6. Convert bytecode to Dalvik dex (d8) ==="
 $classFiles = Get-ChildItem -Path "$buildDir\obj" -Recurse -Filter "*.class" | Select-Object -ExpandProperty FullName
 & "$bt\d8.bat" --lib $plat $classFiles --output "$buildDir"
+if ($LASTEXITCODE -ne 0) { throw "d8 failed" }
 
 Write-Host "=== 7. Add classes.dex and assets to APK ==="
 cd "$buildDir"
@@ -43,6 +47,7 @@ cd "$appDir"
 
 Write-Host "=== 8. Zipalign APK ==="
 & "$bt\zipalign.exe" -p -f 4 "$buildDir\unaligned.apk" "$buildDir\FrameBoost-GameSpace-aligned.apk"
+if ($LASTEXITCODE -ne 0) { throw "zipalign failed" }
 
 Write-Host "=== 9. Sign APK ==="
 $keystore = "$appDir\debug.keystore"
@@ -55,5 +60,9 @@ if (-not (Test-Path $keystore)) {
 $finalApk = "$appDir\FrameBoost-GameSpace.apk"
 & "$bt\apksigner.bat" sign --ks $keystore --ks-pass pass:android --ks-key-alias androiddebugkey --out $finalApk "$buildDir\FrameBoost-GameSpace-aligned.apk"
 
+Write-Host "=== 10. Sync APK into module-src (ZIP payload) ==="
+$moduleApk = Join-Path (Split-Path $appDir -Parent) "module-src\FrameBoost-GameSpace.apk"
+Copy-Item $finalApk $moduleApk -Force
+
 Write-Host "SUCCESS: $finalApk created!"
-Get-Item $finalApk | Select-Object Name, Length
+Get-Item $finalApk, $moduleApk | Select-Object Name, Length

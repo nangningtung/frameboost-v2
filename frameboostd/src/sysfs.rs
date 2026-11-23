@@ -29,6 +29,10 @@ pub fn read_u32(path: &str) -> u32 {
     read_file(path).parse().unwrap_or(0)
 }
 
+pub fn read_i32(path: &str) -> i32 {
+    read_file(path).parse().unwrap_or(0)
+}
+
 pub fn run_cmd(cmd: &str, args: &[&str]) -> String {
     Command::new(cmd)
         .args(args)

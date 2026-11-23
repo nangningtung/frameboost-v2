@@ -19,23 +19,36 @@ public class SnapshotReader {
         public double gpuBusyPct = 0.0;
         public int cpuBigMhz = 0;
         public String tcpCc = "westwood";
+        public String battStatus = "Discharging";
+        public int battCapacity = 0;
+        public int battCurrentMa = 0;
+        public int battVoltageMv = 0;
+        public double battTempC = 0.0;
+        public String battChargeType = "";
+        public double battPowerW = 0.0;
     }
 
     public static SnapshotData read() {
+        String jsonStr = null;
         File file = new File(SNAPSHOT_PATH);
-        if (!file.exists() || !file.canRead()) {
-            return null;
+        if (file.exists() && file.canRead()) {
+            StringBuilder sb = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    sb.append(line);
+                }
+                jsonStr = sb.toString();
+            } catch (Exception ignored) {}
         }
 
-        StringBuilder sb = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line);
-            }
-            String jsonStr = sb.toString();
-            if (jsonStr.isEmpty()) return null;
+        if (jsonStr == null || jsonStr.isEmpty()) {
+            jsonStr = IpcClient.sendCommand("snapshot");
+        }
 
+        if (jsonStr == null || jsonStr.isEmpty()) return null;
+
+        try {
             JSONObject obj = new JSONObject(jsonStr);
             SnapshotData data = new SnapshotData();
             data.daemonState = obj.optString("daemon_state", "IDLE");
@@ -68,6 +81,17 @@ public class SnapshotReader {
             JSONObject net = obj.optJSONObject("net");
             if (net != null) {
                 data.tcpCc = net.optString("congestion_control", "westwood");
+            }
+
+            JSONObject batt = obj.optJSONObject("battery");
+            if (batt != null) {
+                data.battStatus = batt.optString("status", "Discharging");
+                data.battCapacity = batt.optInt("capacity_pct", 0);
+                data.battCurrentMa = batt.optInt("current_now_ma", 0);
+                data.battVoltageMv = batt.optInt("voltage_now_mv", 0);
+                data.battTempC = batt.optDouble("temp_c", 0.0);
+                data.battChargeType = batt.optString("charge_type", "");
+                data.battPowerW = batt.optDouble("power_w", 0.0);
             }
 
             return data;

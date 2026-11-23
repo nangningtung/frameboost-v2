@@ -71,12 +71,32 @@ impl GameProfile {
                 auto_bbr,
             },
         );
+        Self::write_configs(&configs)
+    }
 
+    /// Change only the preset, keeping whatever auto-BBR choice the game already has.
+    pub fn save_preset_only(pkg: &str, preset: &str) -> Result<(), String> {
+        let mut configs = Self::load_custom_configs();
+        let auto_bbr = configs
+            .get(pkg)
+            .map(|c| c.auto_bbr)
+            .unwrap_or_else(|| Self::default_preset_for(pkg).1);
+        configs.insert(
+            pkg.to_string(),
+            CustomGameConfig {
+                preset: preset.to_string(),
+                auto_bbr,
+            },
+        );
+        Self::write_configs(&configs)
+    }
+
+    fn write_configs(configs: &HashMap<String, CustomGameConfig>) -> Result<(), String> {
         if let Some(parent) = Path::new(PROFILES_CONFIG_PATH).parent() {
             let _ = fs::create_dir_all(parent);
         }
 
-        match serde_json::to_string_pretty(&configs) {
+        match serde_json::to_string_pretty(configs) {
             Ok(json) => {
                 if let Ok(mut f) = OpenOptions::new()
                     .create(true)
