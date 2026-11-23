@@ -1,0 +1,16 @@
+# Rust build artifacts
+/frameboostd/target/
+
+# Local sockets & logs
+*.sock
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+
+# OS / Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

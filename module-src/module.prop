@@ -1,0 +1,6 @@
+id=a50_frameboost
+name=FrameBoost A50 - Game Space Console
+version=v2.0.0
+versionCode=200
+author=Assistant & User
+description=Game Space Console for Samsung A50 (Exynos 9610). Native Rust daemon (437KB), WebUI Manager dashboard, auto-profile per game, BBR ping booster, thermal guard with hysteresis, real framestats engine.

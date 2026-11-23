@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>FrameBoost Console</title>
+  <link rel="stylesheet" href="style.css?v=2.0.5">
+  <style>
+    /* Insets & Docked Layout overrides (bypass all external CSS caching) */
+    .hud-header {
+      padding-top: calc(var(--inset-top, 38px) + 8px) !important;
+    }
+    
+    .hud-nav {
+      position: fixed !important;
+      bottom: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      transform: none !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      border-radius: 0 !important;
+      border-left: none !important;
+      border-right: none !important;
+      border-bottom: none !important;
+      border-top: 1px solid rgba(255, 255, 255, 0.12) !important;
+      background: #0d0f17 !important;
+      padding: 6px 12px calc(var(--inset-bottom, 48px) + 8px) 12px !important;
+      box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.7) !important;
+      z-index: 100 !important;
+    }
+
+    .nav-tab {
+      min-height: 44px !important;
+      min-width: 58px !important;
+      border-radius: 12px !important;
+      padding: 6px 12px !important;
+    }
+
+    .hud-main {
+      padding-bottom: calc(var(--inset-bottom, 48px) + 88px) !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Bar: Brand + Quick Status -->
+    <header class="hud-header">
+      <div class="brand">
+        <span class="brand-pill">A50</span>
+        <span class="brand-title">FRAMEBOOST</span>
+      </div>
+      <div class="hud-status">
+        <span class="state-dot" id="state-dot"></span>
+        <span class="state-label" id="state-label">IDLE</span>
+      </div>
+    </header>
+
+    <!-- Tab Panels Container -->
+    <main class="hud-main">
+      <!-- 1. HOME TAB -->
+      <section class="tab-panel active" id="tab-home">
+        <!-- Hero HUD Display -->
+        <div class="hero-card">
+          <div class="hero-meta">
+            <span class="meta-label">FOREGROUND</span>
+            <span class="meta-val" id="hero-game">Tidak ada game</span>
+          </div>
+          
+          <div class="hero-meters">
+            <div class="meter-block">
+              <div class="meter-num" id="hero-temp">--°</div>
+              <div class="meter-sub">BIG TEMP</div>
+            </div>
+            <div class="meter-divider"></div>
+            <div class="meter-block">
+              <div class="meter-num" id="hero-gpu-clk">---</div>
+              <div class="meter-sub">GPU CLK</div>
+            </div>
+            <div class="meter-divider"></div>
+            <div class="meter-block">
+              <div class="meter-num" id="hero-cpu-clk">---</div>
+              <div class="meter-sub">CPU4 CLK</div>
+            </div>
+          </div>
+
+          <div class="hero-footer">
+            <span class="badge" id="hero-gpu-gov">GPU: Interactive</span>
+            <span class="badge" id="hero-cpu-gov">CPU: energy_adaptive</span>
+          </div>
+        </div>
+
+        <!-- Live Frametime Pacing Graph -->
+        <div class="frametime-card">
+          <div class="frametime-header">
+            <div>
+              <span class="frametime-title">FRAME PACING (GFXINFO)</span>
+              <span class="sub-hint" id="fps-live-label">-- FPS • -- ms</span>
+            </div>
+            <div class="frametime-legend">
+              <span class="legend-dot green"></span> 16.6ms Target
+            </div>
+          </div>
+          <canvas id="frametime-canvas" height="60"></canvas>
+        </div>
+
+        <!-- Telemetry Gauges Grid -->
+        <div class="gauges-grid">
+          <div class="gauge-card">
+            <div class="gauge-title">GPU LOAD</div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="gpu-busy-fill" style="width: 0%"></div>
+            </div>
+            <div class="gauge-footer">
+              <span id="gpu-busy-text">0%</span>
+              <span id="gpu-min-text">Min: 260 MHz</span>
+            </div>
+          </div>
+
+          <div class="gauge-card">
+            <div class="gauge-title">THERMAL ZONES</div>
+            <div class="temp-chips">
+              <div class="chip">LITTLE <strong id="temp-little">--°</strong></div>
+              <div class="chip">GPU <strong id="temp-gpu">--°</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Boost Action -->
+        <div class="action-card">
+          <div class="action-info">
+            <div class="action-title">Manual Boost Override</div>
+            <div class="action-desc">Paksa profil gaming tanpa menunggu auto-detect</div>
+          </div>
+          <button class="hud-btn primary" id="btn-toggle-boost">APPLY BOOST</button>
+        </div>
+      </section>
+
+      <!-- 2. GAMES TAB -->
+      <section class="tab-panel" id="tab-games">
+        <div class="section-header">
+          <h2>Game Library</h2>
+          <span class="sub-hint">Auto-detected & Custom Tuned</span>
+        </div>
+
+        <!-- Games Action Toolbar -->
+        <div class="games-toolbar">
+          <input type="text" id="game-search-input" class="hud-search-input" placeholder="Search game or package...">
+          <div class="games-actions-row">
+            <button id="btn-scan-games" class="btn btn-secondary" style="flex:1;">
+              <span>⟳</span> Scan Device
+            </button>
+            <button id="btn-toggle-add-drawer" class="btn btn-primary" style="flex:1;">
+              <span>+</span> Add Custom
+            </button>
+          </div>
+        </div>
+
+        <!-- Collapsible Add Game Drawer -->
+        <div id="add-game-drawer" class="add-game-drawer hidden">
+          <div style="font-size:11px; font-weight:700; color:var(--text-sub);">TAMBAH GAME KE GAME SPACE</div>
+          <select id="installed-apps-select" class="hud-select">
+            <option value="">-- Pilih Aplikasi Terinstall --</option>
+          </select>
+          <input type="text" id="custom-pkg-input" class="hud-input" placeholder="Atau ketik package (cth: org.cutwire.drift)">
+          <div style="display:flex; gap:8px;">
+            <button id="btn-submit-add-game" class="btn btn-primary" style="flex:2;">Tambah Game</button>
+            <button id="btn-cancel-add-game" class="btn btn-secondary" style="flex:1;">Batal</button>
+          </div>
+        </div>
+
+        <!-- Dynamic Games List Container -->
+        <div class="games-list" id="games-container">
+          <div style="text-align:center; padding:20px; color:var(--text-dim); font-family:var(--font-mono); font-size:12px;">
+            Memuat daftar game...
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. NETWORK TAB -->
+      <section class="tab-panel" id="tab-network">
+        <div class="section-header">
+          <h2>Ping Booster</h2>
+          <span class="sub-hint">BBR TCP low-latency engine</span>
+        </div>
+
+        <div class="net-stat-card">
+          <div class="net-header-row">
+            <div>
+              <span class="meta-label">INTERFACE</span>
+              <div class="meta-val" id="net-iface">wlan0</div>
+            </div>
+            <div class="align-right">
+              <span class="meta-label">GATEWAY</span>
+              <div class="meta-val" id="net-gw">192.168.1.1</div>
+            </div>
+          </div>
+
+          <div class="net-ping-display">
+            <div class="ping-circle">
+              <span class="ping-num" id="net-ping-val">--</span>
+              <span class="ping-unit">ms</span>
+            </div>
+            <div class="ping-meta">
+              <div>Jitter: <strong id="net-jitter">-- ms</strong></div>
+              <div>Loss: <strong id="net-loss">0%</strong></div>
+              <div>Engine: <strong id="net-cc-badge">westwood</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="net-controls">
+          <div class="btn-group">
+            <button class="hud-btn secondary" id="btn-net-stock">Stock (Westwood)</button>
+            <button class="hud-btn primary" id="btn-net-bbr">Enable BBR</button>
+          </div>
+          <button class="hud-btn outline full-w" id="btn-net-benchmark">Run 5-packet A/B Test</button>
+        </div>
+
+        <div class="benchmark-result hidden" id="bench-box">
+          <div class="bench-title">A/B BENCHMARK RESULT</div>
+          <div class="bench-grid">
+            <div class="bench-col">
+              <span class="bench-label">Stock Westwood</span>
+              <div class="bench-val" id="bench-stock-val">-- ms</div>
+            </div>
+            <div class="bench-vs">VS</div>
+            <div class="bench-col">
+              <span class="bench-label">BBR Engine</span>
+              <div class="bench-val highlight" id="bench-bbr-val">-- ms</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. SETTINGS TAB -->
+      <section class="tab-panel" id="tab-settings">
+        <div class="section-header">
+          <h2>Safety & System</h2>
+          <span class="sub-hint">Thermal guard & rollback</span>
+        </div>
+
+        <div class="settings-card">
+          <div class="setting-row">
+            <div>
+              <div class="setting-title">Thermal Warn Guard</div>
+              <div class="setting-desc">Turunkan GPU clock ke 385MHz saat mencapai 85°C</div>
+            </div>
+            <span class="badge active">85°C</span>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <div class="setting-title">Thermal Crit Emergency</div>
+              <div class="setting-desc">Restore total ke stock jika mencapai 90°C</div>
+            </div>
+            <span class="badge danger">90°C</span>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <div class="setting-title">Thermal Hysteresis</div>
+              <div class="setting-desc">Boost baru aktif kembali setelah dingin ke 82°C</div>
+            </div>
+            <span class="badge">ACTIVE</span>
+          </div>
+        </div>
+
+        <div class="restore-card">
+          <div class="restore-info">
+            <div class="restore-title">Emergency Stock Restore</div>
+            <div class="restore-desc">Kembalikan seluruh parameter GPU, CPU, dan Network ke kondisi pabrik</div>
+          </div>
+          <button class="hud-btn danger full-w" id="btn-emergency-restore">RESTORE ALL STOCK</button>
+        </div>
+
+        <div class="daemon-meta-card">
+          <div>Daemon: <strong>frameboostd v2.0.0</strong></div>
+          <div>Uptime: <span id="daemon-uptime">0s</span></div>
+          <div>Stock Snapshot: <span id="snapshot-status">SAVED</span></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Navigation Bar (Pill HUD Style) -->
+    <nav class="hud-nav">
+      <button class="nav-tab active" data-tab="tab-home">
+        <span class="nav-icon">⬢</span>
+        <span class="nav-label">HOME</span>
+      </button>
+      <button class="nav-tab" data-tab="tab-games">
+        <span class="nav-icon">◈</span>
+        <span class="nav-label">GAMES</span>
+      </button>
+      <button class="nav-tab" data-tab="tab-network">
+        <span class="nav-icon">▲</span>
+        <span class="nav-label">PING</span>
+      </button>
+      <button class="nav-tab" data-tab="tab-settings">
+        <span class="nav-icon">⚙</span>
+        <span class="nav-label">SAFETY</span>
+      </button>
+    </nav>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
