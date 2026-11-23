@@ -1,105 +1,94 @@
 package com.a50.frameboost.hud;
 
 import android.app.Activity;
-import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
-import android.net.Uri;
+import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
-import android.view.View;
-import android.widget.Button;
-import android.widget.CheckBox;
-import android.widget.TextView;
+import android.view.Window;
+import android.view.WindowManager;
+import android.webkit.WebChromeClient;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 
 public class MainActivity extends Activity {
-    private static final int REQ_OVERLAY_PERM = 101;
-    private TextView txtStatus;
-    private Button btnToggle;
-    private Button btnPerm;
-    private CheckBox chkAutoHide;
-    private boolean isRunning = false;
+    private WebView webView;
+    private WebAppInterface bridge;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Cyberpunk dark system bars
+        Window window = getWindow();
+        window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+        window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+        window.setStatusBarColor(Color.parseColor("#08090d"));
+        window.setNavigationBarColor(Color.parseColor("#0d0f17"));
+
         setContentView(R.layout.activity_main);
 
-        txtStatus = findViewById(R.id.txt_status);
-        btnToggle = findViewById(R.id.btn_toggle_hud);
-        btnPerm = findViewById(R.id.btn_permission);
-        chkAutoHide = findViewById(R.id.chk_auto_hide);
+        webView = findViewById(R.id.webview);
+        bridge = new WebAppInterface(this);
 
-        SharedPreferences prefs = getSharedPreferences("hud_prefs", Context.MODE_PRIVATE);
-        chkAutoHide.setChecked(prefs.getBoolean("auto_hide", true));
+        WebSettings settings = webView.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setAllowFileAccess(true);
+        settings.setAllowContentAccess(true);
+        settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
+        settings.setDisplayZoomControls(false);
+        settings.setSupportZoom(false);
 
-        chkAutoHide.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            prefs.edit().putBoolean("auto_hide", isChecked).apply();
-        });
-
-        btnPerm.setOnClickListener(v -> {
-            Intent intent = new Intent(
-                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:" + getPackageName())
-            );
-            startActivityForResult(intent, REQ_OVERLAY_PERM);
-        });
-
-        btnToggle.setOnClickListener(v -> {
-            if (!Settings.canDrawOverlays(this)) {
-                btnPerm.setVisibility(View.VISIBLE);
-                return;
-            }
-            if (!isRunning) {
-                startHudService();
-            } else {
-                stopHudService();
+        webView.setBackgroundColor(Color.parseColor("#08090d"));
+        webView.setWebChromeClient(new WebChromeClient());
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                if (url != null && (url.startsWith("http://") || url.startsWith("https://"))) {
+                    try {
+                        Intent i = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url));
+                        startActivity(i);
+                        return true;
+                    } catch (Exception ignored) {}
+                }
+                return false;
             }
         });
 
-        checkOverlayPermission();
-    }
+        webView.addJavascriptInterface(bridge, "_nativeBridge");
+        webView.loadUrl("file:///android_asset/webroot/index.html");
 
-    private void checkOverlayPermission() {
-        if (!Settings.canDrawOverlays(this)) {
-            btnPerm.setVisibility(View.VISIBLE);
-            txtStatus.setText("Overlay Permission Needed!");
-            txtStatus.setTextColor(0xffffb800);
-        } else {
-            btnPerm.setVisibility(View.GONE);
-            txtStatus.setText("Permission Granted. Ready.");
-            txtStatus.setTextColor(0xff00ff9d);
+        // Auto-start HUD background service if overlay permission already granted
+        if (Settings.canDrawOverlays(this)) {
+            if (!OverlayService.isRunning()) {
+                Intent hudIntent = new Intent(this, OverlayService.class);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(hudIntent);
+                } else {
+                    startService(hudIntent);
+                }
+            }
         }
-    }
-
-    private void startHudService() {
-        Intent intent = new Intent(this, OverlayService.class);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent);
-        } else {
-            startService(intent);
-        }
-        isRunning = true;
-        btnToggle.setText("STOP FLOATING HUD");
-        btnToggle.setBackgroundColor(0xffff3366);
-        txtStatus.setText("HUD Service: Running (Auto-mode active)");
-        txtStatus.setTextColor(0xff00ff9d);
-    }
-
-    private void stopHudService() {
-        Intent intent = new Intent(this, OverlayService.class);
-        stopService(intent);
-        isRunning = false;
-        btnToggle.setText("START FLOATING HUD");
-        btnToggle.setBackgroundColor(0xff00f0ff);
-        txtStatus.setText("HUD Service: Stopped");
-        txtStatus.setTextColor(0xffffffff);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        checkOverlayPermission();
+        if (webView != null) {
+            webView.evaluateJavascript("if (typeof updateHudToggleState === 'function') updateHudToggleState();", null);
+        }
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (webView != null && webView.canGoBack()) {
+            webView.goBack();
+        } else {
+            // Keep app alive in background when returning to launcher
+            moveTaskToBack(true);
+        }
     }
 }

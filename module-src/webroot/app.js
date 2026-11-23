@@ -2,6 +2,20 @@
 (function () {
   "use strict";
 
+  // Inject Native Bridge to window.ksu shim if running in FrameBoost APK
+  if (window._nativeBridge) {
+    window.ksu = {
+      exec: async function (cmd) {
+        try {
+          const res = window._nativeBridge.exec(cmd);
+          return { errno: 0, stdout: res || "", stderr: "" };
+        } catch (e) {
+          return { errno: -1, stdout: "", stderr: String(e) };
+        }
+      },
+    };
+  }
+
   // Elements: Hero & Telemetry
   const stateDot = document.getElementById("state-dot");
   const stateLabel = document.getElementById("state-label");
@@ -180,6 +194,10 @@
   }
 
   async function sendSocketCmd(cmd) {
+    if (window._nativeBridge && typeof window._nativeBridge.sendSocket === "function") {
+      const res = window._nativeBridge.sendSocket(cmd);
+      return res || null;
+    }
     const shell = `printf "${cmd}\\n" | nc -U /data/local/tmp/frameboost.sock 2>/dev/null`;
     const res = await execCmd(shell);
     return res;
@@ -351,6 +369,7 @@
               <span class="chip-sm">${game.profile || "Balanced 455M"}</span>
             </div>
           </div>
+          <button class="btn-launch-game" data-pkg="${game.pkg}" title="Mainkan Game">▶ PLAY</button>
           <button class="btn-remove-game" data-pkg="${game.pkg}" title="Hapus dari daftar">✕</button>
         </div>
         <div class="game-tune-row">
@@ -434,6 +453,20 @@
           } catch (_) {}
         }
         await loadGames();
+      });
+    });
+
+    // Wire Play / Launch buttons
+    gamesContainer.querySelectorAll(".btn-launch-game").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const pkg = btn.dataset.pkg;
+        if (window._nativeBridge && typeof window._nativeBridge.launchGame === "function") {
+          const ok = window._nativeBridge.launchGame(pkg);
+          if (!ok) alert("Gagal meluncurkan game. Pastikan package terinstall.");
+        } else {
+          execCmd(`monkey -p ${pkg} -c android.intent.category.LAUNCHER 1 2>/dev/null`);
+        }
       });
     });
   }
@@ -648,4 +681,41 @@
     await sendSocketCmd("restore_all");
     setTimeout(() => (btnRestore.textContent = "RESTORE ALL STOCK"), 1500);
   });
+
+  // Floating HUD Controller
+  function updateHudToggleState() {
+    const btn = document.getElementById("btn-toggle-hud");
+    const txt = document.getElementById("hud-status-text");
+    if (!btn || !txt) return;
+
+    if (window._nativeBridge && typeof window._nativeBridge.isHudRunning === "function") {
+      const running = window._nativeBridge.isHudRunning();
+      if (running) {
+        btn.classList.remove("off");
+        txt.textContent = "ON";
+      } else {
+        btn.classList.add("off");
+        txt.textContent = "OFF";
+      }
+    }
+  }
+  window.updateHudToggleState = updateHudToggleState;
+
+  const btnToggleHud = document.getElementById("btn-toggle-hud");
+  btnToggleHud?.addEventListener("click", () => {
+    if (window._nativeBridge) {
+      if (!window._nativeBridge.canDrawOverlays()) {
+        alert("Mohon izinkan izin 'Display over other apps' untuk mengaktifkan HUD melayang.");
+        window._nativeBridge.requestOverlayPermission();
+        return;
+      }
+      const running = window._nativeBridge.isHudRunning();
+      window._nativeBridge.setHudEnabled(!running);
+      setTimeout(updateHudToggleState, 250);
+    } else {
+      alert("HUD Service hanya aktif di aplikasi Android FrameBoost Game Space.");
+    }
+  });
+
+  updateHudToggleState();
 })();

@@ -1,0 +1,126 @@
+package com.a50.frameboost.hud;
+
+import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Build;
+import android.provider.Settings;
+import android.webkit.JavascriptInterface;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.InputStreamReader;
+
+public class WebAppInterface {
+    private Context context;
+
+    public WebAppInterface(Context context) {
+        this.context = context;
+    }
+
+    @JavascriptInterface
+    public String exec(String cmd) {
+        if (cmd == null || cmd.isEmpty()) return "";
+
+        // Fast path 1: Reading snapshot JSON directly from memory without spawning shell
+        if (cmd.contains("cat /data/local/tmp/frameboost-snapshot.json")) {
+            File f = new File("/data/local/tmp/frameboost-snapshot.json");
+            if (f.exists() && f.canRead()) {
+                try (BufferedReader br = new BufferedReader(new FileReader(f))) {
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = br.readLine()) != null) sb.append(line);
+                    return sb.toString();
+                } catch (Exception ignored) {}
+            }
+        }
+
+        // Fast path 2: Socket command sent directly via LocalSocket without spawning nc
+        if (cmd.contains("nc -U /data/local/tmp/frameboost.sock")) {
+            int p1 = cmd.indexOf("\"");
+            int p2 = cmd.lastIndexOf("\\n\"");
+            if (p1 != -1 && p2 > p1) {
+                String sockCmd = cmd.substring(p1 + 1, p2);
+                String res = IpcClient.sendCommand(sockCmd);
+                if (res != null) return res;
+            }
+        }
+
+        // Fallback: execute via su
+        try {
+            Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", cmd});
+            BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (sb.length() > 0) sb.append("\n");
+                sb.append(line);
+            }
+            p.waitFor();
+            return sb.toString();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    @JavascriptInterface
+    public String sendSocket(String sockCmd) {
+        if (sockCmd == null || sockCmd.isEmpty()) return "";
+        String res = IpcClient.sendCommand(sockCmd);
+        return res != null ? res : "";
+    }
+
+    @JavascriptInterface
+    public boolean launchGame(String pkg) {
+        if (pkg == null || pkg.isEmpty()) return false;
+        try {
+            Intent intent = context.getPackageManager().getLaunchIntentForPackage(pkg);
+            if (intent != null) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(intent);
+                return true;
+            }
+        } catch (Exception ignored) {}
+        return false;
+    }
+
+    @JavascriptInterface
+    public boolean isHudRunning() {
+        return OverlayService.isRunning();
+    }
+
+    @JavascriptInterface
+    public boolean canDrawOverlays() {
+        return Settings.canDrawOverlays(context);
+    }
+
+    @JavascriptInterface
+    public void requestOverlayPermission() {
+        try {
+            Intent intent = new Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + context.getPackageName())
+            );
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+        } catch (Exception ignored) {}
+    }
+
+    @JavascriptInterface
+    public void setHudEnabled(boolean enable) {
+        Intent intent = new Intent(context, OverlayService.class);
+        if (enable) {
+            if (Settings.canDrawOverlays(context)) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent);
+                } else {
+                    context.startService(intent);
+                }
+            } else {
+                requestOverlayPermission();
+            }
+        } else {
+            context.stopService(intent);
+        }
+    }
+}

@@ -50,7 +50,10 @@
         <span class="brand-pill">A50</span>
         <span class="brand-title">FRAMEBOOST</span>
       </div>
-      <div class="hud-status">
+      <div class="hud-status" style="display:flex; align-items:center; gap:8px;">
+        <button id="btn-toggle-hud" class="btn-hud-pill" title="Toggle Floating HUD">
+          <span>⚡</span> HUD: <span id="hud-status-text">ON</span>
+        </button>
         <span class="state-dot" id="state-dot"></span>
         <span class="state-label" id="state-label">IDLE</span>
       </div>

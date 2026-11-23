@@ -45,6 +45,12 @@ public class OverlayService extends Service {
     private boolean autoHide = true;
     private String currentGamePkg = "";
 
+    private static volatile boolean running = false;
+
+    public static boolean isRunning() {
+        return running;
+    }
+
     private Button btnBat;
     private Button btnBal;
     private Button btnPerf;
@@ -58,6 +64,7 @@ public class OverlayService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        running = true;
         createNotificationChannel();
         startForeground(1, createNotification());
 
@@ -286,6 +293,7 @@ public class OverlayService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        running = false;
         if (handler != null && updateRunnable != null) {
             handler.removeCallbacks(updateRunnable);
         }
