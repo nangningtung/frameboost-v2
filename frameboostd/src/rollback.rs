@@ -41,6 +41,22 @@ pub fn restore_from_snapshot(snap: &StockSnapshot) -> Result<(), Vec<String>> {
         let _ = write_verified("/proc/sys/net/ipv4/tcp_congestion_control", &snap.net_cc);
     }
 
+    // 6. Restore VM anti-stutter (swappiness & vfs_cache_pressure)
+    if !snap.vm_swappiness.is_empty() {
+        let _ = write_verified("/proc/sys/vm/swappiness", &snap.vm_swappiness);
+    }
+    if !snap.vm_vfs_cache_pressure.is_empty() {
+        let _ = write_verified("/proc/sys/vm/vfs_cache_pressure", &snap.vm_vfs_cache_pressure);
+    }
+
+    // 7. Restore Gaming DND & Brightness Mode
+    if !snap.heads_up_enabled.is_empty() {
+        let _ = crate::sysfs::run_cmd("settings", &["put", "global", "heads_up_notifications_enabled", &snap.heads_up_enabled]);
+    }
+    if !snap.screen_brightness_mode.is_empty() {
+        let _ = crate::sysfs::run_cmd("settings", &["put", "system", "screen_brightness_mode", &snap.screen_brightness_mode]);
+    }
+
     if errors.is_empty() {
         Ok(())
     } else {
@@ -60,6 +76,10 @@ pub fn restore_hardcoded_stock() -> Result<(), Vec<String>> {
         net_cc: "westwood".to_string(),
         net_fastopen: "1543".to_string(),
         net_tw_reuse: "0".to_string(),
+        vm_swappiness: "130".to_string(),
+        vm_vfs_cache_pressure: "100".to_string(),
+        heads_up_enabled: "1".to_string(),
+        screen_brightness_mode: "0".to_string(),
         timestamp: 0,
     };
     restore_from_snapshot(&hardcoded)

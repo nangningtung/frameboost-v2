@@ -179,7 +179,17 @@ impl AutoDaemon {
                     };
                     let _ = apply_profile(&boost);
 
-                    // Game Launch Hygiene: drop pagecache & renice process
+                    // 1. Anti-stutter RAM & ZRAM: lower swappiness from 130 -> 10 to eliminate kswapd0 thrashing
+                    let _ = fs::write("/proc/sys/vm/swappiness", "10");
+                    let _ = fs::write("/proc/sys/vm/vfs_cache_pressure", "50");
+
+                    // 2. Gaming DND: block heads-up notifications from popping up over game
+                    let _ = run_cmd("settings", &["put", "global", "heads_up_notifications_enabled", "0"]);
+
+                    // 3. Anti-redup: lock brightness to manual mode (prevent palm from covering ambient light sensor)
+                    let _ = run_cmd("settings", &["put", "system", "screen_brightness_mode", "0"]);
+
+                    // 4. Game Launch Hygiene: drop pagecache & renice process
                     let _ = fs::write("/proc/sys/vm/drop_caches", "3");
                     let pid_out = run_cmd("pidof", &[&self.current_game]);
                     let pid = pid_out.trim();
@@ -187,7 +197,7 @@ impl AutoDaemon {
                         let _ = run_cmd("renice", &["-n", "-10", "-p", pid]);
                     }
 
-                    // Auto-BBR for online titles
+                    // 5. Auto-BBR for online titles
                     if prof.auto_bbr {
                         let _ = apply_bbr();
                     }

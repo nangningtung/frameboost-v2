@@ -25,6 +25,7 @@
   const heroCpuClk = document.getElementById("hero-cpu-clk");
   const heroGpuGov = document.getElementById("hero-gpu-gov");
   const heroCpuGov = document.getElementById("hero-cpu-gov");
+  const heroStutterGov = document.getElementById("hero-stutter-gov");
   const gpuBusyFill = document.getElementById("gpu-busy-fill");
   const gpuBusyText = document.getElementById("gpu-busy-text");
   const gpuMinText = document.getElementById("gpu-min-text");
@@ -231,6 +232,17 @@
     // Badges
     heroGpuGov.textContent = `GPU: ${data.gpu?.governor || "Interactive"}`;
     heroCpuGov.textContent = `CPU: ${data.cpu?.big?.gov || "energy_adaptive"}`;
+    if (heroStutterGov) {
+      if (data.is_game) {
+        heroStutterGov.textContent = `RAM: Anti-Stutter (ZRAM 10) • DND ON`;
+        heroStutterGov.style.color = "#00ff9d";
+        heroStutterGov.style.borderColor = "rgba(0, 255, 157, 0.4)";
+      } else {
+        heroStutterGov.textContent = `RAM: Stock (ZRAM 130)`;
+        heroStutterGov.style.color = "";
+        heroStutterGov.style.borderColor = "";
+      }
+    }
 
     // Gauges
     const busy = Math.round(data.gpu?.busy_pct || 0);
@@ -460,6 +472,9 @@
     gamesContainer.querySelectorAll(".btn-launch-game").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
+        if (window._nativeBridge && typeof window._nativeBridge.triggerHaptic === "function") {
+          window._nativeBridge.triggerHaptic();
+        }
         const pkg = btn.dataset.pkg;
         if (window._nativeBridge && typeof window._nativeBridge.launchGame === "function") {
           const ok = window._nativeBridge.launchGame(pkg);
@@ -703,6 +718,9 @@
 
   const btnToggleHud = document.getElementById("btn-toggle-hud");
   btnToggleHud?.addEventListener("click", () => {
+    if (window._nativeBridge && typeof window._nativeBridge.triggerHaptic === "function") {
+      window._nativeBridge.triggerHaptic();
+    }
     if (window._nativeBridge) {
       if (!window._nativeBridge.canDrawOverlays()) {
         alert("Mohon izinkan izin 'Display over other apps' untuk mengaktifkan HUD melayang.");

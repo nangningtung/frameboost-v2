@@ -18,6 +18,10 @@ pub struct StockSnapshot {
     pub net_cc: String,
     pub net_fastopen: String,
     pub net_tw_reuse: String,
+    pub vm_swappiness: String,
+    pub vm_vfs_cache_pressure: String,
+    pub heads_up_enabled: String,
+    pub screen_brightness_mode: String,
     pub timestamp: u64,
 }
 
@@ -28,6 +32,11 @@ impl StockSnapshot {
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_secs())
             .unwrap_or(0);
+        let swp = read_file("/proc/sys/vm/swappiness");
+        let vfs = read_file("/proc/sys/vm/vfs_cache_pressure");
+        let heads = crate::sysfs::run_cmd("settings", &["get", "global", "heads_up_notifications_enabled"]).trim().to_string();
+        let bright = crate::sysfs::run_cmd("settings", &["get", "system", "screen_brightness_mode"]).trim().to_string();
+
         Self {
             gpu_governor: read_file("/sys/kernel/gpu/gpu_governor"),
             gpu_min_clock: read_u32("/sys/kernel/gpu/gpu_min_clock"),
@@ -38,6 +47,10 @@ impl StockSnapshot {
             net_cc: read_file("/proc/sys/net/ipv4/tcp_congestion_control"),
             net_fastopen: read_file("/proc/sys/net/ipv4/tcp_fastopen"),
             net_tw_reuse: read_file("/proc/sys/net/ipv4/tcp_tw_reuse"),
+            vm_swappiness: if swp.is_empty() { "130".to_string() } else { swp },
+            vm_vfs_cache_pressure: if vfs.is_empty() { "100".to_string() } else { vfs },
+            heads_up_enabled: if heads.is_empty() { "1".to_string() } else { heads },
+            screen_brightness_mode: if bright.is_empty() { "0".to_string() } else { bright },
             timestamp: now,
         }
     }

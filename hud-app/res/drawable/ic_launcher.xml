@@ -1,13 +1,50 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="48dp"
-    android:height="48dp"
-    android:viewportWidth="48"
-    android:viewportHeight="48">
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Background: Deep Obsidian Shield -->
     <path
-        android:fillColor="#12151f"
-        android:pathData="M8,4h32a4,4 0 0,1 4,4v32a4,4 0 0,1 -4,4H8a4,4 0 0,1 -4,-4V8a4,4 0 0,1 4,-4z" />
+        android:fillColor="#08090d"
+        android:pathData="M18,12 L90,12 A6,6 0 0,1 96,18 L96,90 A6,6 0 0,1 90,96 L18,96 A6,6 0 0,1 12,90 L12,18 A6,6 0 0,1 18,12 Z" />
+
+    <!-- Cyber Shield Inner Glow (Subtle card gradient) -->
+    <path
+        android:fillColor="#11141e"
+        android:pathData="M22,16 L86,16 A4,4 0 0,1 90,20 L90,88 A4,4 0 0,1 86,92 L22,92 A4,4 0 0,1 18,88 L18,20 A4,4 0 0,1 22,16 Z" />
+
+    <!-- Cyberpunk Corner Accents (Cyan Neon) -->
+    <path
+        android:strokeColor="#00f0ff"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="square"
+        android:pathData="M12,28 L12,16 L24,16 M96,28 L96,16 L84,16 M12,80 L12,92 L24,92 M96,80 L96,92 L84,92" />
+
+    <!-- Hexagon Frame Accent -->
+    <path
+        android:strokeColor="#1a00f0ff"
+        android:strokeWidth="1.5"
+        android:pathData="M54,20 L84,36 L84,72 L54,88 L24,72 L24,36 Z" />
+
+    <!-- Dual-Tone Gaming Bolt Shadow / Glow -->
+    <path
+        android:fillColor="#4d00f0ff"
+        android:pathData="M57,25 L34,56 L51,56 L44,83 L74,49 L55,49 Z" />
+
+    <!-- Primary Neon Bolt: Cyber Cyan -->
     <path
         android:fillColor="#00f0ff"
-        android:pathData="M24,10L14,26h9l-3,12 14,-18h-9z" />
+        android:pathData="M55,27 L36,54 L52,54 L46,80 L72,48 L54,48 Z" />
+
+    <!-- Bolt Core Highlight: Speed Green -->
+    <path
+        android:fillColor="#00ff9d"
+        android:pathData="M54,32 L42,50 L52,50 L48,68 L64,48 L53,48 Z" />
+
+    <!-- Bottom Badge Text Accent: 'A50' -->
+    <path
+        android:fillColor="#ffd061"
+        android:pathData="M48,87 h12 v2 h-12 z" />
 </vector>

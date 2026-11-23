@@ -71,6 +71,20 @@ public class WebAppInterface {
     }
 
     @JavascriptInterface
+    public void triggerHaptic() {
+        try {
+            android.os.Vibrator v = (android.os.Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
+            if (v != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    v.vibrate(android.os.VibrationEffect.createOneShot(25, android.os.VibrationEffect.DEFAULT_AMPLITUDE));
+                } else {
+                    v.vibrate(25);
+                }
+            }
+        } catch (Exception ignored) {}
+    }
+
+    @JavascriptInterface
     public boolean launchGame(String pkg) {
         if (pkg == null || pkg.isEmpty()) return false;
         try {

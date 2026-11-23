@@ -76,6 +76,8 @@ pub struct Snapshot {
     pub gpu: GpuState,
     pub cpu: CpuState,
     pub net: NetState,
+    pub vm_swappiness: u32,
+    pub heads_up_blocked: bool,
     pub daemon_uptime_s: u64,
     pub stock_saved: bool,
 }
@@ -158,6 +160,8 @@ fn take_snapshot(start: Instant, detector: &Arc<RwLock<GameDetector>>, state: u8
         gpu: read_gpu(),
         cpu: read_cpu(),
         net: read_net(),
+        vm_swappiness: read_u32("/proc/sys/vm/swappiness"),
+        heads_up_blocked: is_g,
         daemon_uptime_s: start.elapsed().as_secs(),
         stock_saved: StockSnapshot::exists(),
     }

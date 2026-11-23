@@ -155,7 +155,21 @@ public class OverlayService extends Service {
         });
     }
 
+    private void triggerHaptic() {
+        try {
+            android.os.Vibrator v = (android.os.Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+            if (v != null) {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    v.vibrate(android.os.VibrationEffect.createOneShot(20, android.os.VibrationEffect.DEFAULT_AMPLITUDE));
+                } else {
+                    v.vibrate(20);
+                }
+            }
+        } catch (Exception ignored) {}
+    }
+
     private void toggleDrawer() {
+        triggerHaptic();
         isDrawerOpen = !isDrawerOpen;
         if (isDrawerOpen) {
             viewPill.setVisibility(View.GONE);
@@ -205,6 +219,7 @@ public class OverlayService extends Service {
         btnEsp = overlayRoot.findViewById(R.id.btn_preset_esports);
 
         View.OnClickListener listener = v -> {
+            triggerHaptic();
             String preset = "BALANCED";
             if (v.getId() == R.id.btn_preset_battery) preset = "BATTERY";
             else if (v.getId() == R.id.btn_preset_perf) preset = "PERFORMANCE";
