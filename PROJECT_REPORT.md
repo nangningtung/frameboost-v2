@@ -1,7 +1,7 @@
 # FrameBoost v2 — Project Report
 
 Status: **Selesai untuk fase ini**  
-Commit terakhir: `PENDING`  
+Commit fitur terakhir: `0aa121d`  
 Device uji: `RR8M50C0W8T` (Samsung Galaxy A50)
 
 ---
@@ -266,7 +266,7 @@ Gunakan checklist ini setiap kali ada perubahan.
 
 ## 9. Changelog
 
-### `PENDING` — 2026-11-24
+### `0aa121d` — 2026-11-24
 
 ```text
 feat: seamless edge monitor, cockpit panel and SurfaceFlinger FPS
