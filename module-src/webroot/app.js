@@ -26,6 +26,19 @@
   const heroGpuGov = document.getElementById("hero-gpu-gov");
   const heroCpuGov = document.getElementById("hero-cpu-gov");
   const heroStutterGov = document.getElementById("hero-stutter-gov");
+  const radialCpuFill = document.getElementById("radial-cpu-fill");
+  const radialGpuFill = document.getElementById("radial-gpu-fill");
+  const heroGpuLoadSub = document.getElementById("hero-gpu-load-sub");
+  const heroPresetTag = document.getElementById("hero-preset-tag");
+  const btnQuickCleanRam = document.getElementById("btn-quick-clean-ram");
+  const btnQuickBypass = document.getElementById("btn-quick-bypass");
+  const btnQuickDnd = document.getElementById("btn-quick-dnd");
+  const btnQuickGosWeb = document.getElementById("btn-quick-gos-web");
+  const lblQuickRam = document.getElementById("lbl-quick-ram");
+  const lblQuickBypass = document.getElementById("lbl-quick-bypass");
+  const lblQuickDnd = document.getElementById("lbl-quick-dnd");
+  const lblQuickGosWeb = document.getElementById("lbl-quick-gos-web");
+  const presetSegmentBtns = document.querySelectorAll(".preset-segment-btn");
   const gpuBusyFill = document.getElementById("gpu-busy-fill");
   const gpuBusyText = document.getElementById("gpu-busy-text");
   const gpuMinText = document.getElementById("gpu-min-text");
@@ -36,10 +49,11 @@
   const daemonStatus = document.getElementById("daemon-status");
   const frametimeCanvas = document.getElementById("frametime-canvas");
   const fpsLiveLabel = document.getElementById("fps-live-label");
+  const fpsFtLabel = document.getElementById("fps-ft-label");
 
   // Elements: Network
   const netIface = document.getElementById("net-iface");
-  const netCcBadge = document.getElementById("net-health-badge");
+  const netCcBadge = document.getElementById("net-cc-text");
 
   // Elements: Game Library
   const gamesContainer = document.getElementById("games-container");
@@ -77,11 +91,10 @@
     }
 
     if (fpsLiveLabel) {
-      if (fps > 0) {
-        fpsLiveLabel.textContent = `${fps.toFixed(1)} FPS • ${ft.toFixed(1)} ms`;
-      } else {
-        fpsLiveLabel.textContent = `0.0 FPS • -- ms`;
-      }
+      fpsLiveLabel.textContent = fps > 0 ? `${fps.toFixed(1)} FPS` : "0.0 FPS";
+    }
+    if (fpsFtLabel) {
+      fpsFtLabel.textContent = fps > 0 ? `${ft.toFixed(1)} ms frametime` : "-- ms frametime";
     }
 
     const dpr = window.devicePixelRatio || 1;
@@ -102,7 +115,7 @@
     const maxMs = 50;
     const targetY = h - (16.66 / maxMs) * (h - 10);
 
-    ctx.strokeStyle = "rgba(0, 255, 157, 0.4)";
+    ctx.strokeStyle = "rgba(0, 230, 118, 0.4)";
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 4]);
     ctx.beginPath();
@@ -132,8 +145,8 @@
     ctx.lineTo(startX, h);
     ctx.closePath();
     const grad = ctx.createLinearGradient(0, 0, 0, h);
-    grad.addColorStop(0, "rgba(208, 188, 255, 0.25)");
-    grad.addColorStop(1, "rgba(208, 188, 255, 0.0)");
+    grad.addColorStop(0, "rgba(0, 229, 255, 0.22)");
+    grad.addColorStop(1, "rgba(0, 229, 255, 0.0)");
     ctx.fillStyle = grad;
     ctx.fill();
 
@@ -146,7 +159,7 @@
       if (idx === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     });
-    ctx.strokeStyle = "#d0bcff";
+    ctx.strokeStyle = "#00e5ff";
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
@@ -219,6 +232,12 @@
   }
 
   // Update UI with snapshot data
+  function displayGameName(pkg) {
+    if (!pkg) return "Desktop / Idle";
+    const known = allGames.find((g) => g.pkg === pkg);
+    return known && known.name ? known.name : pkg;
+  }
+
   function renderSnapshot(data) {
     if (!data) return;
 
@@ -237,7 +256,7 @@
 
     // Hero Meta
     currentForegroundPkg = data.game_pkg || "";
-    heroGame.textContent = currentForegroundPkg || "Desktop / Idle";
+    heroGame.textContent = displayGameName(currentForegroundPkg);
     const tempC = Math.round((data.temp_big_mc || 0) / 1000);
     heroTemp.textContent = `${tempC}°`;
 
@@ -248,23 +267,62 @@
     const cpuMhz = Math.round((data.cpu?.big?.cur_freq || data.cpu?.big?.min_freq || 0) / 1000);
     heroCpuClk.textContent = `${cpuMhz}M`;
 
+    // Radial Ring Gauges calculation
+    if (radialCpuFill) {
+      const maxTemp = 90;
+      const tempRatio = Math.min(1, Math.max(0, tempC / maxTemp));
+      const cpuOffset = 264 * (1 - tempRatio);
+      radialCpuFill.style.strokeDashoffset = cpuOffset;
+      if (tempC >= 80) {
+        radialCpuFill.style.stroke = "#ff4d5e";
+      } else if (tempC >= 68) {
+        radialCpuFill.style.stroke = "#ffb020";
+      } else {
+        radialCpuFill.style.stroke = "#00e676";
+      }
+    }
+
+    const busy = Math.round(data.gpu?.busy_pct || 0);
+    if (radialGpuFill) {
+      const gpuMax = 1053;
+      const gpuRatio = Math.min(1, Math.max(0, gpuMhz / gpuMax));
+      const gpuOffset = 264 * (1 - gpuRatio);
+      radialGpuFill.style.strokeDashoffset = gpuOffset;
+    }
+    if (heroGpuLoadSub) {
+      heroGpuLoadSub.textContent = `${busy}% LOAD`;
+    }
+
+    // Active Preset Tag & Selector
+    const activePreset = (data.game_preset || "BALANCED").toUpperCase();
+    if (heroPresetTag) {
+      heroPresetTag.textContent = activePreset;
+    }
+    if (presetSegmentBtns && presetSegmentBtns.length) {
+      presetSegmentBtns.forEach(btn => {
+        const p = (btn.getAttribute("data-preset") || "").toUpperCase();
+        if (p === activePreset) {
+          btn.classList.add("active");
+        } else {
+          btn.classList.remove("active");
+        }
+      });
+    }
+
     // Badges
     heroGpuGov.textContent = `GPU: ${data.gpu?.governor || "Interactive"}`;
     heroCpuGov.textContent = `CPU: ${data.cpu?.big?.gov || "energy_adaptive"}`;
     if (heroStutterGov) {
       if (data.is_game) {
-        heroStutterGov.textContent = `RAM: Anti-Stutter (ZRAM 10) • DND ON`;
-        heroStutterGov.style.color = "#7ddca5";
-        heroStutterGov.style.borderColor = "rgba(0, 255, 157, 0.4)";
+        heroStutterGov.textContent = "Anti-Stutter";
+        heroStutterGov.style.color = "#00e676";
       } else {
-        heroStutterGov.textContent = `RAM: Stock (ZRAM 130)`;
+        heroStutterGov.textContent = "Stock";
         heroStutterGov.style.color = "";
-        heroStutterGov.style.borderColor = "";
       }
     }
 
     // Gauges
-    const busy = Math.round(data.gpu?.busy_pct || 0);
     gpuBusyFill.style.width = `${Math.min(100, Math.max(0, busy))}%`;
     gpuBusyText.textContent = `${busy}%`;
     gpuMinText.textContent = `Min: ${Math.round((data.gpu?.min_clock || 260000) / 1000)} MHz`;
@@ -284,9 +342,23 @@
 
       if (battCapEl) battCapEl.textContent = `${b.capacity_pct || 0}%`;
       if (battStatusEl) {
-        battStatusEl.textContent = b.status || "Discharging";
-        battStatusEl.className = "battery-status-badge";
-        if (b.status === "Charging") battStatusEl.classList.add("charging");
+        if (b.bypass_charging) {
+          battStatusEl.textContent = "⚡ Bypass Passthrough";
+          battStatusEl.className = "battery-status-badge bypass";
+        } else {
+          battStatusEl.textContent = b.status || "Discharging";
+          battStatusEl.className = "battery-status-badge";
+          if (b.status === "Charging") battStatusEl.classList.add("charging");
+        }
+      }
+      if (btnQuickBypass && lblQuickBypass) {
+        if (b.bypass_charging) {
+          btnQuickBypass.classList.add("active");
+          lblQuickBypass.textContent = "PASSTHROUGH";
+        } else {
+          btnQuickBypass.classList.remove("active");
+          lblQuickBypass.textContent = "BYPASS CHG";
+        }
       }
       if (battCurrentEl) {
         const sign = b.current_now_ma > 0 ? "+" : "";
@@ -298,6 +370,61 @@
       }
       if (battTempEl) battTempEl.textContent = `${(b.temp_c || 0).toFixed(1)}°C`;
       if (battPowerEl) battPowerEl.textContent = `${(b.power_w || 0).toFixed(2)} W`;
+    }
+
+    // GOS Status
+    const heroGosVal = document.getElementById("hero-gos-val");
+    const heroGosChip = document.getElementById("hero-gos-chip");
+    const btnQuickGosWeb = document.getElementById("btn-quick-gos-web");
+    const lblQuickGosWeb = document.getElementById("lbl-quick-gos-web");
+    const gosBadge = document.getElementById("gos-badge");
+    const gosStatus = document.getElementById("gos-status");
+
+    const isGosDefeated = !!data.gos_disabled;
+    const hasGosPkg = data.has_gos !== false;
+
+    if (heroGosVal) {
+      if (!hasGosPkg) {
+        heroGosVal.textContent = "AOSP";
+        heroGosVal.style.color = "#00e676";
+      } else {
+        heroGosVal.textContent = isGosDefeated ? "BYPASS" : "ACTIVE";
+        heroGosVal.style.color = isGosDefeated ? "#00e676" : "#ffb020";
+      }
+    }
+    if (heroGosChip) {
+      heroGosChip.style.color = (isGosDefeated || !hasGosPkg) ? "#00e676" : "#ffb020";
+    }
+    if (btnQuickGosWeb && lblQuickGosWeb) {
+      if (!hasGosPkg) {
+        btnQuickGosWeb.classList.remove("active");
+        btnQuickGosWeb.disabled = true;
+        btnQuickGosWeb.style.opacity = "0.6";
+        lblQuickGosWeb.textContent = "NO GOS (AOSP)";
+      } else {
+        btnQuickGosWeb.disabled = false;
+        btnQuickGosWeb.style.opacity = "1";
+        btnQuickGosWeb.classList.toggle("active", isGosDefeated);
+        lblQuickGosWeb.textContent = isGosDefeated ? "GOS KILLED" : "GOS BYPASS";
+      }
+    }
+    if (gosBadge) {
+      if (!hasGosPkg) {
+        gosBadge.textContent = "NOT PRESENT (AOSP)";
+        gosBadge.className = "badge active";
+      } else {
+        gosBadge.textContent = isGosDefeated ? "BYPASS ACTIVE" : "ENFORCED";
+        gosBadge.className = isGosDefeated ? "badge active" : "badge warn";
+      }
+    }
+    if (gosStatus) {
+      if (!hasGosPkg) {
+        gosStatus.textContent = "Status: Samsung GOS is not installed on this ROM (AOSP/GSI). No built-in GOS throttling.";
+      } else {
+        gosStatus.textContent = isGosDefeated
+          ? "Status: GOS disabled (no downclocking, no throttling)"
+          : "Status: GOS active (GameSDK caps GPU clock and FPS)";
+      }
     }
 
     // Daemon Meta
@@ -336,6 +463,35 @@
     telemetryVisible = document.visibilityState === "visible";
   });
 
+  let daemonOnline = null;
+
+  function setDaemonActions(enabled) {
+    [
+      "btn-emergency-restore",
+      "btn-gos-disable",
+      "btn-gos-restore",
+      "btn-scan-games",
+      "btn-quick-clean-ram",
+      "btn-quick-bypass",
+      "btn-quick-dnd",
+      "btn-quick-gos-web",
+      "btn-quick-ping",
+    ].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.disabled = !enabled;
+      if (enabled) el.removeAttribute("title");
+      else el.title = "Daemon offline";
+    });
+  }
+
+  function setEngineBadge(online) {
+    const cluster = document.querySelector(".cluster-state");
+    const label = document.querySelector(".engine-badge-text");
+    if (cluster) cluster.classList.toggle("is-offline", !online);
+    if (label) label.textContent = online ? "ENGINE ARMED" : "ENGINE OFFLINE";
+  }
+
   function setDaemonOffline() {
     if (stateLabel) stateLabel.textContent = "OFFLINE";
     if (stateDot) stateDot.className = "state-dot crit";
@@ -345,6 +501,23 @@
     if (heroCpuClk) heroCpuClk.textContent = "--M";
     if (daemonStatus) daemonStatus.textContent = "OFFLINE";
     if (daemonStatus) daemonStatus.className = "badge danger";
+    if (daemonOnline !== false) {
+      daemonOnline = false;
+      setDaemonActions(false);
+      setEngineBadge(false);
+      const statusLine = document.getElementById("gos-status");
+      if (statusLine) statusLine.textContent = "Status: waiting for the daemon";
+      const badge = document.getElementById("gos-badge");
+      if (badge) {
+        badge.textContent = "UNKNOWN";
+        badge.className = "badge";
+      }
+      const gosVal = document.getElementById("hero-gos-val");
+      if (gosVal) {
+        gosVal.textContent = "--";
+        gosVal.style.color = "";
+      }
+    }
   }
 
   async function pollTelemetry() {
@@ -388,6 +561,11 @@
       const banner = document.getElementById("preview-banner");
       if (banner) banner.classList.remove("hidden");
       renderSnapshot(mock);
+      const previewBadge = document.getElementById("net-health-badge");
+      if (previewBadge) {
+        previewBadge.textContent = "PREVIEW";
+        previewBadge.className = "badge active";
+      }
       return;
     }
     let raw = await sendSocketCmd("snapshot");
@@ -397,6 +575,12 @@
     if (raw && typeof raw === "string") {
       try {
         const snap = JSON.parse(raw);
+        if (daemonOnline !== true) {
+          daemonOnline = true;
+          setDaemonActions(true);
+          setEngineBadge(true);
+          refreshGosStatus();
+        }
         renderSnapshot(snap);
         if (daemonStatus) {
           daemonStatus.textContent = "ONLINE";
@@ -421,9 +605,15 @@
     if (!gamesContainer) return;
     if (!games || games.length === 0) {
       gamesContainer.innerHTML = `
-        <div style="text-align:center; padding:30px 10px; color:var(--text-dim); font-family:var(--font-mono); font-size:12px;">
-          Tidak ada game yang cocok.<br>
-          <span style="font-size:10px; color:var(--text-sub);">Hanya aplikasi game yang terpasang di device ditampilkan.</span>
+        <div class="empty-state">
+          <span class="empty-state-glyph" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6.5 8.5h11a3.5 3.5 0 0 1 3.4 4.3l-.8 3.4a2.4 2.4 0 0 1-4.2 1L14.4 15H9.6l-1.5 2.2a2.4 2.4 0 0 1-4.2-1l-.8-3.4A3.5 3.5 0 0 1 6.5 8.5z"/>
+              <path d="M8 11.4v2M7 12.4h2M15.6 12h.01M17.4 13.4h.01"/>
+            </svg>
+          </span>
+          <p class="empty-state-title">No games matched</p>
+          <p class="empty-state-desc">Only installed game apps are listed here.</p>
         </div>`;
       return;
     }
@@ -457,24 +647,30 @@
 
       const isBbr = !!game.auto_bbr;
       const currentPreset = (game.preset || "BALANCED").toUpperCase();
+      const rawProfile = game.profile || "";
+      const presetPrefix = `${currentPreset} \u2022 `;
+      const profileText = rawProfile.toUpperCase().startsWith(presetPrefix)
+        ? rawProfile.slice(presetPrefix.length)
+        : rawProfile;
 
       const initial = (game.name || "?").trim().charAt(0).toUpperCase();
       const hue = (game.pkg.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 360);
       item.innerHTML = `
-        <div class="game-tile-cover" style="background: linear-gradient(135deg, hsl(${hue}, 60%, 25%), hsl(${(hue+60)%360}, 50%, 15%));">
+        <div class="game-tile-cover" style="--tile-hue: ${hue};">
           <div class="game-tile-initial">${initial}</div>
           <div class="game-tile-source ${sourceClass}">${sourceLabel}</div>
         </div>
         <div class="game-tile-body">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-            <div style="min-width:0;">
-              <div class="game-title" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${game.name}</div>
-              <div class="game-pkg" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${game.pkg}</div>
-            </div>
-            <span class="preset-badge-${currentPreset.toLowerCase()}" style="font-family:var(--font-mono);font-size:10px;padding:2px 6px;border-radius:6px;background:var(--surface-2);">${currentPreset}</span>
+          <div class="game-row-top">
+            <div class="game-title">${game.name}</div>
+            <span class="preset-badge preset-badge-${currentPreset.toLowerCase()}">${currentPreset}</span>
           </div>
-          <button class="btn btn-primary inline-launch" data-pkg="${game.pkg}" style="margin-top:10px; width:100%; font-size:11px;">▶ PLAY</button>
+          <div class="game-pkg">${game.pkg}</div>
+          <div class="game-profile">${profileText || "No profile"}</div>
         </div>
+        <button class="game-play-btn inline-launch" data-pkg="${game.pkg}" aria-label="Play ${game.name}" title="Play ${game.name}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.4v13.2L19 12z"/></svg>
+        </button>
       `;
 
       gamesContainer.appendChild(item);
@@ -494,7 +690,7 @@
       if (window._nativeBridge && typeof window._nativeBridge.launchGame === "function") {
         window._nativeBridge.launchGame(btn.dataset.pkg);
       } else {
-        alert("Gagal meluncurkan game. Pastikan package terinstall.");
+        alert("Could not launch game. Make sure the package is installed.");
       }
     });
   });
@@ -518,6 +714,7 @@
 
   const gamesListView = document.getElementById("games-list-view");
   const gameDetailView = document.getElementById("game-detail-view");
+  const gamesToolbar = document.getElementById("games-toolbar");
   let selectedGamePkg = "";
 
   function openGameDetail(pkg) {
@@ -544,6 +741,8 @@
       btn.classList.toggle("active", btn.dataset.preset === (game.preset || "").toLowerCase());
     });
     if (gamesListView) gamesListView.classList.add("hidden");
+    if (gamesToolbar) gamesToolbar.classList.add("hidden");
+    if (addGameDrawer) addGameDrawer.classList.add("hidden");
     if (gameDetailView) gameDetailView.classList.remove("hidden");
   }
 
@@ -551,6 +750,7 @@
     selectedGamePkg = "";
     if (gameDetailView) gameDetailView.classList.add("hidden");
     if (gamesListView) gamesListView.classList.remove("hidden");
+    if (gamesToolbar) gamesToolbar.classList.remove("hidden");
   }
 
   document.getElementById("btn-close-game-detail")?.addEventListener("click", closeGameDetail);
@@ -629,7 +829,17 @@
     // Daemon offline: do not show fake or uninstalled game entries.
     allGames = [];
     if (gamesContainer) {
-      gamesContainer.innerHTML = '<div style="text-align:center; padding:30px 10px; color:var(--text-dim); font-family:var(--font-mono); font-size:12px;">Daemon offline.<br><span style="font-size:10px; color:var(--text-sub);">Start frameboostd and reload.</span></div>';
+      gamesContainer.innerHTML = `
+      <div class="empty-state">
+        <span class="empty-state-glyph" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 7v6M9 11h6"/>
+            <path d="M6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-11A2.5 2.5 0 0 1 6.5 4z"/>
+          </svg>
+        </span>
+        <p class="empty-state-title">Daemon offline</p>
+        <p class="empty-state-desc">Start <code>frameboostd</code> on the device. This screen reconnects on its own.</p>
+      </div>`;
     }
   }
 
@@ -641,7 +851,7 @@
         const apps = JSON.parse(res);
         if (Array.isArray(apps)) {
           installedApps = apps;
-          installedAppsSelect.innerHTML = '<option value="">-- Pilih Aplikasi Terinstall --</option>';
+          installedAppsSelect.innerHTML = '<option value="">-- Select an installed app --</option>';
           apps.forEach((app) => {
             const opt = document.createElement("option");
             opt.value = app;
@@ -668,7 +878,7 @@
         if (data.games) {
           allGames = data.games;
           applyFilter();
-          alert(`Scan selesai! Ditemukan ${data.found || 0} game baru dari sistem.`);
+          alert(`Scan complete. Found ${data.found || 0} new games.`);
           return;
         }
       } catch (e) {
@@ -707,7 +917,7 @@
     btnSubmitAddGame.textContent = "Menyimpan...";
     const res = await sendSocketCmd(`add_game ${pkg}`);
     btnSubmitAddGame.disabled = false;
-    btnSubmitAddGame.textContent = "Tambah Game";
+    btnSubmitAddGame.textContent = "Add game";
     if (res) {
       try {
         const data = JSON.parse(res);
@@ -719,7 +929,7 @@
           addGameDrawer?.classList.add("hidden");
           return;
         } else if (data.status === "error") {
-          alert(`Gagal: ${data.message}`);
+          alert(`Failed: ${data.message}`);
           return;
         }
       } catch (e) {
@@ -738,6 +948,65 @@
   // ==========================================
   // ACTION BUTTONS (Boost, Network, Safety)
   // ==========================================
+
+  // Action: Quick Gaming Dock
+  if (btnQuickCleanRam) {
+    btnQuickCleanRam.addEventListener("click", async () => {
+      btnQuickCleanRam.classList.add("success");
+      if (lblQuickRam) lblQuickRam.textContent = "✓ FREED!";
+      await sendSocketCmd("clean_ram");
+      setTimeout(() => {
+        btnQuickCleanRam.classList.remove("success");
+        if (lblQuickRam) lblQuickRam.textContent = "BOOST RAM";
+      }, 1200);
+    });
+  }
+
+  let bypassActive = false;
+  if (btnQuickBypass) {
+    btnQuickBypass.addEventListener("click", async () => {
+      bypassActive = !bypassActive;
+      btnQuickBypass.classList.toggle("active", bypassActive);
+      if (lblQuickBypass) lblQuickBypass.textContent = bypassActive ? "PASSTHROUGH" : "BYPASS CHG";
+      await sendSocketCmd(`set_bypass_charge ${bypassActive ? 1 : 0}`);
+    });
+  }
+
+  let dndActive = true;
+  if (btnQuickDnd) {
+    btnQuickDnd.addEventListener("click", async () => {
+      dndActive = !dndActive;
+      btnQuickDnd.classList.toggle("active", dndActive);
+      if (lblQuickDnd) lblQuickDnd.textContent = dndActive ? "FOCUS DND" : "NOTIF ON";
+      await sendSocketCmd(`set_heads_up ${dndActive ? 0 : 1}`);
+    });
+  }
+
+  if (btnQuickGosWeb) {
+    btnQuickGosWeb.addEventListener("click", async () => {
+      const targetDisable = !btnQuickGosWeb.classList.contains("active");
+      btnQuickGosWeb.classList.toggle("active", targetDisable);
+      if (lblQuickGosWeb) lblQuickGosWeb.textContent = targetDisable ? "GOS KILLED" : "GOS BYPASS";
+      await sendSocketCmd(targetDisable ? "gos_disable" : "gos_restore");
+      setTimeout(refreshGosStatus, 300);
+    });
+  }
+
+  if (presetSegmentBtns && presetSegmentBtns.length) {
+    presetSegmentBtns.forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const targetPreset = btn.getAttribute("data-preset");
+        presetSegmentBtns.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        if (heroPresetTag) heroPresetTag.textContent = targetPreset;
+        if (currentForegroundPkg) {
+          await sendSocketCmd(`set_game_profile ${currentForegroundPkg} ${targetPreset}`);
+        } else {
+          await sendSocketCmd(`apply_preset ${targetPreset}`);
+        }
+      });
+    });
+  }
 
   // Action: Manual Boost Override
   const btnToggleBoost = document.getElementById("btn-toggle-boost");
@@ -890,7 +1159,7 @@
 
     // 50ms reference line
     const ref50Y = h - (50 / maxPing) * (h - 10);
-    ctx.strokeStyle = "rgba(255, 208, 97, 0.3)";
+    ctx.strokeStyle = "rgba(255, 176, 32, 0.3)";
     ctx.lineWidth = 1;
     ctx.setLineDash([3, 3]);
     ctx.beginPath();
@@ -907,7 +1176,7 @@
       if (idx === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     });
-    ctx.strokeStyle = "#d0bcff";
+    ctx.strokeStyle = "#00e5ff";
     ctx.lineWidth = 2;
     ctx.stroke();
 
@@ -915,7 +1184,7 @@
     samples.forEach((val, idx) => {
       const x = idx * step;
       const y = h - (val / maxPing) * (h - 10);
-      ctx.fillStyle = val < 35 ? "#7ddca5" : val < 75 ? "#f4b77a" : "#ffb4ab";
+      ctx.fillStyle = val < 35 ? "#00e676" : val < 75 ? "#ffb020" : "#ff4d5e";
       ctx.beginPath();
       ctx.arc(x, y, 3, 0, Math.PI * 2);
       ctx.fill();
@@ -1064,8 +1333,11 @@
   }
 
   function formatMultiSub(p) {
-    if (!p || !p.host) return "--";
-    return `${Math.round(p.loss_pct || 0)}% loss • ${(p.jitter_ms || 0).toFixed(1)} j`;
+    if (!p || !p.host) return "";
+    const parts = [];
+    if (p.loss_pct != null) parts.push(`${Math.round(p.loss_pct)}% loss`);
+    if (p.jitter_ms != null) parts.push(`${p.jitter_ms.toFixed(1)} jitter`);
+    return parts.join(" · ");
   }
 
   function renderMultiPing(data) {
@@ -1080,11 +1352,9 @@
       const refs = mpRefs[key];
       if (!refs) return;
       if (!p || !p.host) {
-        if (key === "custom") {
-          refs.host.textContent = "not set";
-          refs.val.textContent = "--";
-          refs.sub.textContent = "--";
-        }
+        if (key === "custom") refs.host.textContent = "not set";
+        refs.val.textContent = "--";
+        refs.sub.textContent = "";
         return;
       }
       if (key === "gateway") gatewayHost = p.host;
@@ -1225,8 +1495,8 @@
   // Action: Emergency Restore All
   const btnRestore = document.getElementById("btn-emergency-restore");
   btnRestore?.addEventListener("click", async () => {
-    if (!confirm("Kembalikan seluruh setting GPU, CPU, dan Network ke stock?")) return;
-    if (!confirm("Konfirmasi terakhir: restore semua setting sekarang?")) return;
+    if (!confirm("Restore all GPU, CPU and network settings to stock?")) return;
+    if (!confirm("This cancels every active tuning profile. Continue?")) return;
     btnRestore.textContent = "RESTORING...";
     await sendSocketCmd("restore_all");
     setTimeout(() => (btnRestore.textContent = "RESTORE ALL STOCK"), 1500);
@@ -1241,12 +1511,22 @@
     if (res && typeof res === "string") {
       try {
         const j = JSON.parse(res);
-        if (gosStatus) gosStatus.textContent = "Status: " + (j.disabled ? "DISABLED" : "ENABLED");
+        const unavailable = j.has_gos === false;
+        if (unavailable) {
+          if (gosStatus) gosStatus.textContent = "Status: no GOS package on this ROM (AOSP/GSI), nothing to disable.";
+        } else {
+          if (gosStatus) gosStatus.textContent = "Status: " + (j.disabled ? "disabled (bypass)" : "enabled (stock)");
+        }
+        [btnGosDisable, btnGosRestore].forEach((btn) => {
+          if (!btn) return;
+          btn.disabled = unavailable;
+          if (unavailable) btn.title = "Game Optimizing Service is not installed on this device";
+        });
       } catch (e) {}
     }
   }
   btnGosDisable?.addEventListener("click", async () => {
-    if (!confirm("Nonaktifkan Samsung Game Optimizing Service?")) return;
+    if (!confirm("Disable Samsung Game Optimizing Service?")) return;
     btnGosDisable.textContent = "DISABLING...";
     await sendSocketCmd("gos_disable");
     btnGosDisable.textContent = "DISABLE GOS";
@@ -1286,7 +1566,7 @@
     }
     if (window._nativeBridge) {
       if (!window._nativeBridge.canDrawOverlays()) {
-        alert("Mohon izinkan izin 'Display over other apps' untuk mengaktifkan HUD melayang.");
+        alert("Allow 'Display over other apps' to enable the floating HUD.");
         window._nativeBridge.requestOverlayPermission();
         return;
       }
@@ -1294,7 +1574,7 @@
       window._nativeBridge.setHudEnabled(!running);
       setTimeout(updateHudToggleState, 250);
     } else {
-      alert("HUD Service hanya aktif di aplikasi Android FrameBoost Game Space.");
+      alert("HUD Service only runs inside the FrameBoost Game Space app.");
     }
   });
 

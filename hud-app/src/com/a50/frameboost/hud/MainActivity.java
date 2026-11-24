@@ -81,6 +81,14 @@ public class MainActivity extends Activity {
                 }
             }
         }
+
+        // Proactively request Superuser from KernelSU/Magisk so the app is recognized as root
+        new Thread(() -> {
+            try {
+                Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", "id"});
+                p.waitFor();
+            } catch (Exception ignored) {}
+        }).start();
     }
 
     @Override

@@ -1,7 +1,7 @@
 # FrameBoost v2 — Project Report
 
 Status: **Selesai untuk fase ini**  
-Commit terakhir: `f72310c`  
+Commit terakhir: `PENDING`  
 Device uji: `RR8M50C0W8T` (Samsung Galaxy A50)
 
 ---
@@ -46,19 +46,32 @@ Prinsip utama: **ringan, cepat, rapi, dan jujur terhadap data**.
 
 ### 2.3 Overlay In-Game
 
-- Edge handle menggantikan bubble besar.
-- FPS overlay:
-  - ON → handle melebar, angka FPS tampil.
-  - OFF → handle kecil, titik status tampil.
-- Tap/swipe inward → side panel.
-- Side panel:
-  - Hero FPS
-  - GPU
-  - CPU BIG
-  - NETWORK
-  - BATTERY
-  - preset switcher
-  - FPS overlay toggle
+**Floating monitor (edge handle)** punya 4 mode, semuanya menempel seamless ke bezel:
+
+| Mode | Ukuran | Isi |
+|---|---|---|
+| OFF | 14 × 48 dp | grip bar cyan (tap target 48 dp) |
+| FPS (COMPACT) | 44 × 44 dp | angka FPS |
+| + TEMP (DETAIL) | 46 × 48 dp | FPS + suhu |
+| + GPU (FULL) | 48 × 62 dp | FPS + suhu + GPU clock |
+
+Detail perilaku:
+
+- Sisi bezel memakai layer-list dengan inset negatif `-3dp`, sehingga stroke luar terpotong tepat di tepi layar (tidak ada garis tepi ganda).
+- Sudut sisi dalam rounded 10 dp; konten selalu center (vertikal dan horizontal).
+- Warna FPS: cyan ≥55, hijau ≥40, amber ≥25, merah <25.
+- Warna suhu: amber ≥78 °C, merah ≥85 °C; GPU clock abu-abu.
+- Drag bebas, lepas → snap ke sisi terdekat; posisi X/Y tersimpan.
+- Tap vs drag dipisah touch slop dinamis (`max(12dp, getScaledTouchSlop())`), disertai press state (alpha 0.72 + scale 0.95).
+- Tap atau fling inward → side panel.
+
+**Side panel** (cockpit GameSpace, lebar 306 dp):
+
+- Header fixed: hero FPS + frametime, GPU, CPU big, network, battery.
+- Aksi scrollable: Boost RAM, Notifs (heads-up), Bypass CHG, No GOS.
+- Preset switcher 4 tombol (ECO / BAL / PERF / ESPORTS).
+- Segmen Floating Monitor: OFF / FPS / + TEMP / + GPU.
+- Muncul dari sisi tempat handle menempel; tutup lewat tombol X atau swipe.
 
 ### 2.4 Telemetry
 
@@ -76,13 +89,14 @@ snapshot
 
 Data:
 
-- FPS
+- FPS (SurfaceFlinger `--timestats`: delta `totalFrames` per layer, prioritas SurfaceView, P1 low dari histogram present2present)
 - P1 low FPS
 - suhu
 - GPU clock
 - CPU big clock
 - congestion control / BBR
-- baterai
+- baterai (termasuk `bypass_charging`)
+- GOS (`gos_disabled`, `has_gos`)
 
 Aturan:
 
@@ -93,14 +107,15 @@ Kosong = -- / N/A.
 
 ### 2.5 Safety
 
-- Snapshot & restore stock config.
+- Snapshot & restore stock config (termasuk `charging_enabled=1` saat rollback).
 - Thermal safety.
-- Auto-hide overlay di luar game.
+- Auto-hide overlay di luar game; deteksi keluar game instan saat pindah ke launcher / system UI (poll 250 ms, debounce 2).
 - Stale-daemon guard.
 - BBR per game.
 - Multi-target ping.
 - Quick Boost.
-- GOS bypass.
+- GOS bypass dengan deteksi paket: ROM tanpa GOS dianggap sudah bypass.
+- Bypass charging dan toggle heads-up notifikasi lewat daemon.
 
 ---
 
@@ -173,7 +188,15 @@ Output:
 
 - `hud-app/FrameBoost-GameSpace.apk`
 - `module-src/system/bin/frameboostd`
+- `module-src/system/priv-app/FrameBoost/FrameBoost-GameSpace.apk`
 - `FrameBoost-v2.3.0-A50.zip`
+
+Catatan deploy:
+
+- `deploy-device.ps1` melakukan `adb install -r`, push binary daemon ke modul, lalu restart daemon + watchdog.
+- `build-hud-apk.ps1` menyalin APK ke payload ZIP dan ke `system/priv-app/FrameBoost`.
+- `customize.sh` memasang APK sebagai priv-app (`pm install -r -d -g`) dan menambahkan `deviceidle whitelist`.
+- Update payload modul di device dilakukan lewat `ksud module install <zip>` lalu reboot, karena `hybrid-mount` mengunci file modul agar tidak bisa ditimpa langsung.
 
 Status:
 
@@ -200,10 +223,10 @@ WebUI: tidak ada error JS
 Belum termasuk fase ini:
 
 - [ ] Per-app layout side panel
-- [ ] Provider FPS fallback SurfaceFlinger / Choreographer
+- [ ] Fallback FPS Choreographer saat SurfaceFlinger tidak tersedia
 - [ ] Capability probe terpisah
 - [ ] State machine overlay murni
-- [ ] Quick action tambahan
+- [x] Quick action tambahan (Boost RAM, Notifs, Bypass CHG, No GOS)
 
 ---
 
@@ -242,6 +265,40 @@ Gunakan checklist ini setiap kali ada perubahan.
 ---
 
 ## 9. Changelog
+
+### `PENDING` — 2026-11-24
+
+```text
+feat: seamless edge monitor, cockpit panel and SurfaceFlinger FPS
+```
+
+Perubahan:
+
+- **Floating monitor**: 4 mode dengan ukuran baru (OFF 14×48, FPS 44×44, +TEMP 46×48, +GPU 48×62 dp), semua memenuhi tap target minimal 44 dp.
+- **Seamless bezel docking**: `bg_edge_handle.xml` dan `bg_edge_handle_left.xml` memakai layer-list inset negatif `-3dp`; stroke luar tidak terlihat dan sudut dalam rounded 10 dp. Grip bar baru `bg_handle_grip.xml`.
+- **Konten simetris**: `view_bubble` jadi vertikal + `gravity=center`, `txt_bubble_fps` center + `maxLines=3`, jadi mode DETAIL dan FULL tidak terpotong.
+- **Warna dinamis**: FPS cyan/hijau/amber/merah, suhu amber/merah, GPU abu-abu, memakai `SpannableStringBuilder`.
+- **Touch**: touch slop dinamis, press state, ambang tap 320 ms / 22 dp, fling inward 320 ms / 36 dp, haptic saat tap.
+- **Docking & clamp**: `dockedX()` dan `clampY()` tanpa margin supaya handle benar-benar menempel dan bisa digeser sampai ujung layar.
+- **Side panel cockpit**: header fixed (hero FPS, GPU, CPU, network, battery) + aksi scrollable (Boost RAM, Notifs, Bypass CHG, No GOS) + preset switcher + segmen Floating Monitor.
+- **Daemon**: FPS dari SurfaceFlinger `--timestats` dengan tracking per layer dan P1 low dari histogram; deteksi GOS; command `set_heads_up`, `set_bypass_charge`, `gos_disable/restore`; restore `charging_enabled` saat rollback; poll game 250 ms dengan keluar instan di launcher/system.
+- **Snapshot**: field baru `gos_disabled`, `has_gos`, `bypass_charging`.
+- **Manifest**: `MainActivity` dan `GameLibraryActivity` dikunci portrait agar console tidak melebar saat keluar dari game landscape.
+- **WebUI**: rewrite dashboard GameSpace dengan tab Home / Games / Network / Settings, hero card, quick dock, dan multi-target ping.
+- **Build**: APK disalin ke payload priv-app; `customize.sh` memasang sebagai priv-app dan whitelist deviceidle.
+- **Root**: `MainActivity` meminta akses `su` lebih awal; `WebAppInterface` punya eksekusi shell umum via `su`.
+
+Testing:
+
+- build: `cargo build --release` tanpa warning, APK + ZIP sukses.
+- device: Galaxy A50 (`RR8M50C0W8T`), landscape Auto Chess (`com.mobilechess.gp`).
+- overlay: OFF / FPS / +TEMP / +GPU tampil simetris, dock kiri dan kanan seamless, tap membuka panel dari kedua sisi, drag + snap berfungsi.
+- daemon: pid aktif, socket `list_games` merespons, log transisi state normal.
+- modul: update via `ksud module install` + reboot, payload webroot/APK/daemon sinkron.
+- parity: `module-src/webroot` dan `hud-app/assets/webroot` identik (3 file).
+- bersih-bersih: 104 screenshot test di `/sdcard` dan file test di `/data/local/tmp` dihapus.
+
+---
 
 ### `f72310c` — 2026-11-24
 

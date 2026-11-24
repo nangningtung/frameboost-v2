@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="bg_main">#101114</color>
-    <color name="bg_card">#202126</color>
-    <color name="cyan">#D0BCFF</color>
-    <color name="green">#7DDCA5</color>
-    <color name="yellow">#F4B77A</color>
-    <color name="red">#FFB4AB</color>
-    <color name="text_main">#E5E1E6</color>
-    <color name="text_dim">#C9C5CA</color>
+    <color name="bg_main">#0A0C11</color>
+    <color name="bg_card">#121620</color>
+    <color name="cyan">#00E5FF</color>
+    <color name="green">#00E676</color>
+    <color name="yellow">#FF9100</color>
+    <color name="red">#FF1744</color>
+    <color name="text_main">#F1F5F9</color>
+    <color name="text_dim">#94A3B8</color>
 </resources>

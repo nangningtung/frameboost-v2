@@ -11,8 +11,8 @@ use crate::profile::GameProfile;
 use crate::rollback::restore_all;
 use crate::sysfs::{read_u32, run_cmd};
 
-const POLL_MS: u64 = 500;
-const DEBOUNCE_MISSES: u32 = 3; // 3 x 500ms = 1.5s before declaring game exit
+const POLL_MS: u64 = 250;
+const DEBOUNCE_MISSES: u32 = 2; // Instant for launcher/system, 2 x 250ms = 500ms for other non-game apps
 
 const TEMP_WARN_ON: u32 = 85000;
 const TEMP_WARN_OFF: u32 = 82000;
@@ -86,7 +86,16 @@ impl AutoDaemon {
                 self.active_profile = Some(GameProfile::for_package(&fg));
             }
         } else {
-            self.miss_count += 1;
+            // Instant exit when user switches to launcher / system UI / home screen
+            if GameDetector::is_system_pkg(&fg) || fg.is_empty() {
+                self.miss_count = DEBOUNCE_MISSES;
+                self.current_game.clear();
+            } else {
+                self.miss_count += 1;
+                if self.miss_count >= DEBOUNCE_MISSES {
+                    self.current_game.clear();
+                }
+            }
         }
 
         let in_game = is_game || (self.miss_count < DEBOUNCE_MISSES && !self.current_game.is_empty());

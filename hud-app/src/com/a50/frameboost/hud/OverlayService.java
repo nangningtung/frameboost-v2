@@ -18,9 +18,11 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 /**
@@ -32,18 +34,19 @@ public class OverlayService extends Service {
     private static final String CHANNEL_ID = "frameboost_hud_channel";
     private static final String PREFS = "hud_prefs";
 
-    private static final int COLOR_DIM = 0xFFC9C5CA;
-    private static final int COLOR_ACCENT = 0xFFD0BCFF;
-    private static final int COLOR_ACTIVE_TEXT = 0xFFE8DEF8;
-    private static final int COLOR_GREEN = 0xFF7DDCA5;
-    private static final int COLOR_AMBER = 0xFFF4B77A;
-    private static final int COLOR_RED = 0xFFFFB4AB;
+    private static final int COLOR_DIM = 0xFF94A3B8;
+    private static final int COLOR_ACCENT = 0xFF00E5FF;
+    private static final int COLOR_ACTIVE_TEXT = 0xFFFFFFFF;
+    private static final int COLOR_TEXT = 0xFFF1F5F9;
+    private static final int COLOR_GREEN = 0xFF00E676;
+    private static final int COLOR_AMBER = 0xFFFF9100;
+    private static final int COLOR_RED = 0xFFFF1744;
 
     private static final int BUBBLE_SIZE_DP = 56;
     private static final int HANDLE_WIDTH_DP = 40;
     private static final int HANDLE_HEIGHT_DP = 40;
-    private static final int HANDLE_SMALL_WIDTH_DP = 12;
-    private static final int HANDLE_SMALL_HEIGHT_DP = 40;
+    private static final int HANDLE_SMALL_WIDTH_DP = 14;
+    private static final int HANDLE_SMALL_HEIGHT_DP = 48;
     private static final int EDGE_MARGIN_DP = 0;
     private static final int PANEL_MARGIN_DP = 6;
 
@@ -58,12 +61,14 @@ public class OverlayService extends Service {
     private TextView txtBubbleFps;
     private TextView txtPanelGame;
     private TextView txtMFps;
+    private TextView txtMFpsStatus;
     private TextView txtMGpu;
     private TextView txtMCpu;
     private TextView txtMNet;
     private TextView txtMBat;
     private TextView txtTelemetryState;
 
+    private Button btnTypeOff;
     private Button btnTypeCompact;
     private Button btnTypeDetail;
     private Button btnTypeFull;
@@ -71,6 +76,10 @@ public class OverlayService extends Service {
     private Button btnPresetBal;
     private Button btnPresetPerf;
     private Button btnPresetEsp;
+    private Button btnQuickRam;
+    private Button btnQuickDnd;
+    private Button btnQuickBypass;
+    private Button btnQuickGos;
 
     private WindowManager.LayoutParams params;
     private Handler handler;
@@ -82,8 +91,13 @@ public class OverlayService extends Service {
     private boolean panelOpen = false;
     private boolean autoHide = true;
     private boolean fpsOverlayEnabled = true;
+    private boolean dndEnabled = true;
+    private boolean bypassEnabled = false;
+    private boolean gosDisabled = false;
+    private boolean hasGos = false;
     private boolean dockedRight = false;
     private boolean touchMoved = false;
+    private boolean yAutoCentered = false;
     private int missedReads = 0;
     /** Bubble's own Y while the panel borrows the window (panel Y is separate). */
     private int bubbleY = -1;
@@ -93,8 +107,10 @@ public class OverlayService extends Service {
     private String currentGamePkg = "";
 
     // Last rendered strings, to skip redundant layout passes at 2 Hz.
-    private String lastBubbleFps = "";
+    private String lastBubbleText = "";
+    private SnapshotReader.SnapshotData lastData;
     private String lastMFps = "";
+    private String lastMFpsStatus = "";
     private String lastMGpu = "";
     private String lastMCpu = "";
     private String lastMNet = "";
@@ -103,7 +119,6 @@ public class OverlayService extends Service {
 
     private int lastScreenW = 0;
     private int lastScreenH = 0;
-    private int insetLeft = 0;
 
     private static volatile boolean running = false;
 
@@ -126,11 +141,13 @@ public class OverlayService extends Service {
         SharedPreferences prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         autoHide = prefs.getBoolean("auto_hide", true);
         fpsOverlayEnabled = prefs.getBoolean("fps_overlay_enabled", true);
+        dndEnabled = prefs.getBoolean("gaming_dnd", true);
         hudType = prefs.getString("hud_type", prefs.getString("fps_overlay_type", "COMPACT"));
         activePreset = prefs.getString("game_preset", "BALANCED");
         dockedRight = prefs.getBoolean("hud_right", false);
         int savedX = prefs.getInt("hud_x", EDGE_MARGIN_DP);
-        int savedY = prefs.getInt("hud_y", 140);
+        int savedY = prefs.getInt("hud_y", -1);
+        yAutoCentered = savedY < 0;
 
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         LayoutInflater inflater = LayoutInflater.from(this);
@@ -145,12 +162,14 @@ public class OverlayService extends Service {
         txtBubbleFps = overlayRoot.findViewById(R.id.txt_bubble_fps);
         txtPanelGame = overlayRoot.findViewById(R.id.txt_panel_game);
         txtMFps = overlayRoot.findViewById(R.id.txt_m_fps);
+        txtMFpsStatus = overlayRoot.findViewById(R.id.txt_m_fps_status);
         txtMGpu = overlayRoot.findViewById(R.id.txt_m_gpu);
         txtMCpu = overlayRoot.findViewById(R.id.txt_m_cpu);
         txtMNet = overlayRoot.findViewById(R.id.txt_m_net);
         txtMBat = overlayRoot.findViewById(R.id.txt_m_bat);
         txtTelemetryState = overlayRoot.findViewById(R.id.txt_telemetry_state);
 
+        btnTypeOff = overlayRoot.findViewById(R.id.btn_type_off);
         btnTypeCompact = overlayRoot.findViewById(R.id.btn_type_compact);
         btnTypeDetail = overlayRoot.findViewById(R.id.btn_type_detail);
         btnTypeFull = overlayRoot.findViewById(R.id.btn_type_full);
@@ -158,6 +177,10 @@ public class OverlayService extends Service {
         btnPresetBal = overlayRoot.findViewById(R.id.btn_preset_balanced);
         btnPresetPerf = overlayRoot.findViewById(R.id.btn_preset_perf);
         btnPresetEsp = overlayRoot.findViewById(R.id.btn_preset_esports);
+        btnQuickRam = overlayRoot.findViewById(R.id.btn_quick_ram);
+        btnQuickDnd = overlayRoot.findViewById(R.id.btn_quick_dnd);
+        btnQuickBypass = overlayRoot.findViewById(R.id.btn_quick_bypass);
+        btnQuickGos = overlayRoot.findViewById(R.id.btn_quick_gos);
 
         int layoutType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
         params = new WindowManager.LayoutParams(
@@ -168,8 +191,11 @@ public class OverlayService extends Service {
                         | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                 PixelFormat.TRANSLUCENT
         );
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            params.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
+        }
         params.gravity = Gravity.TOP | Gravity.START;
-        params.y = Math.max(0, savedY);
+        if (savedY >= 0) params.y = savedY;
 
         windowManager.addView(overlayRoot, params);
 
@@ -177,15 +203,15 @@ public class OverlayService extends Service {
         applyFpsOverlayState();
         highlightHudType();
         highlightPreset();
+        updateDndButton();
+        updateBypassButton();
 
         Handler main = new Handler(Looper.getMainLooper());
         viewBubble.post(() -> {
-            refreshInsets();
-            if (dockedRight) {
-                params.x = Math.max(0, usableWidth() - viewBubble.getWidth() - dp(EDGE_MARGIN_DP));
-            } else {
-                params.x = Math.max(0, Math.min(savedX, usableWidth() - bubbleWidth()));
+            if (yAutoCentered) {
+                centerBubbleY();
             }
+            params.x = dockedX(bubbleWidth());
             clampY();
             updateLayout();
         });
@@ -206,7 +232,7 @@ public class OverlayService extends Service {
                     // has finished, so slow IPC cannot pile up in the executor queue.
                     handler.post(() -> {
                         applyHudData(data);
-                        if (running) handler.postDelayed(updateRunnable, 500);
+                        if (running) handler.postDelayed(updateRunnable, 200);
                     });
                 });
             }
@@ -242,43 +268,22 @@ public class OverlayService extends Service {
     }
 
     /**
-     * The overlay window is fitted inside the system bars, so params.x/y are
-     * relative to that inset frame, not the raw display. Cache the insets so
-     * edge snapping and clamping use the same space the window lives in.
+     * The overlay window parent spans the full display [0, 0, width, height],
+     * so params.x/y are already in display coordinates. Do not subtract system
+     * bar insets here or the right dock ends up short of the screen edge.
      */
-    private void refreshInsets() {
-        int left = 0, top = 0, right = 0, bottom = 0;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && windowManager != null) {
-            try {
-                android.view.WindowInsets insets = windowManager.getCurrentWindowMetrics()
-                        .getWindowInsets();
-                android.graphics.Insets bars = insets.getInsetsIgnoringVisibility(
-                        android.view.WindowInsets.Type.systemBars()
-                                | android.view.WindowInsets.Type.displayCutout());
-                left = bars.left;
-                top = bars.top;
-                right = bars.right;
-                bottom = bars.bottom;
-            } catch (Exception ignored) {}
-        }
-        insetLeft = left;
-    }
-
     private int usableWidth() {
-        // Overlay params are relative to parent frame [insetLeft, 0, displayRight, displayBottom].
-        // Do not subtract right/bottom bars again: Samsung A50 already excludes them from parent.
-        return Math.max(dp(BUBBLE_SIZE_DP), getScreenWidth() - insetLeft);
+        return Math.max(dp(BUBBLE_SIZE_DP), getScreenWidth());
     }
 
     private int usableHeight() {
-        // params.y starts at parent top (0), not below status-bar inset.
         return Math.max(dp(BUBBLE_SIZE_DP), getScreenHeight());
     }
 
     private int dockedX(int contentWidth) {
         return dockedRight
-                ? Math.max(0, usableWidth() - contentWidth - dp(EDGE_MARGIN_DP))
-                : dp(EDGE_MARGIN_DP);
+                ? Math.max(0, usableWidth() - contentWidth)
+                : 0;
     }
 
     private int clampPanelY(int panelHeight) {
@@ -287,27 +292,51 @@ public class OverlayService extends Service {
         return Math.max(0, Math.min(params.y, maxY));
     }
 
+    private int targetBubbleWidth() {
+        if (!fpsOverlayEnabled) return dp(HANDLE_SMALL_WIDTH_DP);
+        if ("FULL".equals(hudType)) return dp(48);
+        if ("DETAIL".equals(hudType)) return dp(46);
+        return dp(44);
+    }
+
+    private int targetBubbleHeight() {
+        if (!fpsOverlayEnabled) return dp(HANDLE_SMALL_HEIGHT_DP);
+        if ("FULL".equals(hudType)) return dp(62);
+        if ("DETAIL".equals(hudType)) return dp(48);
+        return dp(44);
+    }
+
     private int bubbleWidth() {
         int w = viewBubble != null ? viewBubble.getWidth() : 0;
         if (w > 0) return w;
-        return dp(fpsOverlayEnabled ? HANDLE_WIDTH_DP : HANDLE_SMALL_WIDTH_DP);
+        return targetBubbleWidth();
     }
 
     private int bubbleHeight() {
         int h = viewBubble != null ? viewBubble.getHeight() : 0;
         if (h > 0) return h;
-        return dp(fpsOverlayEnabled ? HANDLE_HEIGHT_DP : HANDLE_SMALL_HEIGHT_DP);
+        return targetBubbleHeight();
+    }
+
+    private void centerBubbleY() {
+        if (!yAutoCentered) return;
+        params.y = Math.max(0, (getScreenHeight() - targetBubbleHeight()) / 2);
+    }
+
+    private void updateBubbleOrientation() {
+        if (viewBubble == null) return;
+        viewBubble.setBackgroundResource(dockedRight ? R.drawable.bg_edge_handle : R.drawable.bg_edge_handle_left);
     }
 
     private int panelWidth() {
         int w = viewSidePanel != null ? viewSidePanel.getWidth() : 0;
-        return w > 0 ? w : dp(288);
+        return w > 0 ? w : dp(306);
     }
 
     private void clampY() {
         int contentHeight = panelOpen ? viewSidePanel.getHeight() : bubbleHeight();
         if (contentHeight <= 0) contentHeight = dp(BUBBLE_SIZE_DP);
-        int maxY = Math.max(0, usableHeight() - contentHeight - dp(EDGE_MARGIN_DP));
+        int maxY = Math.max(0, usableHeight() - contentHeight);
         params.y = Math.max(0, Math.min(params.y, maxY));
     }
 
@@ -338,7 +367,8 @@ public class OverlayService extends Service {
         viewSidePanel.setTranslationX(0f);
         viewSidePanel.setVisibility(View.GONE);
         viewBubble.setVisibility(View.VISIBLE);
-        if (bubbleY >= 0) params.y = bubbleY;
+        if (yAutoCentered) centerBubbleY();
+        else if (bubbleY >= 0) params.y = bubbleY;
         clampY();
         updateLayout();
     }
@@ -350,6 +380,7 @@ public class OverlayService extends Service {
         int width = bubbleWidth();
         boolean right = (fromX + width / 2) >= usableWidth() / 2;
         dockedRight = right;
+        updateBubbleOrientation();
         int targetX = dockedX(width);
 
         if (snapAnimator != null) snapAnimator.cancel();
@@ -371,12 +402,13 @@ public class OverlayService extends Service {
 
     private void savePosition() {
         try {
-            getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            android.content.SharedPreferences.Editor editor = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                     .edit()
                     .putBoolean("hud_right", dockedRight)
-                    .putInt("hud_x", params.x)
-                    .putInt("hud_y", params.y)
-                    .apply();
+                    .putInt("hud_x", params.x);
+            if (yAutoCentered) editor.remove("hud_y");
+            else editor.putInt("hud_y", params.y);
+            editor.apply();
         } catch (Exception ignored) {}
     }
 
@@ -389,6 +421,7 @@ public class OverlayService extends Service {
             private float downRawX;
             private float downRawY;
             private long downTime;
+            private boolean isDrag = false;
 
             @Override
             public boolean onTouch(View v, MotionEvent event) {
@@ -399,19 +432,27 @@ public class OverlayService extends Service {
                         downRawX = event.getRawX();
                         downRawY = event.getRawY();
                         downTime = System.currentTimeMillis();
+                        isDrag = false;
                         touchMoved = false;
+                        viewBubble.setAlpha(0.72f);
+                        viewBubble.setScaleX(0.95f);
+                        viewBubble.setScaleY(0.95f);
                         return true;
 
                     case MotionEvent.ACTION_MOVE: {
                         float dx = event.getRawX() - downRawX;
                         float dy = event.getRawY() - downRawY;
-                        if (Math.abs(dx) >= dp(6) || Math.abs(dy) >= dp(6)) {
+                        float dist = (float) Math.hypot(dx, dy);
+                        int slop = Math.max(dp(12), android.view.ViewConfiguration.get(getApplicationContext()).getScaledTouchSlop());
+                        if (dist >= slop) {
+                            isDrag = true;
                             touchMoved = true;
                         }
-                        if (touchMoved) {
+                        if (isDrag) {
+                            yAutoCentered = false;
                             int usable = usableWidth();
                             int bw = bubbleWidth();
-                            int maxY = Math.max(0, usableHeight() - bubbleHeight() - dp(EDGE_MARGIN_DP));
+                            int maxY = Math.max(0, usableHeight() - bubbleHeight());
                             params.x = Math.max(0, Math.min(initialX + (int) dx, usable - bw));
                             params.y = Math.max(0, Math.min(initialY + (int) dy, maxY));
                             updateLayout();
@@ -420,16 +461,23 @@ public class OverlayService extends Service {
                     }
 
                     case MotionEvent.ACTION_UP: {
+                        viewBubble.setAlpha(1.0f);
+                        viewBubble.setScaleX(1.0f);
+                        viewBubble.setScaleY(1.0f);
+
                         float dx = event.getRawX() - downRawX;
                         float dy = event.getRawY() - downRawY;
                         long elapsed = System.currentTimeMillis() - downTime;
-                        boolean flingInward = elapsed < 280
-                                && Math.abs(dx) > dp(56)
-                                && Math.abs(dy) < dp(44)
+                        float dist = (float) Math.hypot(dx, dy);
+
+                        boolean isTap = !isDrag || (elapsed < 320 && dist < dp(22));
+                        boolean flingInward = elapsed < 320
+                                && Math.abs(dx) > dp(36)
                                 && (dockedRight ? dx < 0 : dx > 0);
 
-                        if (!touchMoved || flingInward) {
-                            if (touchMoved) {
+                        if (isTap || flingInward) {
+                            triggerHaptic();
+                            if (isDrag) {
                                 placeBubble();
                             }
                             openPanel();
@@ -440,6 +488,9 @@ public class OverlayService extends Service {
                     }
 
                     case MotionEvent.ACTION_CANCEL:
+                        viewBubble.setAlpha(1.0f);
+                        viewBubble.setScaleX(1.0f);
+                        viewBubble.setScaleY(1.0f);
                         snapToEdge(params.x);
                         return true;
                 }
@@ -467,6 +518,22 @@ public class OverlayService extends Service {
         viewSidePanel.post(() -> {
             int pw = viewSidePanel.getWidth();
             int ph = viewSidePanel.getHeight();
+            int maxAllowedH = usableHeight() - dp(PANEL_MARGIN_DP * 2);
+            if (ph > maxAllowedH && maxAllowedH > dp(180)) {
+                ViewGroup.LayoutParams lp = viewSidePanel.getLayoutParams();
+                if (lp != null) {
+                    lp.height = maxAllowedH;
+                    viewSidePanel.setLayoutParams(lp);
+                }
+                View scroll = viewSidePanel.findViewById(R.id.sidepanel_scroll);
+                if (scroll != null) {
+                    LinearLayout.LayoutParams slp = (LinearLayout.LayoutParams) scroll.getLayoutParams();
+                    slp.height = 0;
+                    slp.weight = 1f;
+                    scroll.setLayoutParams(slp);
+                }
+                ph = maxAllowedH;
+            }
             viewSidePanel.setPivotX(dockedRight ? pw : 0f);
             params.x = dockedRight
                     ? Math.max(0, usableWidth() - pw - dp(PANEL_MARGIN_DP))
@@ -499,6 +566,18 @@ public class OverlayService extends Service {
                 .setInterpolator(new android.view.animation.AccelerateInterpolator())
                 .withEndAction(() -> {
                     viewSidePanel.setVisibility(View.GONE);
+                    ViewGroup.LayoutParams lp = viewSidePanel.getLayoutParams();
+                    if (lp != null && lp.height != ViewGroup.LayoutParams.WRAP_CONTENT) {
+                        lp.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+                        viewSidePanel.setLayoutParams(lp);
+                    }
+                    View scroll = viewSidePanel.findViewById(R.id.sidepanel_scroll);
+                    if (scroll != null) {
+                        LinearLayout.LayoutParams slp = (LinearLayout.LayoutParams) scroll.getLayoutParams();
+                        slp.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+                        slp.weight = 0f;
+                        scroll.setLayoutParams(slp);
+                    }
                     viewBubble.setVisibility(View.VISIBLE);
                     viewBubble.post(OverlayService.this::placeBubble);
                 })
@@ -539,9 +618,43 @@ public class OverlayService extends Service {
             });
         }
 
-        if (btnTypeCompact != null) btnTypeCompact.setOnClickListener(v -> setHudType("COMPACT"));
-        if (btnTypeDetail != null) btnTypeDetail.setOnClickListener(v -> setHudType("DETAIL"));
-        if (btnTypeFull != null) btnTypeFull.setOnClickListener(v -> setHudType("FULL"));
+        if (btnTypeOff != null) {
+            btnTypeOff.setOnClickListener(v -> {
+                triggerHaptic();
+                fpsOverlayEnabled = false;
+                getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                        .edit().putBoolean("fps_overlay_enabled", false).apply();
+                applyFpsOverlayState();
+                highlightHudType();
+            });
+        }
+        if (btnTypeCompact != null) {
+            btnTypeCompact.setOnClickListener(v -> {
+                fpsOverlayEnabled = true;
+                getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                        .edit().putBoolean("fps_overlay_enabled", true).apply();
+                setHudType("COMPACT");
+                applyFpsOverlayState();
+            });
+        }
+        if (btnTypeDetail != null) {
+            btnTypeDetail.setOnClickListener(v -> {
+                fpsOverlayEnabled = true;
+                getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                        .edit().putBoolean("fps_overlay_enabled", true).apply();
+                setHudType("DETAIL");
+                applyFpsOverlayState();
+            });
+        }
+        if (btnTypeFull != null) {
+            btnTypeFull.setOnClickListener(v -> {
+                fpsOverlayEnabled = true;
+                getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                        .edit().putBoolean("fps_overlay_enabled", true).apply();
+                setHudType("FULL");
+                applyFpsOverlayState();
+            });
+        }
 
         View.OnClickListener presetListener = v -> {
             String preset = "BALANCED";
@@ -565,6 +678,102 @@ public class OverlayService extends Service {
                 applyFpsOverlayState();
             });
         }
+
+        if (btnQuickRam != null) {
+            btnQuickRam.setOnClickListener(v -> {
+                triggerHaptic();
+                btnQuickRam.setText("FREED");
+                btnQuickRam.setTextColor(COLOR_GREEN);
+                tintQuickIcon(btnQuickRam, COLOR_GREEN);
+                if (actionExecutor != null) {
+                    actionExecutor.execute(() -> IpcClient.sendCommand("clean_ram"));
+                }
+                if (handler != null) {
+                    handler.postDelayed(() -> {
+                        if (btnQuickRam != null) {
+                            btnQuickRam.setText("BOOST RAM");
+                            btnQuickRam.setTextColor(COLOR_TEXT);
+                            tintQuickIcon(btnQuickRam, COLOR_DIM);
+                        }
+                    }, 1200);
+                }
+            });
+        }
+
+        if (btnQuickDnd != null) {
+            btnQuickDnd.setOnClickListener(v -> {
+                triggerHaptic();
+                dndEnabled = !dndEnabled;
+                getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                        .edit().putBoolean("gaming_dnd", dndEnabled).apply();
+                updateDndButton();
+                if (actionExecutor != null) {
+                    actionExecutor.execute(() -> IpcClient.sendCommand("set_heads_up " + (dndEnabled ? "0" : "1")));
+                }
+            });
+        }
+
+        if (btnQuickBypass != null) {
+            btnQuickBypass.setOnClickListener(v -> {
+                triggerHaptic();
+                bypassEnabled = !bypassEnabled;
+                updateBypassButton();
+                if (actionExecutor != null) {
+                    actionExecutor.execute(() -> IpcClient.sendCommand("set_bypass_charge " + (bypassEnabled ? "1" : "0")));
+                }
+            });
+        }
+
+        if (btnQuickGos != null) {
+            btnQuickGos.setOnClickListener(v -> {
+                triggerHaptic();
+                if (!hasGos) {
+                    android.widget.Toast.makeText(this, "ROM AOSP/GSI: Samsung GOS tidak ada (Bebas throttling)", android.widget.Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                gosDisabled = !gosDisabled;
+                updateGosButton();
+                if (actionExecutor != null) {
+                    actionExecutor.execute(() -> IpcClient.sendCommand(gosDisabled ? "gos_disable" : "gos_restore"));
+                }
+            });
+        }
+    }
+
+    private void updateDndButton() {
+        if (btnQuickDnd == null) return;
+        btnQuickDnd.setBackgroundResource(dndEnabled ? R.drawable.bg_segment_active : R.drawable.bg_segment_track);
+        btnQuickDnd.setText(dndEnabled ? "FOCUS DND" : "NOTIFS ON");
+        btnQuickDnd.setTextColor(dndEnabled ? COLOR_ACTIVE_TEXT : COLOR_DIM);
+        tintQuickIcon(btnQuickDnd, dndEnabled ? COLOR_ACCENT : COLOR_DIM);
+    }
+
+    private void updateBypassButton() {
+        if (btnQuickBypass == null) return;
+        btnQuickBypass.setBackgroundResource(bypassEnabled ? R.drawable.bg_segment_active : R.drawable.bg_segment_track);
+        btnQuickBypass.setText(bypassEnabled ? "PASSTHRU" : "BYPASS CHG");
+        btnQuickBypass.setTextColor(bypassEnabled ? COLOR_ACTIVE_TEXT : COLOR_DIM);
+        tintQuickIcon(btnQuickBypass, bypassEnabled ? COLOR_ACCENT : COLOR_DIM);
+    }
+
+    private void updateGosButton() {
+        if (btnQuickGos == null) return;
+        if (!hasGos) {
+            btnQuickGos.setBackgroundResource(R.drawable.bg_segment_track);
+            btnQuickGos.setText("NO GOS");
+            btnQuickGos.setTextColor(COLOR_DIM);
+            tintQuickIcon(btnQuickGos, COLOR_DIM);
+        } else {
+            btnQuickGos.setBackgroundResource(gosDisabled ? R.drawable.bg_segment_active : R.drawable.bg_segment_track);
+            btnQuickGos.setText(gosDisabled ? "GOS KILL" : "GOS ON");
+            btnQuickGos.setTextColor(gosDisabled ? COLOR_GREEN : COLOR_DIM);
+            tintQuickIcon(btnQuickGos, gosDisabled ? COLOR_GREEN : COLOR_DIM);
+        }
+    }
+
+    private void tintQuickIcon(Button btn, int color) {
+        if (btn == null) return;
+        btn.setCompoundDrawableTintList(ColorStateList.valueOf(color));
     }
 
     private void setHudType(String type) {
@@ -574,8 +783,10 @@ public class OverlayService extends Service {
                 .edit().putString("hud_type", type).apply();
         highlightHudType();
         applyBubbleMode();
-        refreshBubbleText();
-        lastBubbleFps = "";
+        lastBubbleText = "";
+        if (lastData != null) {
+            refreshBubbleText(lastData);
+        }
     }
 
     private void applyPreset(String preset) {
@@ -585,19 +796,23 @@ public class OverlayService extends Service {
                 .edit().putString("game_preset", preset).apply();
         highlightPreset();
         final String pkg = currentGamePkg;
-        if (pkg == null || pkg.isEmpty()) return;
-        // No auto-BBR argument: the daemon keeps the game's existing choice.
         if (actionExecutor != null) {
-            actionExecutor.execute(() -> IpcClient.sendCommand("set_game_profile " + pkg + " " + preset));
-        } else if (ioExecutor != null) {
-            ioExecutor.execute(() -> IpcClient.sendCommand("set_game_profile " + pkg + " " + preset));
+            actionExecutor.execute(() -> {
+                if (pkg != null && !pkg.isEmpty()) {
+                    IpcClient.sendCommand("set_game_profile " + pkg + " " + preset);
+                } else {
+                    IpcClient.sendCommand("apply_preset " + preset);
+                }
+            });
         }
     }
 
     private void highlightHudType() {
-        boolean compact = "COMPACT".equals(hudType);
-        boolean detail = "DETAIL".equals(hudType);
-        boolean full = "FULL".equals(hudType);
+        boolean off = !fpsOverlayEnabled;
+        boolean compact = fpsOverlayEnabled && "COMPACT".equals(hudType);
+        boolean detail = fpsOverlayEnabled && "DETAIL".equals(hudType);
+        boolean full = fpsOverlayEnabled && "FULL".equals(hudType);
+        styleSegment(btnTypeOff, off);
         styleSegment(btnTypeCompact, compact);
         styleSegment(btnTypeDetail, detail);
         styleSegment(btnTypeFull, full);
@@ -621,17 +836,19 @@ public class OverlayService extends Service {
     private void applyBubbleMode() {
         if (viewBubble == null) return;
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) viewBubble.getLayoutParams();
-        // Edge handle stays narrow in every HUD mode; no hidden 56dp bubble hitbox.
-        lp.width = dp(HANDLE_WIDTH_DP);
-        lp.height = dp(HANDLE_HEIGHT_DP);
+        lp.width = targetBubbleWidth();
+        lp.height = targetBubbleHeight();
         viewBubble.setLayoutParams(lp);
         viewBubble.setMinimumWidth(0);
         viewBubble.setMinimumHeight(0);
+        updateBubbleOrientation();
 
         if (!panelOpen && viewBubble.getVisibility() == View.VISIBLE) {
             viewBubble.post(() -> {
-                if (!panelOpen) {
-                    params.x = dockedX(bubbleWidth());
+                if (!panelOpen && viewBubble != null) {
+                    params.x = dockedX(targetBubbleWidth());
+                    centerBubbleY();
+                    clampY();
                     updateLayout();
                 }
             });
@@ -639,20 +856,7 @@ public class OverlayService extends Service {
     }
 
     private void applyFpsOverlayState() {
-        if (viewBubble != null) {
-            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) viewBubble.getLayoutParams();
-            lp.width = dp(fpsOverlayEnabled ? HANDLE_WIDTH_DP : HANDLE_SMALL_WIDTH_DP);
-            lp.height = dp(fpsOverlayEnabled ? HANDLE_HEIGHT_DP : HANDLE_SMALL_HEIGHT_DP);
-            viewBubble.setLayoutParams(lp);
-            if (!panelOpen) {
-                viewBubble.post(() -> {
-                    if (!panelOpen && viewBubble != null) {
-                        params.x = dockedX(bubbleWidth());
-                        updateLayout();
-                    }
-                });
-            }
-        }
+        applyBubbleMode();
         if (dotState != null) {
             dotState.setVisibility(fpsOverlayEnabled ? View.GONE : View.VISIBLE);
         }
@@ -679,6 +883,7 @@ public class OverlayService extends Service {
             return;
         }
         missedReads = 0;
+        lastData = data;
 
         if (data.gamePreset != null && !data.gamePreset.isEmpty()
                 && !data.gamePreset.equals(activePreset)) {
@@ -692,13 +897,29 @@ public class OverlayService extends Service {
         if (sw != lastScreenW || sh != lastScreenH) {
             lastScreenW = sw;
             lastScreenH = sh;
-            refreshInsets();
             if (panelOpen) {
                 int pw = panelWidth();
+                int maxAllowedH = usableHeight() - dp(PANEL_MARGIN_DP * 2);
+                int ph = viewSidePanel.getHeight();
+                if (ph > maxAllowedH && maxAllowedH > dp(180)) {
+                    ViewGroup.LayoutParams lp = viewSidePanel.getLayoutParams();
+                    if (lp != null) {
+                        lp.height = maxAllowedH;
+                        viewSidePanel.setLayoutParams(lp);
+                    }
+                    View scroll = viewSidePanel.findViewById(R.id.sidepanel_scroll);
+                    if (scroll != null) {
+                        LinearLayout.LayoutParams slp = (LinearLayout.LayoutParams) scroll.getLayoutParams();
+                        slp.height = 0;
+                        slp.weight = 1f;
+                        scroll.setLayoutParams(slp);
+                    }
+                    ph = maxAllowedH;
+                }
                 params.x = dockedRight
                         ? Math.max(0, usableWidth() - pw - dp(PANEL_MARGIN_DP))
                         : dp(PANEL_MARGIN_DP);
-                params.y = clampPanelY(viewSidePanel.getHeight());
+                params.y = clampPanelY(ph);
                 updateLayout();
             } else {
                 placeBubble();
@@ -718,7 +939,7 @@ public class OverlayService extends Service {
         int dotColor;
         if (data.tempBigC >= 90) dotColor = COLOR_RED;
         else if (data.tempBigC >= 85) dotColor = COLOR_AMBER;
-        else dotColor = COLOR_GREEN;
+        else dotColor = COLOR_ACCENT;
         if (dotState != null) {
             dotState.setBackgroundTintList(ColorStateList.valueOf(dotColor));
         }
@@ -731,68 +952,170 @@ public class OverlayService extends Service {
     }
 
     private void refreshBubbleText() {
-        refreshBubbleText(null);
+        refreshBubbleText(lastData);
     }
 
     private void refreshBubbleText(SnapshotReader.SnapshotData data) {
         if (txtBubbleFps == null) return;
         if (data == null) {
-            // Re-render with the last known strings only for mode/telemetry changes.
-            txtBubbleFps.setText(lastBubbleFps.isEmpty() ? "--" : lastBubbleFps);
+            txtBubbleFps.setText(lastBubbleText.isEmpty() ? "--" : lastBubbleText);
             return;
         }
 
         String fps = data.fps > 0
                 ? String.format(java.util.Locale.US, "%.0f", data.fps)
                 : "--";
-        if (!fps.equals(lastBubbleFps)) {
-            txtBubbleFps.setText(fps);
-            lastBubbleFps = fps;
+
+        int fpsColor;
+        if (data.fps >= 55) fpsColor = COLOR_ACCENT;
+        else if (data.fps >= 40) fpsColor = COLOR_GREEN;
+        else if (data.fps >= 25) fpsColor = COLOR_AMBER;
+        else if (data.fps > 0) fpsColor = COLOR_RED;
+        else fpsColor = 0xFF8798AC;
+
+        if ("DETAIL".equals(hudType)) {
+            String temp = data.tempBigC > 0 ? (data.tempBigC + "°") : "--°";
+            int tempColor = data.tempBigC >= 85 ? COLOR_RED : (data.tempBigC >= 78 ? COLOR_AMBER : 0xFF94A3B8);
+
+            android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder();
+            sb.append(fps);
+            sb.setSpan(new android.text.style.ForegroundColorSpan(fpsColor),
+                    0, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+            int startTemp = sb.length();
+            sb.append("\n").append(temp);
+            sb.setSpan(new android.text.style.ForegroundColorSpan(tempColor),
+                    startTemp + 1, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+            txtBubbleFps.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 10.5f);
+            txtBubbleFps.setLineSpacing(0f, 1.05f);
+            txtBubbleFps.setText(sb);
+            lastBubbleText = fps + "\n" + temp;
+        } else if ("FULL".equals(hudType)) {
+            String temp = data.tempBigC > 0 ? (data.tempBigC + "°") : "--°";
+            int tempColor = data.tempBigC >= 85 ? COLOR_RED : (data.tempBigC >= 78 ? COLOR_AMBER : 0xFF94A3B8);
+            String gpu = data.gpuClockMhz > 0 ? (data.gpuClockMhz + "M") : "--";
+
+            android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder();
+            sb.append(fps);
+            sb.setSpan(new android.text.style.ForegroundColorSpan(fpsColor),
+                    0, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+            int startTemp = sb.length();
+            sb.append("\n").append(temp);
+            sb.setSpan(new android.text.style.ForegroundColorSpan(tempColor),
+                    startTemp + 1, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+            int startGpu = sb.length();
+            sb.append("\n").append(gpu);
+            sb.setSpan(new android.text.style.ForegroundColorSpan(0xFF8798AC),
+                    startGpu + 1, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+            txtBubbleFps.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 9f);
+            txtBubbleFps.setLineSpacing(0f, 1.05f);
+            txtBubbleFps.setText(sb);
+            lastBubbleText = fps + "\n" + temp + "\n" + gpu;
+        } else {
+            // COMPACT
+            android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder();
+            sb.append(fps);
+            sb.setSpan(new android.text.style.ForegroundColorSpan(fpsColor),
+                    0, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+            txtBubbleFps.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12f);
+            txtBubbleFps.setLineSpacing(0f, 1.0f);
+            txtBubbleFps.setText(sb);
+            lastBubbleText = fps;
         }
+    }
+
+    private final java.util.Map<String, String> appNameCache = new java.util.HashMap<>();
+
+    private String shortGameName(String pkg) {
+        if (pkg == null || pkg.isEmpty()) return "Game Space";
+        if (appNameCache.containsKey(pkg)) {
+            return appNameCache.get(pkg);
+        }
+        try {
+            android.content.pm.PackageManager pm = getPackageManager();
+            android.content.pm.ApplicationInfo ai = pm.getApplicationInfo(pkg, 0);
+            CharSequence label = pm.getApplicationLabel(ai);
+            if (label != null && label.length() > 0) {
+                String name = label.toString();
+                appNameCache.put(pkg, name);
+                return name;
+            }
+        } catch (Exception ignored) {}
+
+        int dot = pkg.lastIndexOf('.');
+        String tail = dot >= 0 && dot + 1 < pkg.length() ? pkg.substring(dot + 1) : pkg;
+        String pretty = tail.isEmpty() ? pkg : Character.toUpperCase(tail.charAt(0)) + tail.substring(1);
+        appNameCache.put(pkg, pretty);
+        return pretty;
     }
 
     private void refreshPanel(SnapshotReader.SnapshotData data) {
         if (txtPanelGame == null) return;
 
-        String game = data.gamePkg.isEmpty() ? "No game" : shortGameName(data.gamePkg);
-        if (!game.equals(lastGame)) {
-            txtPanelGame.setText(game);
-            lastGame = game;
+        String baseGame = data.gamePkg.isEmpty() ? "Game Space" : shortGameName(data.gamePkg);
+        String gameWithGos = baseGame + (data.hasGos ? (data.gosDisabled ? " · GOS OFF" : " · GOS ON") : " · AOSP");
+        if (!gameWithGos.equals(lastGame)) {
+            txtPanelGame.setText(gameWithGos);
+            lastGame = gameWithGos;
         }
 
         String fps = data.fps > 0
                 ? String.format(java.util.Locale.US, "%.1f FPS", data.fps)
-                : "N/A";
+                : "-- FPS";
         if (!fps.equals(lastMFps)) { txtMFps.setText(fps); lastMFps = fps; }
+
+        String frameMs;
+        int frameMsColor;
+        if (data.fps > 0) {
+            frameMs = String.format(java.util.Locale.US, "%.1f MS", 1000.0 / data.fps);
+            frameMsColor = data.fps >= 50 ? COLOR_GREEN : data.fps >= 30 ? COLOR_AMBER : COLOR_RED;
+        } else {
+            frameMs = "NO SIGNAL";
+            frameMsColor = COLOR_DIM;
+        }
+        if (txtMFpsStatus != null && !frameMs.equals(lastMFpsStatus)) {
+            txtMFpsStatus.setText(frameMs);
+            txtMFpsStatus.setTextColor(frameMsColor);
+            lastMFpsStatus = frameMs;
+        }
 
         String gpu = data.gpuClockMhz > 0
                 ? String.format(java.util.Locale.US, "%d MHz · %.0f%%", data.gpuClockMhz, data.gpuBusyPct)
-                : "N/A";
+                : "Idle";
         if (!gpu.equals(lastMGpu)) { txtMGpu.setText(gpu); lastMGpu = gpu; }
 
         String cpu = data.cpuBigMhz > 0
                 ? String.format(java.util.Locale.US, "%.2f GHz · %d°C", data.cpuBigMhz / 1000.0, data.tempBigC)
-                : "N/A";
+                : "Idle";
         if (!cpu.equals(lastMCpu)) { txtMCpu.setText(cpu); lastMCpu = cpu; }
 
         String net = data.tcpCc == null || data.tcpCc.isEmpty()
-                ? "N/A"
-                : data.tcpCc.toUpperCase();
+                ? "wlan0"
+                : (data.tcpCc.equalsIgnoreCase("bbr") ? "BBR ACCEL" : data.tcpCc.toUpperCase(java.util.Locale.US));
         if (!net.equals(lastMNet)) { txtMNet.setText(net); lastMNet = net; }
 
         String bat = data.battCapacity > 0
                 ? String.format(java.util.Locale.US, "%d%% · %.1fW%s",
                         data.battCapacity, data.battPowerW,
-                        data.battStatus.equalsIgnoreCase("Charging") ? " · CHG" : "")
-                : "N/A";
+                        data.battBypass ? " · BYPASS" : (data.battStatus.equalsIgnoreCase("Charging") ? " · CHG" : ""))
+                : "Battery";
         if (!bat.equals(lastMBat)) { txtMBat.setText(bat); lastMBat = bat; }
-    }
 
-    private String shortGameName(String pkg) {
-        int dot = pkg.lastIndexOf('.');
-        String tail = dot >= 0 && dot + 1 < pkg.length() ? pkg.substring(dot + 1) : pkg;
-        if (tail.isEmpty()) return pkg;
-        return Character.toUpperCase(tail.charAt(0)) + tail.substring(1);
+        if (data.battBypass != bypassEnabled) {
+            bypassEnabled = data.battBypass;
+            updateBypassButton();
+        }
+
+        if (data.gosDisabled != gosDisabled || data.hasGos != hasGos) {
+            gosDisabled = data.gosDisabled;
+            hasGos = data.hasGos;
+            updateGosButton();
+        }
     }
 
     private void triggerHaptic() {
@@ -848,7 +1171,6 @@ public class OverlayService extends Service {
         super.onConfigurationChanged(newConfig);
         if (overlayRoot == null || windowManager == null) return;
         overlayRoot.post(() -> {
-            refreshInsets();
             if (panelOpen) {
                 int pw = panelWidth();
                 params.x = dockedRight
@@ -856,7 +1178,8 @@ public class OverlayService extends Service {
                         : dp(PANEL_MARGIN_DP);
                 params.y = clampPanelY(viewSidePanel.getHeight());
             } else {
-                params.x = dockedX(bubbleWidth());
+                params.x = dockedX(targetBubbleWidth());
+                centerBubbleY();
                 clampY();
             }
             updateLayout();

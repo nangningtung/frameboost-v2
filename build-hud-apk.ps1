@@ -63,6 +63,9 @@ $finalApk = "$appDir\FrameBoost-GameSpace.apk"
 Write-Host "=== 10. Sync APK into module-src (ZIP payload) ==="
 $moduleApk = Join-Path (Split-Path $appDir -Parent) "module-src\FrameBoost-GameSpace.apk"
 Copy-Item $finalApk $moduleApk -Force
+$privAppDir = Join-Path (Split-Path $appDir -Parent) "module-src\system\priv-app\FrameBoost"
+New-Item -ItemType Directory -Path $privAppDir -Force | Out-Null
+Copy-Item $finalApk "$privAppDir\FrameBoost-GameSpace.apk" -Force
 
 Write-Host "SUCCESS: $finalApk created!"
-Get-Item $finalApk, $moduleApk | Select-Object Name, Length
+Get-Item $finalApk, $moduleApk, "$privAppDir\FrameBoost-GameSpace.apk" | Select-Object Name, Length

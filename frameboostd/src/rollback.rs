@@ -57,6 +57,9 @@ pub fn restore_from_snapshot(snap: &StockSnapshot) -> Result<(), Vec<String>> {
         let _ = crate::sysfs::run_cmd("settings", &["put", "system", "screen_brightness_mode", &snap.screen_brightness_mode]);
     }
 
+    // 8. Restore battery charging
+    let _ = std::fs::write("/sys/class/power_supply/battery/charging_enabled", "1");
+
     if errors.is_empty() {
         Ok(())
     } else {

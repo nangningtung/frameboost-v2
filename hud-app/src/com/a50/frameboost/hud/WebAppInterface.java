@@ -44,6 +44,20 @@ public class WebAppInterface {
             return snap != null ? snap : "";
         }
 
+        // General shell execution via su for full root capability
+        try {
+            Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", cmd});
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (sb.length() > 0) sb.append("\n");
+                    sb.append(line);
+                }
+                return sb.toString();
+            }
+        } catch (Exception ignored) {}
+
         return "";
     }
 

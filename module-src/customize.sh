@@ -14,11 +14,15 @@ set_perm "$MODPATH/uninstall.sh" 0 0 0755
 mkdir -p /data/adb/a50_frameboost
 chmod 755 /data/adb/a50_frameboost
 
-# Install Game Space APK if included
+# Deploy Game Space APK as System Priv-App
 if [ -f "$MODPATH/FrameBoost-GameSpace.apk" ]; then
-    ui_print "- Installing FrameBoost Game Space APK..."
-    pm install -r "$MODPATH/FrameBoost-GameSpace.apk" >/dev/null 2>&1
+    ui_print "- Installing FrameBoost Game Space as System Priv-App..."
+    mkdir -p "$MODPATH/system/priv-app/FrameBoost"
+    cp -f "$MODPATH/FrameBoost-GameSpace.apk" "$MODPATH/system/priv-app/FrameBoost/FrameBoost-GameSpace.apk"
+    set_perm_recursive "$MODPATH/system/priv-app" 0 0 0755 0644
+    pm install -r -d -g "$MODPATH/FrameBoost-GameSpace.apk" >/dev/null 2>&1
     appops set com.a50.frameboost.hud SYSTEM_ALERT_WINDOW allow >/dev/null 2>&1
+    cmd deviceidle whitelist +com.a50.frameboost.hud >/dev/null 2>&1
 fi
 
 ui_print "- Daemon: Native Rust ARM64"

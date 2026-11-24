@@ -72,6 +72,30 @@ pub struct BatteryState {
     pub temp_c: f64,
     pub charge_type: String,
     pub power_w: f64,
+    pub bypass_charging: bool,
+}
+
+static GOS_DISABLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+fn has_samsung_gos() -> bool {
+    std::process::Command::new("pm")
+        .args(["path", "com.samsung.android.game.gos"])
+        .output()
+        .map(|o| o.status.success() && !o.stdout.is_empty())
+        .unwrap_or(false)
+}
+
+fn check_gos_disabled() -> bool {
+    if !has_samsung_gos() {
+        return true;
+    }
+
+    let out = std::process::Command::new("pm")
+        .args(["list", "packages", "-d"])
+        .output();
+    out.ok()
+        .map(|o| String::from_utf8_lossy(&o.stdout).contains("com.samsung.android.game.gos"))
+        .unwrap_or(false)
 }
 
 #[derive(Serialize, Clone, Default)]
@@ -91,6 +115,8 @@ pub struct Snapshot {
     pub battery: BatteryState,
     pub vm_swappiness: u32,
     pub heads_up_blocked: bool,
+    pub gos_disabled: bool,
+    pub has_gos: bool,
     pub daemon_uptime_s: u64,
     pub stock_saved: bool,
 }
@@ -189,6 +215,8 @@ fn read_battery() -> BatteryState {
     let charge_type = read_file("/sys/class/power_supply/battery/charge_type");
     let power_w = (voltage_mv as f64 * (current_ma.abs() as f64)) / 1_000_000.0;
     let power_w = (power_w * 100.0).round() / 100.0;
+    let chg_enabled = read_file("/sys/class/power_supply/battery/charging_enabled");
+    let bypass_charging = chg_enabled.trim() == "0";
 
     BatteryState {
         status: if status.is_empty() { "Discharging".to_string() } else { status },
@@ -198,6 +226,7 @@ fn read_battery() -> BatteryState {
         temp_c,
         charge_type,
         power_w,
+        bypass_charging,
     }
 }
 
@@ -247,6 +276,8 @@ fn take_snapshot(
         battery: read_battery(),
         vm_swappiness: read_u32("/proc/sys/vm/swappiness"),
         heads_up_blocked: is_g,
+        gos_disabled: GOS_DISABLED.load(Ordering::Relaxed),
+        has_gos: has_samsung_gos(),
         daemon_uptime_s: start.elapsed().as_secs(),
         stock_saved: StockSnapshot::exists(),
     }
@@ -287,29 +318,43 @@ fn handle_client(
             serde_json::to_string(&list).unwrap_or_default()
         )
     } else if req == "gos_disable" {
-        let out = std::process::Command::new("pm")
-            .args(["disable-user", "--user", "0", "com.samsung.android.game.gos"])
-            .output();
-        match out {
-            Ok(o) if o.status.success() => r#"{"status":"ok","message":"GOS disabled"}"#.to_string(),
-            Ok(o) => format!(r#"{{"status":"error","message":"{}"}}"#, String::from_utf8_lossy(&o.stderr).trim()),
-            Err(e) => format!(r#"{{"status":"error","message":"{}"}}"#, e),
+        if !has_samsung_gos() {
+            GOS_DISABLED.store(true, Ordering::Relaxed);
+            r#"{"status":"ok","message":"GOS not installed on this ROM (already bypassed)","disabled":true,"has_gos":false}"#.to_string()
+        } else {
+            let out = std::process::Command::new("pm")
+                .args(["disable-user", "--user", "0", "com.samsung.android.game.gos"])
+                .output();
+            match out {
+                Ok(o) if o.status.success() => {
+                    GOS_DISABLED.store(true, Ordering::Relaxed);
+                    r#"{"status":"ok","message":"GOS disabled","disabled":true,"has_gos":true}"#.to_string()
+                }
+                Ok(o) => format!(r#"{{"status":"error","message":"{}"}}"#, String::from_utf8_lossy(&o.stderr).trim()),
+                Err(e) => format!(r#"{{"status":"error","message":"{}"}}"#, e),
+            }
         }
     } else if req == "gos_restore" {
-        let out = std::process::Command::new("pm")
-            .args(["enable", "com.samsung.android.game.gos"])
-            .output();
-        match out {
-            Ok(o) if o.status.success() => r#"{"status":"ok","message":"GOS restored"}"#.to_string(),
-            Ok(o) => format!(r#"{{"status":"error","message":"{}"}}"#, String::from_utf8_lossy(&o.stderr).trim()),
-            Err(e) => format!(r#"{{"status":"error","message":"{}"}}"#, e),
+        if !has_samsung_gos() {
+            GOS_DISABLED.store(false, Ordering::Relaxed);
+            r#"{"status":"ok","message":"GOS not installed on this ROM","disabled":false,"has_gos":false}"#.to_string()
+        } else {
+            let out = std::process::Command::new("pm")
+                .args(["enable", "com.samsung.android.game.gos"])
+                .output();
+            match out {
+                Ok(o) if o.status.success() => {
+                    GOS_DISABLED.store(false, Ordering::Relaxed);
+                    r#"{"status":"ok","message":"GOS restored","disabled":false,"has_gos":true}"#.to_string()
+                }
+                Ok(o) => format!(r#"{{"status":"error","message":"{}"}}"#, String::from_utf8_lossy(&o.stderr).trim()),
+                Err(e) => format!(r#"{{"status":"error","message":"{}"}}"#, e),
+            }
         }
     } else if req == "gos_status" {
-        let out = std::process::Command::new("pm")
-            .args(["list", "packages", "-d"])
-            .output();
-        let disabled = out.ok().map(|o| String::from_utf8_lossy(&o.stdout).contains("com.samsung.android.game.gos")).unwrap_or(false);
-        format!(r#"{{"status":"ok","disabled":{}}}"#, disabled)
+        let disabled = GOS_DISABLED.load(Ordering::Relaxed);
+        let exists = has_samsung_gos();
+        format!(r#"{{"status":"ok","disabled":{},"has_gos":{}}}"#, disabled, exists)
     } else if req == "list_installed_apps" {
         let apps = GameDetector::get_installed_user_apps();
         serde_json::to_string(&apps).unwrap_or_default()
@@ -388,9 +433,58 @@ fn handle_client(
         let count: u32 = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(5);
         let p = run_ping(host, count);
         serde_json::to_string(&p).unwrap_or_default()
+    } else if let Some(val) = req.strip_prefix("set_heads_up ") {
+        let v = if val.trim() == "0" || val.trim().eq_ignore_ascii_case("false") { "0" } else { "1" };
+        let out = std::process::Command::new("settings")
+            .args(["put", "global", "heads_up_notifications_enabled", v])
+            .output();
+        match out {
+            Ok(_) => format!(r#"{{"status":"ok","heads_up":"{}"}}"#, v),
+            Err(e) => format!(r#"{{"status":"error","message":"{}"}}"#, e),
+        }
+    } else if let Some(val) = req.strip_prefix("set_bypass_charge ") {
+        let v = if val.trim() == "1" || val.trim().eq_ignore_ascii_case("true") { "0" } else { "1" };
+        let res = std::fs::write("/sys/class/power_supply/battery/charging_enabled", v);
+        match res {
+            Ok(_) => format!(r#"{{"status":"ok","bypass":{}}}"#, v == "0"),
+            Err(e) => format!(r#"{{"status":"error","message":"{}"}}"#, e),
+        }
+    } else if let Some(preset_name) = req.strip_prefix("apply_preset ") {
+        let preset = crate::profile::Preset::from_str(preset_name.trim());
+        let prof = crate::profile::GameProfile::build("MANUAL", preset, true);
+        let boost = crate::apply::BoostProfile {
+            name: Box::leak(prof.preset.clone().into_boxed_str()),
+            gpu_gov: Box::leak(prof.gpu_gov.clone().into_boxed_str()),
+            gpu_min: prof.gpu_min,
+            cpu0_min: prof.cpu0_min,
+            cpu4_min: prof.cpu4_min,
+        };
+        let res = crate::apply::apply_profile(&boost);
+        format!(r#"{{"status":"{}","preset":"{}"}}"#, if res.success { "ok" } else { "fail" }, prof.preset)
     } else {
         match req {
             "ping" => r#"{"status":"ok"}"#.to_string(),
+            "clean_ram" => {
+                let _ = std::process::Command::new("sync").output();
+                let res = std::fs::write("/proc/sys/vm/drop_caches", "3");
+                match res {
+                    Ok(_) => r#"{"status":"ok","message":"RAM cleaned"}"#.to_string(),
+                    Err(e) => format!(r#"{{"status":"error","message":"{}"}}"#, e),
+                }
+            }
+            "get_heads_up" => {
+                let out = std::process::Command::new("settings")
+                    .args(["get", "global", "heads_up_notifications_enabled"])
+                    .output();
+                let val = out.ok().map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string()).unwrap_or_else(|| "1".to_string());
+                let enabled = val != "0";
+                format!(r#"{{"status":"ok","enabled":{}}}"#, enabled)
+            }
+            "get_bypass_charge" => {
+                let chg = read_file("/sys/class/power_supply/battery/charging_enabled");
+                let bypass = chg.trim() == "0";
+                format!(r#"{{"status":"ok","bypass":{}}}"#, bypass)
+            }
             "apply_game" => {
                 let r = apply_profile(&PROFILE_GAME);
                 format!(
@@ -436,6 +530,8 @@ fn handle_client(
 
 fn main() {
     let _ = fs::remove_file(SOCK_PATH);
+
+    GOS_DISABLED.store(check_gos_disabled(), Ordering::Relaxed);
 
     // Initial stock capture so baseline is preserved
     let snap = StockSnapshot::capture();
@@ -484,7 +580,7 @@ fn main() {
             if let Ok(json) = serde_json::to_string(&snap) {
                 let _ = fs::write(SNAPSHOT_FILE, &json);
             }
-            thread::sleep(Duration::from_millis(500));
+            thread::sleep(Duration::from_millis(250));
         }
     });
 

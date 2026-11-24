@@ -27,6 +27,9 @@ public class SnapshotReader {
         public double battTempC = 0.0;
         public String battChargeType = "";
         public double battPowerW = 0.0;
+        public boolean battBypass = false;
+        public boolean gosDisabled = false;
+        public boolean hasGos = false;
     }
 
     public static SnapshotData read() {
@@ -58,6 +61,8 @@ public class SnapshotReader {
             data.isGame = obj.optBoolean("is_game", false);
             data.fps = obj.optDouble("fps", 0.0);
             data.p1LowFps = obj.optDouble("p1_low_fps", 0.0);
+            data.gosDisabled = obj.optBoolean("gos_disabled", false);
+            data.hasGos = obj.optBoolean("has_gos", false);
 
             int tempMc = obj.optInt("temp_big_mc", 0);
             data.tempBigC = tempMc > 0 ? (tempMc / 1000) : 0;
@@ -92,6 +97,7 @@ public class SnapshotReader {
                 data.battTempC = batt.optDouble("temp_c", 0.0);
                 data.battChargeType = batt.optString("charge_type", "");
                 data.battPowerW = batt.optDouble("power_w", 0.0);
+                data.battBypass = batt.optBoolean("bypass_charging", false);
             }
 
             return data;
