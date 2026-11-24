@@ -1,7 +1,7 @@
 # FrameBoost v2 — Project Report
 
 Status: **Selesai untuk fase ini**  
-Commit fitur terakhir: `c27fdff`  
+Commit fitur terakhir: `2ab3759`  
 Device uji: `RR8M50C0W8T` (Samsung Galaxy A50)
 
 ---
@@ -281,6 +281,7 @@ Perubahan:
 - **Preset**: keep-alive setiap 5 detik, hanya menulis kalau nilai benar-benar drift. Clock tidak lagi balik ke stock karena reset Samsung. Perubahan preset dari WebUI/panel ikut terbaca tanpa restart game.
 - **Thermal**: ambang Warn 87 °C, kembali ke Game di 82 °C, Crit 92 °C. Extras (swappiness, DND, renice, BBR) hanya dijalankan sekali per sesi game, bukan setiap transisi suhu.
 - **Apply**: min freq di-clamp ke `scaling_max_freq` yang sedang aktif (thermal cap), dan kegagalan satu write tidak lagi rollback ke stock; keep-alive yang retry.
+- **Telemetry**: `read_u32` sekarang mem-parse nilai berakhiran `%` (mis. `gpu_busy` 78%) supaya `busy_pct` tidak lagi 0.
 - **Versi**: modul naik ke v2.4.0.
 
 Testing (Auto Chess, Galaxy A50, landscape):
