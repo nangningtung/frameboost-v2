@@ -105,10 +105,13 @@ Tidak ada angka palsu.
 Kosong = -- / N/A.
 ```
 
+FPS self-healing: TimeStats di-enable otomatis, layer basi di-clear + enable ulang, dan tidak ada fallback ke rata-rata lama.
+
 ### 2.5 Safety
 
 - Snapshot & restore stock config (termasuk `charging_enabled=1` saat rollback).
-- Thermal safety.
+- Thermal safety dengan hysteresis lebar (Warn 87 °C, kembali 82 °C, Crit 92 °C).
+- Keep-alive profil tiap 5 detik untuk menahan reset clock dari layanan Samsung.
 - Auto-hide overlay di luar game; deteksi keluar game instan saat pindah ke launcher / system UI (poll 250 ms, debounce 2).
 - Stale-daemon guard.
 - BBR per game.
@@ -189,7 +192,7 @@ Output:
 - `hud-app/FrameBoost-GameSpace.apk`
 - `module-src/system/bin/frameboostd`
 - `module-src/system/priv-app/FrameBoost/FrameBoost-GameSpace.apk`
-- `FrameBoost-v2.3.0-A50.zip`
+- `FrameBoost-v2.4.0-A50.zip`
 
 Catatan deploy:
 
@@ -265,6 +268,39 @@ Gunakan checklist ini setiap kali ada perubahan.
 ---
 
 ## 9. Changelog
+
+### `v2.4.0` — 2026-11-25
+
+```text
+fix: honest live FPS, sticky presets and stable thermal hysteresis
+```
+
+Perubahan:
+
+- **FPS**: TimeStats di-enable otomatis; layer basi dideteksi (2 poll tanpa frame) lalu `-clear` + `-enable` ulang; fallback `averageFPS` dihapus supaya tidak ada lagi angka 60 palsu; P1 low dihitung dari histogram window berjalan dan di-clamp supaya tidak melebihi FPS.
+- **Preset**: keep-alive setiap 5 detik, hanya menulis kalau nilai benar-benar drift. Clock tidak lagi balik ke stock karena reset Samsung. Perubahan preset dari WebUI/panel ikut terbaca tanpa restart game.
+- **Thermal**: ambang Warn 87 °C, kembali ke Game di 82 °C, Crit 92 °C. Extras (swappiness, DND, renice, BBR) hanya dijalankan sekali per sesi game, bukan setiap transisi suhu.
+- **Apply**: min freq di-clamp ke `scaling_max_freq` yang sedang aktif (thermal cap), dan kegagalan satu write tidak lagi rollback ke stock; keep-alive yang retry.
+- **Versi**: modul naik ke v2.4.0.
+
+Testing (Auto Chess, Galaxy A50, landscape):
+
+```text
+Sebelum:
+  FPS battle 47.9, jank 20.3%
+  GPU Dynamic / 385 MHz, CPU big min 1248 MHz
+  monitor stuck di 61
+
+Sesudah:
+  clock hold Booster / 683 MHz + CPU big min 1508 MHz selama 60 detik
+  battle 50.2 FPS, jank 14.4%
+  lobby 58.3 FPS, jank 1%
+  monitor live: 60 / 79 C / 683 MHz
+```
+
+Catatan: thermal HAL Samsung tetap membatasi CPU big ke ~1.77-1.98 GHz saat 80-82 °C, jadi battle berat belum 60 stabil penuh.
+
+---
 
 ### `0aa121d` — 2026-11-24
 

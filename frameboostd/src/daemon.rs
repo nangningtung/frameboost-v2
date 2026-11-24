@@ -2,9 +2,9 @@ use std::fs;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::{Arc, RwLock};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use crate::apply::{apply_profile, BoostProfile};
+use crate::apply::{apply_profile, apply_profile_if_drifted, BoostProfile};
 use crate::detect::GameDetector;
 use crate::net::{apply_bbr, restore_stock_cc};
 use crate::profile::GameProfile;
@@ -14,10 +14,15 @@ use crate::sysfs::{read_u32, run_cmd};
 const POLL_MS: u64 = 250;
 const DEBOUNCE_MISSES: u32 = 2; // Instant for launcher/system, 2 x 250ms = 500ms for other non-game apps
 
-const TEMP_WARN_ON: u32 = 85000;
-const TEMP_WARN_OFF: u32 = 82000;
-const TEMP_CRIT_ON: u32 = 90000;
+const TEMP_WARN_ON: u32 = 87000; // only throttle when really hot; Samsung HAL caps earlier
+const TEMP_WARN_OFF: u32 = 82000; // 5C band prevents profile flapping around the threshold
+const TEMP_CRIT_ON: u32 = 92000;
 const TEMP_CRIT_OFF: u32 = 80000;
+
+/// How often the daemon re-checks the platform against the active profile.
+/// Samsung resets the GPU/CPU knobs a few seconds after they are written, so
+/// this keep-alive is what makes a preset actually stick.
+const KEEPALIVE_SECS: u64 = 5;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u8)]
@@ -54,6 +59,8 @@ pub struct AutoDaemon {
     current_game: String,
     miss_count: u32,
     active_profile: Option<GameProfile>,
+    last_keepalive: Instant,
+    extras_pkg: String,
 }
 
 impl AutoDaemon {
@@ -64,6 +71,8 @@ impl AutoDaemon {
             current_game: String::new(),
             miss_count: 0,
             active_profile: None,
+            last_keepalive: Instant::now(),
+            extras_pkg: String::new(),
         }
     }
 
@@ -158,35 +167,91 @@ impl AutoDaemon {
             self.state = next_state;
         }
 
+        // Keep the active profile pinned. Samsung's power service reverts the
+        // clock knobs a few seconds after they are written, so without this
+        // loop a preset only lasts a few seconds.
+        if matches!(self.state, DaemonState::Game | DaemonState::Warn)
+            && !self.current_game.is_empty()
+            && self.last_keepalive.elapsed() >= Duration::from_secs(KEEPALIVE_SECS)
+        {
+            self.last_keepalive = Instant::now();
+            self.sync_active_profile();
+            self.keepalive_apply();
+        }
+
         // Clean up current_game if fully dropped to idle
         if self.state == DaemonState::Idle && !in_game {
             self.current_game.clear();
             self.active_profile = None;
+            self.extras_pkg.clear();
         }
 
         self.state
     }
 
-    fn apply_state(&self, st: DaemonState) {
+    /// Pick up preset changes made from the WebUI or side panel without
+    /// waiting for the game to be restarted.
+    fn sync_active_profile(&mut self) {
+        let fresh = GameProfile::for_package(&self.current_game);
+        let changed = match &self.active_profile {
+            Some(cur) => cur.preset != fresh.preset,
+            None => true,
+        };
+        if changed {
+            self.active_profile = Some(fresh);
+        }
+    }
+
+    fn keepalive_apply(&self) {
+        if let Some(prof) = &self.active_profile {
+            let target = if self.state == DaemonState::Warn {
+                prof.warn_min
+            } else {
+                prof.gpu_min
+            };
+            let boost = BoostProfile {
+                name: "KEEP".to_string(),
+                gpu_gov: prof.gpu_gov.clone(),
+                gpu_min: target,
+                cpu0_min: prof.cpu0_min,
+                cpu4_min: prof.cpu4_min,
+            };
+            if let Some(rep) = apply_profile_if_drifted(&boost) {
+                if !rep.success {
+                    eprintln!("[keepalive] re-apply failed: {:?}", rep.errors);
+                }
+            }
+        }
+    }
+
+    fn apply_state(&mut self, st: DaemonState) {
         match st {
             DaemonState::Idle => {
                 let _ = restore_all();
-                if let Some(prof) = &self.active_profile {
+                self.extras_pkg.clear();
+                if let Some(prof) = self.active_profile.clone() {
                     if prof.auto_bbr {
                         let _ = restore_stock_cc();
                     }
                 }
             }
             DaemonState::Game => {
-                if let Some(prof) = &self.active_profile {
-                    let boost = BoostProfile {
-                        name: "GAME",
-                        gpu_gov: Box::leak(prof.gpu_gov.clone().into_boxed_str()),
-                        gpu_min: prof.gpu_min,
-                        cpu0_min: prof.cpu0_min,
-                        cpu4_min: prof.cpu4_min,
-                    };
-                    let _ = apply_profile(&boost);
+                let Some(prof) = self.active_profile.clone() else {
+                    return;
+                };
+                let boost = BoostProfile {
+                    name: "GAME".to_string(),
+                    gpu_gov: prof.gpu_gov.clone(),
+                    gpu_min: prof.gpu_min,
+                    cpu0_min: prof.cpu0_min,
+                    cpu4_min: prof.cpu4_min,
+                };
+                let _ = apply_profile(&boost);
+
+                // One-shot extras per game session. Running them again on
+                // every thermal recovery just adds binder/IO churn.
+                if self.extras_pkg != self.current_game {
+                    self.extras_pkg = self.current_game.clone();
 
                     // 1. Anti-stutter RAM & ZRAM: lower swappiness from 130 -> 10 to eliminate kswapd0 thrashing
                     let _ = fs::write("/proc/sys/vm/swappiness", "10");
@@ -214,10 +279,10 @@ impl AutoDaemon {
                 }
             }
             DaemonState::Warn => {
-                if let Some(prof) = &self.active_profile {
+                if let Some(prof) = self.active_profile.clone() {
                     let warn = BoostProfile {
-                        name: "WARN",
-                        gpu_gov: Box::leak(prof.gpu_gov.clone().into_boxed_str()),
+                        name: "WARN".to_string(),
+                        gpu_gov: prof.gpu_gov.clone(),
                         gpu_min: prof.warn_min,
                         cpu0_min: prof.cpu0_min,
                         cpu4_min: prof.cpu4_min,

@@ -2,7 +2,7 @@ import os
 import zipfile
 
 src_dir = r"C:\Users\Administrator\Documents\code\frameboost-v2\module-src"
-out_zip = r"C:\Users\Administrator\Documents\code\frameboost-v2\FrameBoost-v2.3.0-A50.zip"
+out_zip = r"C:\Users\Administrator\Documents\code\frameboost-v2\FrameBoost-v2.4.0-A50.zip"
 
 if os.path.exists(out_zip):
     os.remove(out_zip)

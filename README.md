@@ -51,7 +51,7 @@ powershell -ExecutionPolicy Bypass -File .\build-hud-apk.ps1
 python make-zip.py
 ```
 
-The ZIP (`FrameBoost-v2.3.0-A50.zip`) is installed through KernelSU/Magisk Manager. `deploy-device.ps1` is faster for day-to-day updates and needs root ADB (`su`).
+The ZIP (`FrameBoost-v2.4.0-A50.zip`) is installed through KernelSU/Magisk Manager. `deploy-device.ps1` is faster for day-to-day updates and needs root ADB (`su`).
 
 ## Notes
 - `disabled_games.list` under `/data/adb/a50_frameboost/` hides games removed from the UI. Clear the file (or re-add the package) to show them again.

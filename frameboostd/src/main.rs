@@ -18,7 +18,7 @@ mod rollback;
 mod snapshot;
 mod sysfs;
 
-use apply::{apply_profile, PROFILE_GAME};
+use apply::{apply_profile, profile_game};
 use daemon::{spawn_auto_daemon, DaemonState};
 use detect::GameDetector;
 use fps::measure_fps;
@@ -453,8 +453,8 @@ fn handle_client(
         let preset = crate::profile::Preset::from_str(preset_name.trim());
         let prof = crate::profile::GameProfile::build("MANUAL", preset, true);
         let boost = crate::apply::BoostProfile {
-            name: Box::leak(prof.preset.clone().into_boxed_str()),
-            gpu_gov: Box::leak(prof.gpu_gov.clone().into_boxed_str()),
+            name: prof.preset.clone(),
+            gpu_gov: prof.gpu_gov.clone(),
             gpu_min: prof.gpu_min,
             cpu0_min: prof.cpu0_min,
             cpu4_min: prof.cpu4_min,
@@ -486,7 +486,7 @@ fn handle_client(
                 format!(r#"{{"status":"ok","bypass":{}}}"#, bypass)
             }
             "apply_game" => {
-                let r = apply_profile(&PROFILE_GAME);
+                let r = apply_profile(&profile_game());
                 format!(
                     r#"{{"status":"{}","profile":"{}","errors":{:?}}}"#,
                     if r.success { "ok" } else { "fail" },
@@ -554,7 +554,7 @@ fn main() {
     let detector = Arc::new(RwLock::new(GameDetector::new()));
 
     eprintln!(
-        "FrameBoost daemon v2.0.0 started (pid={})",
+        "FrameBoost daemon v2.4.0 started (pid={})",
         std::process::id()
     );
 
