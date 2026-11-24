@@ -1,6 +1,6 @@
 # Secreto Space 0.1.0 - Project Report
 
-Status: **M0 selesai di kode, verifikasi device tertunda**  
+Status: **M0 dan M1 selesai di kode; M1 terverifikasi di device kecuali uji reboot**  
 Commit terakhir sebelum rebrand: `0221973`  
 Device uji: `RR8M50C0W8T` (Samsung Galaxy A50, GSI API 36)
 
@@ -119,6 +119,25 @@ FPS self-healing: TimeStats di-enable otomatis, layer basi di-clear + enable ula
 - Quick Boost.
 - GOS bypass dengan deteksi paket: ROM tanpa GOS dianggap sudah bypass.
 - Bypass charging dan toggle heads-up notifikasi lewat daemon.
+
+### 2.6 Sesi game & background apps
+
+Sesi adalah unit yang dilaporkan console, bukan sekadar kumpulan tweak.
+
+- Sesi mulai otomatis saat game masuk foreground, berakhir saat game ditinggalkan.
+- Aplikasi user yang tidak dipakai ditidurkan: `cmd appops set <pkg> RUN_IN_BACKGROUND ignore`
+  lalu `am force-stop <pkg>`. `am set-inactive` tidak dipakai karena no-op di GSI ini.
+- Yang tidak pernah ditidurkan: game aktif, semua game di library, launcher, keyboard aktif,
+  app telepon/dialer, GMS, Secreto sendiri, dan whitelist user.
+- Whitelist dan toggle on/off disimpan di `/data/adb/secreto_space/`.
+- Journal `sleeping.list` berisi `pkg mode` ditulis **sebelum** aksi pertama, sehingga crash,
+  reboot, atau uninstall selalu bisa mengembalikan mode appops semula.
+- Batch tidur berjalan di worker thread dengan `APPLY_LOCK`, jadi tick loop termal tidak
+  berhenti beberapa detik saat app ditidurkan.
+- Laporan sesi: durasi, rata-rata FPS, 1% low dari p99 seluruh sesi, jank terhadap interval
+  vsync panel, suhu puncak, baterai awal/akhir, jumlah app yang tidur, dan alasan berakhir.
+- `End session & restore` dan `RESTORE NOW` mengakhiri sesi, membangunkan app, memulihkan
+  clock stock, lalu mem-pause Secreto untuk game itu sampai game ditutup.
 
 ---
 
@@ -279,7 +298,17 @@ Gunakan checklist ini setiap kali ada perubahan.
 - **Migrasi otomatis** dari FrameBoost 2.x: profil, stock snapshot, dan daftar game
   disalin ke `/data/adb/secreto_space/`; modul lama, APK lama, dan file runtime lama dihapus.
 - **Path runtime baru**: `/data/local/tmp/secreto.sock`, `secreto-snapshot.json`, `secretod.log`.
-- Perilaku daemon, preset, overlay, dan telemetri tidak berubah pada rilis ini.
+- **Sesi game (M1)**:
+  - Sesi dimulai saat game masuk foreground dan berakhir saat game ditinggalkan.
+  - Background apps ditidurkan dengan `RUN_IN_BACKGROUND ignore` + `am force-stop`, karena
+    `am set-inactive` terbukti no-op di GSI ini.
+  - Journal `sleeping.list` ditulis sebelum aksi, dipulihkan oleh daemon, `service.sh`,
+    dan `uninstall.sh`.
+  - Game di library, launcher, IME, app telepon, GMS, dan whitelist tidak pernah ditidurkan.
+  - Laporan sesi: durasi, rata-rata FPS, 1% low (p99 seluruh sesi), jank terhadap vsync
+    panel, suhu puncak, baterai awal/akhir, jumlah app yang tidur.
+  - `End session & restore` dan `RESTORE NOW` mengakhiri sesi, membangunkan app, dan
+    mem-pause Secreto untuk game itu sampai game ditutup.
 
 ### `v2.4.0` - 2026-11-25
 

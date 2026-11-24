@@ -21,6 +21,19 @@ fi
 rm -f /data/local/tmp/frameboost.sock
 rm -f /data/local/tmp/frameboost-snapshot.json
 
+# Safety net for an interrupted session: put every journaled app back even if
+# the daemon binary cannot start. The journal is left in place so the daemon
+# can still restore clocks and finish the recovery itself.
+SLEEP_LIST=/data/adb/secreto_space/sleeping.list
+if [ -f "$SLEEP_LIST" ]; then
+    while read -r pkg mode; do
+        if [ -n "$pkg" ]; then
+            cmd appops set "$pkg" RUN_IN_BACKGROUND "${mode:-default}" 2>/dev/null
+        fi
+    done < "$SLEEP_LIST"
+    log -t SecretoSpace "woke apps from an interrupted session"
+fi
+
 # Ensure daemon binary is executable
 DAEMON="$MODDIR/system/bin/secretod"
 LOG=/data/local/tmp/secretod.log
@@ -40,7 +53,7 @@ while true; do
 
     if ! pidof secretod >/dev/null 2>&1; then
         rm -f /data/local/tmp/secreto.sock
-        "$DAEMON" > "$LOG" 2>&1 &
+        "$DAEMON" >> "$LOG" 2>&1 &
     fi
     sleep 10
 done

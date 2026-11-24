@@ -9,12 +9,14 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 mod apply;
+mod apps;
 mod daemon;
 mod detect;
 mod fps;
 mod net;
 mod profile;
 mod rollback;
+mod session;
 mod snapshot;
 mod sysfs;
 
@@ -153,6 +155,8 @@ pub struct Snapshot {
     pub has_gos: bool,
     pub daemon_uptime_s: u64,
     pub stock_saved: bool,
+    pub session: crate::session::SessionInfo,
+    pub sleeping_apps: Vec<String>,
 }
 
 fn read_gpu() -> GpuState {
@@ -279,6 +283,13 @@ fn take_snapshot(
         // ponytail: throttle fps measurement to 1s to prevent RenderThread binder stalls
         if last_fps_time.elapsed() >= Duration::from_millis(1000) {
             let rep = measure_fps(active_pkg);
+            if rep.available {
+                crate::session::sample(
+                    &rep,
+                    read_u32("/sys/class/thermal/thermal_zone0/temp"),
+                    read_u32("/sys/class/power_supply/battery/capacity") as i32,
+                );
+            }
             *last_fps = Some(rep.clone());
             *last_fps_time = Instant::now();
             rep
@@ -314,6 +325,8 @@ fn take_snapshot(
         has_gos: has_samsung_gos(),
         daemon_uptime_s: start.elapsed().as_secs(),
         stock_saved: StockSnapshot::exists(),
+        session: crate::session::info(),
+        sleeping_apps: crate::session::sleeping_apps(),
     }
 }
 
@@ -510,6 +523,93 @@ fn handle_client(
             let res = crate::apply::apply_profile(&boost);
             format!(r#"{{"status":"{}","preset":"{}"}}"#, if res.success { "ok" } else { "fail" }, prof.preset)
         }
+    } else if req == "session_status" {
+        let info = crate::session::info();
+        let last = crate::session::last_report();
+        format!(
+            r#"{{"status":"ok","session":{},"last":{},"sleeping":{}}}"#,
+            serde_json::to_string(&info).unwrap_or_default(),
+            serde_json::to_string(&last).unwrap_or_default(),
+            serde_json::to_string(&crate::session::sleeping_apps()).unwrap_or_default()
+        )
+    } else if let Some(rest) = req.strip_prefix("session_start") {
+        let arg = rest.trim();
+        let pkg = if arg.is_empty() {
+            GameDetector::get_foreground_pkg()
+        } else {
+            arg.to_string()
+        };
+        if pkg.is_empty() || pkg == "com.secreto.space" {
+            r#"{"status":"error","message":"Open a game first"}"#.to_string()
+        } else {
+            let preset = crate::profile::GameProfile::for_package(&pkg).preset;
+            let fresh = crate::session::start(&pkg, &preset);
+            if fresh {
+                crate::session::sleep_background(&pkg);
+            }
+            format!(
+                r#"{{"status":"ok","message":"{}","pkg":"{}","preset":"{}","sleep_queued":{}}}"#,
+                if fresh { "Session started" } else { "Session already active" },
+                pkg,
+                preset,
+                fresh
+            )
+        }
+    } else if req == "session_end" {
+        let target = crate::session::active_pkg().unwrap_or_else(GameDetector::get_foreground_pkg);
+        crate::daemon::pause_current(&target);
+        let report = crate::session::finish("manual");
+        let restore = match restore_all() {
+            Ok(msg) => msg,
+            Err(e) => e,
+        };
+        format!(
+            r#"{{"status":"ok","report":{},"restore":"{}"}}"#,
+            serde_json::to_string(&report).unwrap_or_default(),
+            restore
+        )
+    } else if req == "sleep_apps" {
+        let game = GameDetector::get_foreground_pkg();
+        let list = crate::session::preview_candidates(&game);
+        format!(
+            r#"{{"status":"ok","candidates":{},"count":{}}}"#,
+            serde_json::to_string(&list).unwrap_or_default(),
+            list.len()
+        )
+    } else if req == "wake_apps" {
+        let woke = crate::session::wake_now();
+        format!(r#"{{"status":"ok","woke":{}}}"#, woke)
+    } else if req == "get_sleep_settings" {
+        let game = GameDetector::get_foreground_pkg();
+        let candidates = crate::session::preview_candidates(&game);
+        format!(
+            r#"{{"status":"ok","enabled":{},"whitelist":{},"sleeping":{},"candidates":{},"count":{}}}"#,
+            crate::apps::enabled(),
+            serde_json::to_string(&crate::apps::whitelist()).unwrap_or_default(),
+            serde_json::to_string(&crate::session::sleeping_apps()).unwrap_or_default(),
+            serde_json::to_string(&candidates).unwrap_or_default(),
+            candidates.len()
+        )
+    } else if let Some(val) = req.strip_prefix("set_sleep_enabled ") {
+        let on = val.trim() == "1" || val.trim().eq_ignore_ascii_case("true");
+        match crate::apps::set_enabled(on) {
+            Ok(_) => format!(r#"{{"status":"ok","enabled":{}}}"#, on),
+            Err(e) => format!(r#"{{"status":"error","message":"{}"}}"#, e),
+        }
+    } else if req == "set_sleep_whitelist" || req.starts_with("set_sleep_whitelist ") {
+        let val = req.strip_prefix("set_sleep_whitelist").unwrap_or("").trim();
+        let list: Vec<String> = val
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| s.contains('.'))
+            .collect();
+        match crate::apps::set_whitelist(&list) {
+            Ok(_) => format!(
+                r#"{{"status":"ok","whitelist":{}}}"#,
+                serde_json::to_string(&crate::apps::whitelist()).unwrap_or_default()
+            ),
+            Err(e) => format!(r#"{{"status":"error","message":"{}"}}"#, e),
+        }
     } else {
         match req {
             "ping" => r#"{"status":"ok"}"#.to_string(),
@@ -543,10 +643,19 @@ fn handle_client(
                     r.errors
                 )
             }
-            "restore_all" => match restore_all() {
-                Ok(msg) => format!(r#"{{"status":"ok","message":"{}"}}"#, msg),
-                Err(e) => format!(r#"{{"status":"error","message":"{}"}}"#, e),
-            },
+            "restore_all" => {
+                // Same contract as the console's End session: wake the apps,
+                // close the session and pause the current game, otherwise
+                // keep-alive re-applies the preset five seconds later.
+                let target =
+                    crate::session::active_pkg().unwrap_or_else(GameDetector::get_foreground_pkg);
+                crate::daemon::pause_current(&target);
+                crate::session::finish("manual_restore");
+                match restore_all() {
+                    Ok(msg) => format!(r#"{{"status":"ok","message":"{}"}}"#, msg),
+                    Err(e) => format!(r#"{{"status":"error","message":"{}"}}"#, e),
+                }
+            }
             "fps" => {
                 let pkg = GameDetector::get_foreground_pkg();
                 let rep = measure_fps(&pkg);
@@ -585,6 +694,10 @@ fn main() {
     // Initial stock capture so baseline is preserved
     let snap = StockSnapshot::capture();
     let _ = snap.save_if_new();
+
+    // Finish anything a crash or a reboot interrupted before serving clients.
+    // `recover()` logs its own summary, so it is not logged twice here.
+    let _ = crate::session::recover();
 
     let listener = match UnixListener::bind(SOCK_PATH) {
         Ok(l) => l,

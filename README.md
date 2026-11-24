@@ -26,6 +26,10 @@ This module is device locked on purpose. `customize.sh` aborts the install and
 - **In-game bubble and side panel**: snaps to the nearest edge, opens a cockpit with
   real FPS, GPU/CPU clocks, BBR, battery, quick actions and the preset switcher.
 - **Honest telemetry**: FPS comes from SurfaceFlinger `--timestats` per layer.
+- **Game sessions**: a session starts when a game comes forward, sleeps the user apps you
+  do not need, and reports duration, average FPS, session-wide 1% low, jank against the
+  panel vsync, peak temperature and battery. Every slept app is journaled first, so a
+  crash, reboot or uninstall restores its original app-op mode.
   Missing data shows `--`, never a fabricated number.
 - **Wide thermal hysteresis**: warn 87C, recover 82C, critical 92C.
 

@@ -53,6 +53,32 @@ di foreground.
 3. Keluar game, cek `gpu_governor` dan `gpu_min_clock` kembali stock.
 4. Reboot saat game aktif, pastikan setelah boot tidak ada sisa preset yang nyangkut.
 
+## 5a. Sesi dan background apps
+
+| Cek | Perintah | Harapan |
+|---|---|---|
+| Sesi mulai | buka game, lalu `su -c "printf 'session_status' \| nc -U /data/local/tmp/secreto.sock"` | `active:true`, `pkg` = game |
+| Journal | `su -c "cat /data/adb/secreto_space/sleeping.list"` | satu baris `pkg mode` per app |
+| App tidur | `su -c "wc -l < /data/adb/secreto_space/sleeping.list"` | belasan sampai puluhan app |
+| Game tidak tidur | cek daftar journal | tidak ada game dari library |
+| Laporan | keluar game, `su -c "cat /data/adb/secreto_space/session_last.json"` | `reason:"idle"`, `avg_fps`, `p1_low`, `jank_pct` terisi |
+| Bangun semua | `su -c "printf 'wake_apps' \| nc -U /data/local/tmp/secreto.sock"` | `woke` > 0, sesi tetap aktif |
+| Mode appops pulih | `cmd appops get com.discord RUN_IN_BACKGROUND` | sama seperti sebelum sesi |
+| End session | tekan `End session & restore` di console | jam stock, journal hilang, app bangun |
+| Tidak ada re-apply | tunggu 15 detik setelah End session | jam tetap stock |
+
+`avg_fps`, `p1_low`, dan `jank_pct` hanya terisi kalau layer game benar-benar
+menghasilkan frame. Jank dihitung terhadap vsync panel (frame > 1,5 x interval
+vsync), bukan ambang 16 ms tetap.
+
+## 5b. Reboot di tengah sesi
+
+1. Mulai sesi, tunggu sampai journal terisi.
+2. `adb reboot`, tunggu `sys.boot_completed=1`.
+3. `su -c "ls /data/adb/secreto_space/sleeping.list"` harus gagal (sudah dibersihkan).
+4. `su -c "tail -20 /data/local/tmp/secretod.log"` berisi `session: recovered N apps`.
+5. `cmd appops get com.discord RUN_IN_BACKGROUND` kembali ke mode semula.
+
 ## 6. Rollback
 
 Kalau install 0.1.0 gagal, modul lama sudah dihapus oleh `customize.sh`. ZIP lama
@@ -65,3 +91,17 @@ git show 0221973:FrameBoost-v2.4.0-A50.zip > FrameBoost-v2.4.0-A50.zip
 Install ZIP itu lewat KernelSU, lalu reboot. Data di `/data/adb/secreto_space`
 tidak dibaca oleh versi lama, jadi profil perlu disalin kembali ke
 `/data/adb/a50_frameboost/` bila diperlukan.
+
+## 7. Hasil uji 2026-11-25
+
+| Bagian | Hasil |
+|---|---|
+| 1 Install | PASS, modul `secreto_space` v0.1.0, modul lama hilang |
+| 2 Identitas | PASS, `com.secreto.space` versionName 0.1.0 |
+| 3 Runtime | PASS, `secretod` jalan, socket dan snapshot terbaca |
+| 4 Reboot | PASS, jam stock setelah reboot |
+| 5a Sesi | PASS, 33 app tidur, game library tidak tidur, journal `pkg mode`, wake tanpa mengakhiri sesi |
+| 5b Reboot saat sesi | PASS, log `session: recovered 31 apps, all knobs restored to stock`, journal dibersihkan, appops kembali `allow`/`default` |
+| Whitelist | PASS, `com.whatsapp` dan `com.discord` di whitelist tidak masuk journal (31 dari 33) |
+| Toggle sleep | PASS, `set_sleep_enabled 0` dan `1` tersimpan |
+| Smoke test | PASS penuh 17 cek, termasuk sesi aktif dan journal |

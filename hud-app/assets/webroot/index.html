@@ -110,6 +110,37 @@
           </div>
         </div>
 
+        <!-- Session: what Secreto is doing right now -->
+        <section class="panel session-card" aria-labelledby="session-title">
+          <div class="panel-head">
+            <h2 class="panel-title" id="session-title">Session</h2>
+            <span class="badge" id="session-badge">IDLE</span>
+          </div>
+          <div class="session-grid">
+            <div class="session-metric">
+              <span class="meta-label">Duration</span>
+              <strong id="session-duration">--</strong>
+            </div>
+            <div class="session-metric">
+              <span class="meta-label">Apps asleep</span>
+              <strong id="session-slept">0</strong>
+            </div>
+            <div class="session-metric">
+              <span class="meta-label">Avg FPS</span>
+              <strong id="session-avg-fps">--</strong>
+            </div>
+            <div class="session-metric">
+              <span class="meta-label">1% low</span>
+              <strong id="session-p1">--</strong>
+            </div>
+          </div>
+          <p class="panel-note block" id="session-last">No session recorded yet.</p>
+          <div class="btn-group">
+            <button class="hud-btn secondary" id="btn-session-wake">Wake apps</button>
+            <button class="hud-btn danger" id="btn-session-end">End session &amp; restore</button>
+          </div>
+        </section>
+
         <!-- Compact game library -->
         <section class="panel" aria-labelledby="home-games-title">
           <div class="panel-head">
@@ -507,6 +538,24 @@
             <button class="hud-btn secondary" id="btn-gos-restore">Restore GOS</button>
           </div>
           <div id="gos-status" class="status-line">Status: checking for GOS package</div>
+        </section>
+
+        <section class="panel" aria-labelledby="sleep-title">
+          <div class="panel-head">
+            <h2 class="panel-title" id="sleep-title">Background apps</h2>
+            <span class="badge" id="sleep-badge">ON</span>
+          </div>
+          <p class="panel-note block">Sleeps user apps while a game session runs. Games, launchers, keyboards, the phone app and your whitelist stay awake. Every app is restored when the session ends.</p>
+          <div class="setting-row">
+            <div>
+              <div class="setting-title">Sleep during sessions</div>
+              <div class="setting-desc" id="sleep-desc">Checking installed apps</div>
+            </div>
+            <button class="hud-btn secondary" id="btn-sleep-toggle">ON</button>
+          </div>
+          <label class="setting-title" for="sleep-whitelist-input">Whitelist (comma separated)</label>
+          <textarea id="sleep-whitelist-input" class="hud-input sleep-whitelist" rows="2" placeholder="com.whatsapp,com.discord"></textarea>
+          <button class="hud-btn secondary full-w" id="btn-sleep-save">Save whitelist</button>
         </section>
 
         <section class="panel">

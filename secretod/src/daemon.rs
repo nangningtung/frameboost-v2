@@ -1,6 +1,6 @@
 use std::fs;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -23,6 +23,20 @@ const TEMP_CRIT_OFF: u32 = 80000;
 /// Samsung resets the GPU/CPU knobs a few seconds after they are written, so
 /// this keep-alive is what makes a preset actually stick.
 const KEEPALIVE_SECS: u64 = 5;
+
+/// Set by the console's "end session" action. While this matches the
+/// foreground package, Secreto stays out of the way so keep-alive cannot
+/// re-apply a preset the user just removed.
+static PAUSED_PKG: Mutex<String> = Mutex::new(String::new());
+
+pub fn pause_current(pkg: &str) {
+    let mut p = PAUSED_PKG.lock().unwrap();
+    if pkg.is_empty() {
+        p.clear();
+    } else {
+        *p = pkg.to_string();
+    }
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u8)]
@@ -80,13 +94,39 @@ impl AutoDaemon {
 
     pub fn tick(&mut self) -> DaemonState {
         let fg = GameDetector::get_foreground_pkg();
+
+        // A manual restore pauses Secreto for this game until it leaves the
+        // foreground; otherwise keep-alive would undo the restore in 5s.
+        {
+            let mut paused = PAUSED_PKG.lock().unwrap();
+            if !paused.is_empty() && *paused != fg {
+                paused.clear();
+            }
+        }
+        let paused = {
+            let p = PAUSED_PKG.lock().unwrap();
+            !p.is_empty() && *p == fg
+        };
+
+        // A paused game drops to Idle on this very tick. Waiting for the
+        // debounce would keep `in_game` true for one tick and start a brand
+        // new session right after the user ended the last one.
+        if paused {
+            self.miss_count = DEBOUNCE_MISSES;
+            self.current_game.clear();
+        }
+
         let fast_check = {
             let det = self.detector.read().unwrap();
             det.is_game_fast(&fg)
         };
-        let is_game = match fast_check {
-            Some(val) => val,
-            None => self.detector.write().unwrap().is_game(&fg),
+        let is_game = if paused {
+            false
+        } else {
+            match fast_check {
+                Some(val) => val,
+                None => self.detector.write().unwrap().is_game(&fg),
+            }
         };
         let temp_big = read_u32("/sys/class/thermal/thermal_zone0/temp");
 
@@ -167,6 +207,19 @@ impl AutoDaemon {
             ));
             self.apply_state(next_state);
             self.state = next_state;
+        }
+
+        // Session lifecycle follows the game, not the thermal state, so a game
+        // that starts already hot still gets its session and its sleep batch.
+        if in_game && !paused && !self.current_game.is_empty() {
+            let preset = self
+                .active_profile
+                .as_ref()
+                .map(|p| p.preset.clone())
+                .unwrap_or_default();
+            if crate::session::start(&self.current_game, &preset) {
+                crate::session::sleep_background(&self.current_game);
+            }
         }
 
         // Keep the active profile pinned. Samsung's power service reverts the
@@ -272,6 +325,7 @@ impl AutoDaemon {
     fn apply_state(&mut self, st: DaemonState) {
         match st {
             DaemonState::Idle => {
+                crate::session::finish("idle");
                 let _ = restore_all();
                 crate::refresh_heads_up_cache();
                 self.extras_pkg.clear();
@@ -360,6 +414,7 @@ pub fn spawn_auto_daemon(
             thread::sleep(Duration::from_millis(POLL_MS));
         }
         // Restore stock when daemon shuts down
+        crate::session::finish("daemon_stop");
         let _ = restore_all();
     })
 }

@@ -1,9 +1,41 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
 
 use crate::sysfs::run_cmd;
+
+/// Frame interval of the panel, in milliseconds, read once per daemon run.
+/// Jank must be judged against the real vsync period: on a 60 Hz panel the
+/// histogram buckets 16 and 17 ms are both on time, so a fixed 16 ms cut-off
+/// reported half of a healthy 60 FPS game as jank.
+fn vsync_ms() -> f64 {
+    static VSYNC: OnceLock<f64> = OnceLock::new();
+    *VSYNC.get_or_init(|| {
+        let out = run_cmd("dumpsys", &["display"]);
+        for line in out.lines() {
+            let Some(idx) = line.find("renderFrameRate ") else {
+                continue;
+            };
+            let rest = &line[idx + "renderFrameRate ".len()..];
+            let num: String = rest
+                .chars()
+                .take_while(|c| c.is_ascii_digit() || *c == '.')
+                .collect();
+            if let Ok(hz) = num.parse::<f64>() {
+                if (30.0..=240.0).contains(&hz) {
+                    return 1000.0 / hz;
+                }
+            }
+        }
+        1000.0 / 60.0
+    })
+}
+
+/// A frame is late when it misses more than one and a half vsync periods.
+fn jank_threshold_ms() -> f64 {
+    vsync_ms() * 1.5
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct FpsReport {
@@ -14,6 +46,17 @@ pub struct FpsReport {
     pub p1_low_fps: Option<f64>,
     pub jank_count: u32,
     pub total_frames: u32,
+    /// Frames presented in this measurement window. `total_frames` is the
+    /// layer's cumulative counter and resets when the layer changes, so the
+    /// session report must use this value for jank percentages.
+    pub window_frames: u32,
+    /// 99th percentile frame time for this window, in milliseconds.
+    pub p99_frame_ms: Option<f64>,
+    /// Frame-time histogram for this window, in integer milliseconds. Kept
+    /// out of the JSON payload; the session engine merges it to compute a real
+    /// session-wide 1% low instead of averaging per-window worst frames.
+    #[serde(skip)]
+    pub hist: HashMap<u32, u32>,
 }
 
 #[derive(Default, Clone)]
@@ -242,14 +285,15 @@ fn measure_fps_timestats(pkg: &str) -> Option<FpsReport> {
     };
 
     // P1 low from the frames of this window only, clamped so it can never be
-    // higher than the measured FPS.
+    // higher than the measured FPS. A window with only a few frames still has
+    // a real worst frame; skipping it left p99 at a fake 16 ms.
     let total_samples: u64 = delta_hist.values().map(|&c| c as u64).sum();
-    let p1_low = if total_samples >= 5 {
+    let mut p99_ms = frame_time_ms.round() as u32;
+    if total_samples > 0 {
         let threshold = (total_samples as f64 * 0.99).ceil() as u64;
         let mut keys: Vec<u32> = delta_hist.keys().copied().collect();
         keys.sort_unstable();
         let mut accum = 0u64;
-        let mut p99_ms = 16u32;
         for ms in keys {
             accum += delta_hist[&ms] as u64;
             if accum >= threshold {
@@ -257,18 +301,17 @@ fn measure_fps_timestats(pkg: &str) -> Option<FpsReport> {
                 break;
             }
         }
-        if p99_ms > 0 {
-            (1000.0 / p99_ms as f64).min(fps_val)
-        } else {
-            fps_val
-        }
+    }
+    let p1_low = if p99_ms > 0 {
+        (1000.0 / p99_ms as f64).min(fps_val)
     } else {
         fps_val
     };
 
+    let jank_cut = jank_threshold_ms();
     let janks: u32 = delta_hist
         .iter()
-        .filter(|(ms, _)| **ms > 16)
+        .filter(|(ms, _)| **ms as f64 > jank_cut)
         .map(|(_, cnt)| *cnt)
         .sum();
 
@@ -280,6 +323,9 @@ fn measure_fps_timestats(pkg: &str) -> Option<FpsReport> {
         p1_low_fps: Some((p1_low * 10.0).round() / 10.0),
         jank_count: janks,
         total_frames: best_layer.total_frames as u32,
+        window_frames: d_frames as u32,
+        p99_frame_ms: Some(p99_ms as f64),
+        hist: delta_hist,
     })
 }
 
@@ -331,13 +377,17 @@ fn measure_fps_gfxinfo(pkg: &str) -> FpsReport {
             p1_low_fps: None,
             jank_count: 0,
             total_frames: 0,
+            window_frames: 0,
+            p99_frame_ms: None,
+            hist: HashMap::new(),
         };
     }
 
     let total = frame_durations_ns.len() as u32;
+    let jank_cut_ns = (jank_threshold_ms() * 1_000_000.0) as u64;
     let janks = frame_durations_ns
         .iter()
-        .filter(|&&d| d > 16_666_666)
+        .filter(|&&d| d > jank_cut_ns)
         .count() as u32;
 
     let sum_ns: u64 = frame_durations_ns.iter().sum();
@@ -355,6 +405,12 @@ fn measure_fps_gfxinfo(pkg: &str) -> FpsReport {
         0.0
     };
 
+    let mut hist: HashMap<u32, u32> = HashMap::new();
+    for &d in &frame_durations_ns {
+        let ms = ((d / 1_000_000).max(1)) as u32;
+        *hist.entry(ms).or_insert(0) += 1;
+    }
+
     FpsReport {
         package: pkg.to_string(),
         available: true,
@@ -363,6 +419,9 @@ fn measure_fps_gfxinfo(pkg: &str) -> FpsReport {
         p1_low_fps: Some(((p1_low_fps.min(fps)) * 10.0).round() / 10.0),
         jank_count: janks,
         total_frames: total,
+        window_frames: total,
+        p99_frame_ms: Some(p99_dur_ns as f64 / 1_000_000.0),
+        hist,
     }
 }
 

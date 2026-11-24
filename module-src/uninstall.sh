@@ -7,6 +7,15 @@ if [ -S /data/local/tmp/secreto.sock ]; then
 fi
 pkill -9 -f secretod 2>/dev/null || true
 
+# 1.5 Wake every app the session engine slept, before the journal is deleted.
+if [ -f /data/adb/secreto_space/sleeping.list ]; then
+    while read -r pkg mode; do
+        if [ -n "$pkg" ]; then
+            cmd appops set "$pkg" RUN_IN_BACKGROUND "${mode:-default}" 2>/dev/null || true
+        fi
+    done < /data/adb/secreto_space/sleeping.list
+fi
+
 # 2. Force restore stock knobs
 echo "Interactive" > /sys/kernel/gpu/gpu_governor 2>/dev/null || true
 echo "260000" > /sys/kernel/gpu/gpu_min_clock 2>/dev/null || true

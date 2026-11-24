@@ -2131,3 +2131,44 @@ button:disabled,
 }
 
 .diagnostics-body { display: grid; gap: 12px; padding: 0 12px 12px; }
+/* Session card: the unit the console reports on */
+.session-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.session-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 9px;
+  background: var(--bg-surface);
+}
+
+.session-metric strong {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.sleep-whitelist {
+  min-height: 64px;
+  padding: 10px 12px;
+  margin: 6px 0 8px;
+  resize: vertical;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 400px) {
+  .session-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

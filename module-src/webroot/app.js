@@ -51,6 +51,21 @@
   const fpsLiveLabel = document.getElementById("fps-live-label");
   const fpsFtLabel = document.getElementById("fps-ft-label");
 
+  // Elements: Session
+  const sessionBadge = document.getElementById("session-badge");
+  const sessionDuration = document.getElementById("session-duration");
+  const sessionSlept = document.getElementById("session-slept");
+  const sessionAvgFps = document.getElementById("session-avg-fps");
+  const sessionP1 = document.getElementById("session-p1");
+  const sessionLast = document.getElementById("session-last");
+  const btnSessionWake = document.getElementById("btn-session-wake");
+  const btnSessionEnd = document.getElementById("btn-session-end");
+  const sleepBadge = document.getElementById("sleep-badge");
+  const sleepDesc = document.getElementById("sleep-desc");
+  const btnSleepToggle = document.getElementById("btn-sleep-toggle");
+  const sleepWhitelistInput = document.getElementById("sleep-whitelist-input");
+  const btnSleepSave = document.getElementById("btn-sleep-save");
+
   // Elements: Network
   const netIface = document.getElementById("net-iface");
   const netCcBadge = document.getElementById("net-cc-text");
@@ -182,6 +197,9 @@
         if (tab.dataset.tab === "tab-games") {
           loadGames();
         }
+        if (tab.dataset.tab === "tab-settings") {
+          refreshSleepSettings();
+        }
         if (tab.dataset.tab === "tab-network" && !multiPingDone) {
           multiPingDone = true;
           runMultiPing();
@@ -236,6 +254,92 @@
     if (!pkg) return "Desktop / Idle";
     const known = allGames.find((g) => g.pkg === pkg);
     return known && known.name ? known.name : pkg;
+  }
+
+  let lastSessionReport = null;
+  let sleepEnabled = true;
+  let sleepCandidateCount = 0;
+
+  function formatDuration(totalSeconds) {
+    const sec = Math.max(0, Math.round(totalSeconds || 0));
+    if (sec < 60) return `${sec}s`;
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    if (m < 60) return `${m}m ${s}s`;
+    return `${Math.floor(m / 60)}h ${m % 60}m`;
+  }
+
+  function renderSession(sess, sleeping) {
+    const active = !!sess.active;
+    if (sessionBadge) {
+      sessionBadge.textContent = active ? "LIVE" : "IDLE";
+      sessionBadge.className = active ? "badge active" : "badge";
+    }
+    if (sessionDuration) {
+      sessionDuration.textContent = active ? formatDuration(sess.elapsed_s) : "--";
+    }
+    const sleptCount = active ? (sess.slept_apps || 0) : (sleeping ? sleeping.length : 0);
+    if (sessionSlept) sessionSlept.textContent = String(sleptCount);
+    if (sessionAvgFps) {
+      sessionAvgFps.textContent = sess.avg_fps != null ? `${sess.avg_fps} FPS` : "--";
+    }
+    if (sessionP1) {
+      sessionP1.textContent = sess.p1_low != null ? `${sess.p1_low} FPS` : "--";
+    }
+    if (sessionLast) {
+      if (active) {
+        sessionLast.textContent = `Running ${displayGameName(sess.pkg)} on ${sess.preset || "preset"}. ${sleptCount} apps asleep.`;
+      } else if (lastSessionReport) {
+        const r = lastSessionReport;
+        const avg = r.avg_fps != null ? `${r.avg_fps} FPS avg` : "no FPS data";
+        const jank = r.jank_pct != null ? `${r.jank_pct}% jank` : "no frame data";
+        sessionLast.textContent = `Last: ${displayGameName(r.pkg)} · ${formatDuration(r.duration_s)} · ${avg} · ${jank} · peak ${r.max_temp_c || 0}°C`;
+      } else {
+        sessionLast.textContent = "No session recorded yet.";
+      }
+    }
+  }
+
+  async function refreshSessionReport() {
+    const raw = await sendSocketCmd("session_status");
+    if (raw && typeof raw === "string") {
+      try {
+        const j = JSON.parse(raw);
+        lastSessionReport = j.last || null;
+        renderSession(j.session || {}, j.sleeping || []);
+      } catch (e) {
+        console.error("session_status parse:", e);
+      }
+    }
+  }
+
+  async function refreshSleepSettings() {
+    const raw = await sendSocketCmd("get_sleep_settings");
+    if (!raw || typeof raw !== "string") return;
+    try {
+      const j = JSON.parse(raw);
+      sleepEnabled = j.enabled !== false;
+      sleepCandidateCount = j.count || 0;
+      if (sleepBadge) {
+        sleepBadge.textContent = sleepEnabled ? "ON" : "OFF";
+        sleepBadge.className = sleepEnabled ? "badge active" : "badge";
+      }
+      if (btnSleepToggle) {
+        btnSleepToggle.textContent = sleepEnabled ? "ON" : "OFF";
+        btnSleepToggle.classList.toggle("active", sleepEnabled);
+      }
+      if (sleepDesc) {
+        const sleeping = (j.sleeping || []).length;
+        sleepDesc.textContent = sleepEnabled
+          ? `${j.count || 0} apps would sleep, ${sleeping} asleep now`
+          : "Off. Nothing is slept when a session starts.";
+      }
+      if (sleepWhitelistInput && document.activeElement !== sleepWhitelistInput) {
+        sleepWhitelistInput.value = (j.whitelist || []).join(", ");
+      }
+    } catch (e) {
+      console.error("get_sleep_settings parse:", e);
+    }
   }
 
   function renderSnapshot(data) {
@@ -383,6 +487,9 @@
     const isGosDefeated = !!data.gos_disabled;
     const hasGosPkg = data.has_gos !== false;
 
+    const gosPanel = document.getElementById("gos-title")?.closest(".panel");
+    if (gosPanel) gosPanel.style.display = hasGosPkg ? "" : "none";
+
     if (heroGosVal) {
       if (!hasGosPkg) {
         heroGosVal.textContent = "AOSP";
@@ -431,6 +538,8 @@
     if (daemonUptime) daemonUptime.textContent = `${data.daemon_uptime_s || 0}s`;
     if (snapshotStatus) snapshotStatus.textContent = data.stock_saved ? "SAVED" : "NONE";
 
+    renderSession(data.session || {}, data.sleeping_apps || []);
+
     // Net Meta
     if (data.net) {
       if (data.net.interface && netIface) netIface.textContent = data.net.interface;
@@ -476,6 +585,10 @@
       "btn-quick-dnd",
       "btn-quick-gos-web",
       "btn-quick-ping",
+      "btn-session-end",
+      "btn-session-wake",
+      "btn-sleep-toggle",
+      "btn-sleep-save",
     ].forEach((id) => {
       const el = document.getElementById(id);
       if (!el) return;
@@ -1507,6 +1620,49 @@
     setTimeout(() => (btnRestore.textContent = "RESTORE ALL STOCK"), 1500);
   });
 
+  // Action: Session controls
+  btnSessionEnd?.addEventListener("click", async () => {
+    if (!confirm("End this session, wake every app and restore stock clocks?")) return;
+    btnSessionEnd.disabled = true;
+    btnSessionEnd.textContent = "RESTORING...";
+    await sendSocketCmd("session_end");
+    await refreshSessionReport();
+    await refreshSleepSettings();
+    btnSessionEnd.textContent = "End session & restore";
+    btnSessionEnd.disabled = false;
+  });
+
+  btnSessionWake?.addEventListener("click", async () => {
+    btnSessionWake.disabled = true;
+    await sendSocketCmd("wake_apps");
+    await refreshSleepSettings();
+    await refreshSessionReport();
+    btnSessionWake.disabled = false;
+  });
+
+  btnSleepToggle?.addEventListener("click", async () => {
+    const next = !sleepEnabled;
+    btnSleepToggle.disabled = true;
+    await sendSocketCmd(`set_sleep_enabled ${next ? 1 : 0}`);
+    await refreshSleepSettings();
+    btnSleepToggle.disabled = false;
+  });
+
+  btnSleepSave?.addEventListener("click", async () => {
+    const value = (sleepWhitelistInput?.value || "").trim();
+    btnSleepSave.disabled = true;
+    await sendSocketCmd(`set_sleep_whitelist ${value}`);
+    await refreshSleepSettings();
+    btnSleepSave.textContent = "Saved";
+    setTimeout(() => (btnSleepSave.textContent = "Save whitelist"), 1200);
+    btnSleepSave.disabled = false;
+  });
+
+  refreshSleepSettings();
+  refreshSessionReport();
+  setInterval(refreshSessionReport, 30000);
+  setInterval(refreshSleepSettings, 30000);
+
   // Action: Samsung GOS Disable/Restore
   const btnGosDisable = document.getElementById("btn-gos-disable");
   const btnGosRestore = document.getElementById("btn-gos-restore");
@@ -1517,6 +1673,8 @@
       try {
         const j = JSON.parse(res);
         const unavailable = j.has_gos === false;
+        const panel = document.getElementById("gos-title")?.closest(".panel");
+        if (panel) panel.style.display = unavailable ? "none" : "";
         if (unavailable) {
           if (gosStatus) gosStatus.textContent = "Status: no GOS package on this ROM (AOSP/GSI), nothing to disable.";
         } else {

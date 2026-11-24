@@ -40,7 +40,7 @@ Add-Result "module v0.1.0" ($moduleVersion -eq "v0.1.0") $moduleVersion
 # 4. APK version
 $pkg = & $adb -s $Serial shell dumpsys package com.secreto.space
 $apkVersion = (($pkg | Select-String "versionName=") | Select-Object -First 1).Line.Trim()
-Add-Result "APK versionName" ($apkVersion -match "2\.4\.0") $apkVersion
+Add-Result "APK versionName" ($apkVersion -match "0\.1\.0") $apkVersion
 
 # 5. Snapshot
 $snapRaw = & $adb -s $Serial shell "cat /data/local/tmp/secreto-snapshot.json"
@@ -103,6 +103,27 @@ if ($snap) {
         } else {
             Add-Result "hud process" $false "not running"
         }
+
+        # 10. Session engine
+        $sessRaw = & $adb -s $Serial shell su -c "printf 'session_status' | nc -U /data/local/tmp/secreto.sock"
+        try {
+            $sess = $sessRaw | ConvertFrom-Json
+            $sessOk = [bool]$sess.session.active -and ($sess.session.pkg -eq $snap.game_pkg)
+            Add-Result "session active" $sessOk ("pkg=" + $sess.session.pkg)
+
+            $journal = (& $adb -s $Serial shell su -c "cat /data/adb/secreto_space/sleeping.list 2>/dev/null").Trim()
+            $lines = @($journal -split "`n" | Where-Object { $_.Trim() -ne "" })
+            $badLines = @($lines | Where-Object { $_ -notmatch '^\S+ (allow|default|ignore|deny|foreground)$' })
+            Add-Result "sleep journal" ($lines.Count -ge 1 -and $badLines.Count -eq 0) ("apps=" + $lines.Count)
+
+            $gameSlept = @($lines | Where-Object { $_ -match [regex]::Escape([string]$snap.game_pkg) })
+            Add-Result "active game not slept" ($gameSlept.Count -eq 0) ("matches=" + $gameSlept.Count)
+        } catch {
+            Add-Result "session active" $false "invalid JSON"
+        }
+    } else {
+        $journalExists = (& $adb -s $Serial shell su -c "[ -f /data/adb/secreto_space/sleeping.list ] && echo yes || echo no").Trim()
+        Add-Result "no stale sleep journal" ($journalExists -eq "no") ("journal=" + $journalExists)
     }
 }
 
