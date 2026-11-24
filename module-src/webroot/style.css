@@ -2026,6 +2026,10 @@ button:disabled,
   font-weight: 700;
   letter-spacing: 0.04em;
   cursor: pointer;
+  min-height: 44px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
 }
 
 .home-games-list { display: grid; gap: 8px; }
@@ -2077,7 +2081,7 @@ button:disabled,
 .home-game-play {
   flex: 0 0 auto;
   min-width: 44px;
-  min-height: 34px;
+  min-height: 44px;
   border-radius: 8px;
   border: 1px solid var(--accent-line);
   background: var(--bg-raised);
