@@ -290,7 +290,7 @@ Perubahan:
 - **Sinkronisasi panel/app**: `heads_up_blocked` sekarang membaca setting asli (cache 5 detik), tombol Apply Profile memakai preset game yang dipilih dan tidak mengubah clock saat game di background (hanya menyimpan untuk launch berikutnya).
 - **Floating monitor dua arah**: app punya segment OFF/FPS/+TEMP/+GPU yang memakai prefs sama dengan side panel; OverlayService mendengarkan perubahan prefs. Selector preset app dibatasi ke `[data-preset]` supaya tidak menghapus state aktif tombol monitor.
 - **Smoke test**: tanpa game aktif, pengecekan terkait game ditandai SKIP, bukan FAIL.
-- **Responsive**: diuji pada lebar 320/360/411/540/700/820 CSS px, tanpa overflow horizontal dan semua tombol >= 44 px. Layout berubah dua kolom mulai 700 px. Activity console dikunci portrait; overlay HUD tetap landscape saat game.
+- **Responsive**: diuji pada lebar 320/360/411/540/700/820 CSS px, tanpa overflow horizontal dan semua tombol >= 44 px (tombol PLAY 56x44 px dengan padding 8 px). Layout berubah dua kolom mulai 700 px. Activity console dikunci portrait; overlay HUD tetap landscape saat game.
 - **Versi**: modul naik ke v2.4.0.
 
 Testing (Auto Chess, Galaxy A50, landscape):
