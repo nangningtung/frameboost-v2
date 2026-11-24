@@ -176,6 +176,20 @@
           <canvas id="frametime-canvas" height="60" aria-label="Frametime chart, last 60 frames" role="img"></canvas>
         </section>
 
+        <!-- Floating monitor -->
+        <section class="panel" aria-labelledby="monitor-title">
+          <div class="panel-head">
+            <h2 class="panel-title" id="monitor-title">Floating monitor</h2>
+            <span class="panel-note">Synced with side panel</span>
+          </div>
+          <div class="preset-segmented-control" role="group" aria-label="Floating monitor mode">
+            <button class="preset-segment-btn" data-hud-mode="OFF">OFF</button>
+            <button class="preset-segment-btn" data-hud-mode="COMPACT">FPS</button>
+            <button class="preset-segment-btn" data-hud-mode="DETAIL">+ TEMP</button>
+            <button class="preset-segment-btn" data-hud-mode="FULL">+ GPU</button>
+          </div>
+        </section>
+
         <!-- Load + thermal -->
         <section class="panel" aria-labelledby="load-title">
           <div class="panel-head">

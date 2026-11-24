@@ -288,6 +288,8 @@ Perubahan:
 - **Build**: `build-hud-apk.ps1` mendeteksi JDK Adoptium otomatis dan mengekspor `JAVA_HOME` untuk `d8`/`apksigner`.
 - **Test**: `smoke-test.ps1` mengecek 14 titik secara otomatis (termasuk konsistensi DND) dan melaporkan PASS/FAIL.
 - **Sinkronisasi panel/app**: `heads_up_blocked` sekarang membaca setting asli (cache 5 detik), tombol Apply Profile memakai preset game yang dipilih dan tidak mengubah clock saat game di background (hanya menyimpan untuk launch berikutnya).
+- **Floating monitor dua arah**: app punya segment OFF/FPS/+TEMP/+GPU yang memakai prefs sama dengan side panel; OverlayService mendengarkan perubahan prefs. Selector preset app dibatasi ke `[data-preset]` supaya tidak menghapus state aktif tombol monitor.
+- **Smoke test**: tanpa game aktif, pengecekan terkait game ditandai SKIP, bukan FAIL.
 - **Versi**: modul naik ke v2.4.0.
 
 Testing (Auto Chess, Galaxy A50, landscape):

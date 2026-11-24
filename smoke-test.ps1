@@ -14,6 +14,9 @@ $results = New-Object System.Collections.ArrayList
 function Add-Result([string]$name, [bool]$ok, [string]$detail) {
     [void]$results.Add([pscustomobject]@{ Check = $name; Result = $(if ($ok) { "PASS" } else { "FAIL" }); Detail = $detail })
 }
+function Add-Skip([string]$name, [string]$detail) {
+    [void]$results.Add([pscustomobject]@{ Check = $name; Result = "SKIP"; Detail = $detail })
+}
 
 # 1. Device
 if (-not $Serial) {
@@ -56,7 +59,11 @@ if ($snap) {
     Add-Result "dnd state matches snapshot" $dndOk ("setting=" + $headsUp + " blocked=" + $snap.heads_up_blocked)
 
     $isGame = [bool]$snap.is_game
-    Add-Result "game detected" $isGame ($(if ($isGame) { $snap.game_pkg } else { "no game in foreground (partial test)" }))
+    if ($isGame) {
+        Add-Result "game detected" $true $snap.game_pkg
+    } else {
+        Add-Skip "game detected" "no game in foreground (partial test)"
+    }
 
     if ($isGame) {
         # 6. FPS sanity

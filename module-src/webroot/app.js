@@ -38,7 +38,7 @@
   const lblQuickBypass = document.getElementById("lbl-quick-bypass");
   const lblQuickDnd = document.getElementById("lbl-quick-dnd");
   const lblQuickGosWeb = document.getElementById("lbl-quick-gos-web");
-  const presetSegmentBtns = document.querySelectorAll(".preset-segment-btn");
+  const presetSegmentBtns = document.querySelectorAll(".preset-segment-btn[data-preset]");
   const gpuBusyFill = document.getElementById("gpu-busy-fill");
   const gpuBusyText = document.getElementById("gpu-busy-text");
   const gpuMinText = document.getElementById("gpu-min-text");
@@ -1583,5 +1583,38 @@
   });
 
   updateHudToggleState();
+
+  // Floating monitor mode, shared with the in-game side panel prefs
+  function updateMonitorSegments() {
+    const bridge = window._nativeBridge;
+    if (!bridge || typeof bridge.getHudMode !== "function") return;
+    let mode = "COMPACT";
+    try {
+      const data = JSON.parse(bridge.getHudMode());
+      mode = data.enabled ? (data.type || "COMPACT").toUpperCase() : "OFF";
+    } catch (e) {}
+    document.querySelectorAll("[data-hud-mode]").forEach((btn) => {
+      btn.classList.toggle("active", (btn.dataset.hudMode || "").toUpperCase() === mode);
+    });
+  }
+
+  document.querySelectorAll("[data-hud-mode]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const mode = (btn.dataset.hudMode || "COMPACT").toUpperCase();
+      const bridge = window._nativeBridge;
+      if (!bridge || typeof bridge.setHudMode !== "function") return;
+      bridge.setHudMode(mode);
+      if (typeof bridge.triggerHaptic === "function") bridge.triggerHaptic();
+      setTimeout(updateMonitorSegments, 150);
+    });
+  });
+
+  document.querySelectorAll(".nav-tab").forEach((tab) => {
+    tab.addEventListener("click", () => setTimeout(updateMonitorSegments, 200));
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) updateMonitorSegments();
+  });
+  updateMonitorSegments();
 })();
 
