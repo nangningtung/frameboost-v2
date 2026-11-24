@@ -26,7 +26,11 @@ pub fn write_verified(path: &str, val: &str) -> Result<(), String> {
 }
 
 pub fn read_u32(path: &str) -> u32 {
-    read_file(path).parse().unwrap_or(0)
+    // Some Samsung nodes return values like "78%" or "764000\n"; parse the
+    // leading digits instead of failing the whole parse.
+    let raw = read_file(path);
+    let digits: String = raw.chars().take_while(|c| c.is_ascii_digit()).collect();
+    digits.parse().unwrap_or(0)
 }
 
 pub fn read_i32(path: &str) -> i32 {
