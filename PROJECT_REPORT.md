@@ -1,7 +1,7 @@
 # FrameBoost v2 — Project Report
 
 Status: **Selesai untuk fase ini**  
-Commit fitur terakhir: `2ab3759`  
+Commit fitur terakhir: `b8e88ab`  
 Device uji: `RR8M50C0W8T` (Samsung Galaxy A50)
 
 ---
@@ -302,6 +302,18 @@ Sesudah:
   lobby 58.3 FPS, jank 1%
   monitor live: 60 / 79 C / 683 MHz
 ```
+
+Post-reboot (verifikasi akhir):
+
+`	ext
+modul v2.4.0 aktif, modules_update kosong
+daemon v2.4.0 start dengan timestamp
+APK versionName=2.4.0 / versionCode=240
+overlay otomatis hidup saat game dibuka
+preset ESPORTS diterapkan: Booster / 683 MHz, CPU big min 1508 MHz
+saat keluar game: governor Interactive / 260 MHz, swappiness 130,
+BBR westwood, heads-up kembali aktif (restore_all bekerja)
+`
 
 Catatan: thermal HAL Samsung tetap membatasi CPU big ke ~1.77-1.98 GHz saat 80-82 °C, jadi battle berat belum 60 stabil penuh.
 
