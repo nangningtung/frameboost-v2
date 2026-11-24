@@ -1,7 +1,7 @@
 # FrameBoost v2 — Project Report
 
 Status: **Selesai untuk fase ini**  
-Commit fitur terakhir: `0aa121d`  
+Commit fitur terakhir: `c27fdff`  
 Device uji: `RR8M50C0W8T` (Samsung Galaxy A50)
 
 ---
