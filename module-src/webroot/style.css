@@ -2015,3 +2015,102 @@ button:disabled,
     box-shadow: none;
   }
 }
+
+/* ---------------------------------------------------------------- HOME: compact game list + collapsed diagnostics */
+.panel-link {
+  background: none;
+  border: 0;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.home-games-list { display: grid; gap: 8px; }
+
+.home-game-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-inset);
+}
+
+.home-game-icon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--accent);
+  background: var(--bg-raised);
+  border: 1px solid var(--accent-line);
+}
+
+.home-game-meta { flex: 1 1 auto; min-width: 0; }
+
+.home-game-name {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.home-game-sub {
+  display: block;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+
+.home-game-play {
+  flex: 0 0 auto;
+  min-width: 44px;
+  min-height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--accent-line);
+  background: var(--bg-raised);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.diagnostics {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.diagnostics > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.diagnostics > summary::-webkit-details-marker { display: none; }
+
+.diagnostics > summary span {
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+}
+
+.diagnostics-body { display: grid; gap: 12px; padding: 0 12px 12px; }

@@ -57,7 +57,6 @@ public class OverlayService extends Service {
     private View dotState;
     private View dotPanelState;
     private View panelHeader;
-    private SharedPreferences.OnSharedPreferenceChangeListener prefListener;
 
     private TextView txtBubbleFps;
     private TextView txtPanelGame;
@@ -149,22 +148,6 @@ public class OverlayService extends Service {
         int savedX = prefs.getInt("hud_x", EDGE_MARGIN_DP);
         int savedY = prefs.getInt("hud_y", -1);
         yAutoCentered = savedY < 0;
-
-        // The console writes the same prefs; react immediately so the side
-        // panel and the app never disagree about the monitor mode.
-        prefListener = (sp, key) -> {
-            if (overlayRoot == null) return;
-            if ("fps_overlay_enabled".equals(key)) {
-                fpsOverlayEnabled = sp.getBoolean(key, true);
-                applyFpsOverlayState();
-                highlightHudType();
-            } else if ("hud_type".equals(key)) {
-                hudType = sp.getString(key, "COMPACT");
-                applyFpsOverlayState();
-                highlightHudType();
-            }
-        };
-        prefs.registerOnSharedPreferenceChangeListener(prefListener);
 
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         LayoutInflater inflater = LayoutInflater.from(this);
@@ -1209,10 +1192,6 @@ public class OverlayService extends Service {
     public void onDestroy() {
         super.onDestroy();
         running = false;
-        try {
-            getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                    .unregisterOnSharedPreferenceChangeListener(prefListener);
-        } catch (Exception ignored) {}
         if (handler != null && updateRunnable != null) {
             handler.removeCallbacks(updateRunnable);
         }

@@ -150,27 +150,4 @@ public class WebAppInterface {
             context.stopService(intent);
         }
     }
-
-    /** Monitor mode shared with the in-game side panel: OFF/FPS/+TEMP/+GPU. */
-    @JavascriptInterface
-    public String getHudMode() {
-        android.content.SharedPreferences p =
-                context.getSharedPreferences("hud_prefs", Context.MODE_PRIVATE);
-        boolean enabled = p.getBoolean("fps_overlay_enabled", true);
-        String type = p.getString("hud_type", "COMPACT");
-        return "{\"enabled\":" + enabled + ",\"type\":\"" + type + "\"}";
-    }
-
-    @JavascriptInterface
-    public void setHudMode(String mode) {
-        if (mode == null) return;
-        String m = mode.trim().toUpperCase();
-        boolean enabled = !"OFF".equals(m);
-        String type = enabled ? m : "COMPACT";
-        context.getSharedPreferences("hud_prefs", Context.MODE_PRIVATE)
-                .edit()
-                .putBoolean("fps_overlay_enabled", enabled)
-                .putString("hud_type", type)
-                .apply();
-    }
 }

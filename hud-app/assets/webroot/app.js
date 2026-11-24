@@ -698,6 +698,7 @@
   }
 
   function applyFilter() {
+    renderHomeGames();
     const q = (gameSearchInput?.value || "").toLowerCase().trim();
     if (!q) {
       renderGamesList(allGames);
@@ -1584,37 +1585,39 @@
 
   updateHudToggleState();
 
-  // Floating monitor mode, shared with the in-game side panel prefs
-  function updateMonitorSegments() {
-    const bridge = window._nativeBridge;
-    if (!bridge || typeof bridge.getHudMode !== "function") return;
-    let mode = "COMPACT";
-    try {
-      const data = JSON.parse(bridge.getHudMode());
-      mode = data.enabled ? (data.type || "COMPACT").toUpperCase() : "OFF";
-    } catch (e) {}
-    document.querySelectorAll("[data-hud-mode]").forEach((btn) => {
-      btn.classList.toggle("active", (btn.dataset.hudMode || "").toUpperCase() === mode);
-    });
+  // Compact game list on Home. Full management lives in the Games tab.
+  const homeGames = document.getElementById("home-games");
+  function renderHomeGames() {
+    if (!homeGames) return;
+    if (!allGames || !allGames.length) {
+      homeGames.innerHTML = '<div class="home-game-row"><span class="home-game-sub">No games detected yet</span></div>';
+      return;
+    }
+    const esc = (s) => String(s == null ? "" : s).replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]));
+    homeGames.innerHTML = allGames.slice(0, 4).map((g) => {
+      const name = esc(g.name || g.pkg || "?");
+      const preset = esc((g.preset || "BALANCED").toUpperCase());
+      const pkg = esc(g.pkg || "");
+      const initial = esc((g.name || g.pkg || "?").charAt(0).toUpperCase());
+      return '<div class="home-game-row">' +
+        '<span class="home-game-icon">' + initial + '</span>' +
+        '<span class="home-game-meta"><span class="home-game-name">' + name + '</span>' +
+        '<span class="home-game-sub">' + preset + ' | ' + pkg + '</span></span>' +
+        '<button class="home-game-play" data-home-launch="' + pkg + '">PLAY</button>' +
+        '</div>';
+    }).join("");
   }
 
-  document.querySelectorAll("[data-hud-mode]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const mode = (btn.dataset.hudMode || "COMPACT").toUpperCase();
-      const bridge = window._nativeBridge;
-      if (!bridge || typeof bridge.setHudMode !== "function") return;
-      bridge.setHudMode(mode);
-      if (typeof bridge.triggerHaptic === "function") bridge.triggerHaptic();
-      setTimeout(updateMonitorSegments, 150);
-    });
+  document.getElementById("btn-home-see-games")?.addEventListener("click", () => {
+    document.querySelector('[data-tab="tab-games"]')?.click();
   });
-
-  document.querySelectorAll(".nav-tab").forEach((tab) => {
-    tab.addEventListener("click", () => setTimeout(updateMonitorSegments, 200));
+  homeGames?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-home-launch]");
+    if (!btn) return;
+    const pkg = btn.getAttribute("data-home-launch");
+    if (window._nativeBridge && typeof window._nativeBridge.launchGame === "function") {
+      window._nativeBridge.launchGame(pkg);
+    }
   });
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) updateMonitorSegments();
-  });
-  updateMonitorSegments();
 })();
 
