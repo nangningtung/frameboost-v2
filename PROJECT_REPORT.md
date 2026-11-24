@@ -286,6 +286,7 @@ Perubahan:
 - **Log**: setiap baris daemon diberi timestamp WIB; `service.sh` merotasi log di 512 KB.
 - **APK**: `versionName=2.4.0`, `versionCode=240`; warna FPS memakai nilai bulat supaya cocok dengan angka yang tampil.
 - **Build**: `build-hud-apk.ps1` mendeteksi JDK Adoptium otomatis dan mengekspor `JAVA_HOME` untuk `d8`/`apksigner`.
+- **Test**: `smoke-test.ps1` mengecek 13 titik secara otomatis dan melaporkan PASS/FAIL.
 - **Versi**: modul naik ke v2.4.0.
 
 Testing (Auto Chess, Galaxy A50, landscape):
