@@ -1,4 +1,4 @@
-package com.a50.frameboost.hud;
+package com.secreto.space;
 
 import android.app.Activity;
 import android.content.Intent;
@@ -128,7 +128,7 @@ public class GameLibraryActivity extends Activity {
     private void renderGames(String res) {
         grid.removeAllViews();
         if (res == null) {
-            statusText.setText("Daemon offline. Start frameboostd.");
+            statusText.setText("Daemon offline. Start secretod.");
             return;
         }
         try {

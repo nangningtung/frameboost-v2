@@ -1,17 +1,17 @@
-# FrameBoost v2 — Project Report
+# Secreto Space 0.1.0 - Project Report
 
-Status: **Selesai untuk fase ini**  
-Commit fitur terakhir: `b8e88ab`  
-Device uji: `RR8M50C0W8T` (Samsung Galaxy A50)
+Status: **M0 selesai di kode, verifikasi device tertunda**  
+Commit terakhir sebelum rebrand: `0221973`  
+Device uji: `RR8M50C0W8T` (Samsung Galaxy A50, GSI API 36)
 
 ---
 
 ## 1. Ringkasan
 
-FrameBoost v2 adalah sistem optimasi game untuk Samsung A50 yang terdiri dari:
+Secreto Space 0.1.0 adalah game space untuk Samsung A50 yang terdiri dari:
 
-- **Rust daemon** (`frameboostd`) sebagai pemilik konfigurasi kernel, jaringan, profil, snapshot, dan restore.
-- **Android HUD app** (`com.a50.frameboost.hud`) untuk overlay in-game.
+- **Rust daemon** (`secretod`) sebagai pemilik konfigurasi kernel, jaringan, profil, snapshot, dan restore.
+- **Android app** (`com.secreto.space`) untuk library game, konfigurasi sesi, dan overlay in-game.
 - **WebUI** (`module-src/webroot`) untuk kontrol utama.
 
 Prinsip utama: **ringan, cepat, rapi, dan jujur terhadap data**.
@@ -78,7 +78,7 @@ Detail perilaku:
 Sumber:
 
 ```text
-/data/local/tmp/frameboost-snapshot.json
+/data/local/tmp/secreto-snapshot.json
 ```
 
 atau IPC:
@@ -128,7 +128,7 @@ FPS self-healing: TimeStats di-enable otomatis, layer basi di-clear + enable ula
 WebUI (module-src/webroot)
         │ Unix socket IPC
         ▼
-Rust daemon (frameboostd)
+Rust daemon (secretod)
         │ snapshot JSON
         ▼
 Android HUD app
@@ -141,9 +141,9 @@ File penting:
 
 | File | Fungsi |
 |---|---|
-| `frameboostd/src/main.rs` | IPC, snapshot, command router |
-| `frameboostd/src/profile.rs` | Preset & per-game config |
-| `frameboostd/src/net.rs` | Ping, BBR, network |
+| `secretod/src/main.rs` | IPC, snapshot, command router |
+| `secretod/src/profile.rs` | Preset & per-game config |
+| `secretod/src/net.rs` | Ping, BBR, network |
 | `hud-app/src/.../OverlayService.java` | Overlay, drag, panel, preset IPC |
 | `hud-app/src/.../SnapshotReader.java` | Parse snapshot |
 | `hud-app/res/layout/overlay_layout.xml` | Handle + side panel |
@@ -189,15 +189,15 @@ powershell -ExecutionPolicy Bypass -File .\deploy-device.ps1
 
 Output:
 
-- `hud-app/FrameBoost-GameSpace.apk`
-- `module-src/system/bin/frameboostd`
-- `module-src/system/priv-app/FrameBoost/FrameBoost-GameSpace.apk`
-- `FrameBoost-v2.4.0-A50.zip`
+- `hud-app/SecretoSpace.apk`
+- `module-src/system/bin/secretod`
+- `module-src/system/priv-app/SecretoSpace/SecretoSpace.apk`
+- `SecretoSpace-v0.1.0-A50.zip`
 
 Catatan deploy:
 
 - `deploy-device.ps1` melakukan `adb install -r`, push binary daemon ke modul, lalu restart daemon + watchdog.
-- `build-hud-apk.ps1` menyalin APK ke payload ZIP dan ke `system/priv-app/FrameBoost`.
+- `build-hud-apk.ps1` menyalin APK ke payload ZIP dan ke `system/priv-app/SecretoSpace`.
 - `customize.sh` memasang APK sebagai priv-app (`pm install -r -d -g`) dan menambahkan `deviceidle whitelist`.
 - Update payload modul di device dilakukan lewat `ksud module install <zip>` lalu reboot, karena `hybrid-mount` mengunci file modul agar tidak bisa ditimpa langsung.
 
@@ -269,7 +269,19 @@ Gunakan checklist ini setiap kali ada perubahan.
 
 ## 9. Changelog
 
-### `v2.4.0` — 2026-11-25
+### `v0.1.0` - 2026-11-25
+
+- **Identitas baru**: FrameBoost v2 menjadi Secreto Space 0.1.0.
+  - modul `secreto_space`, daemon `secretod`, APK `com.secreto.space`
+  - `versionName=0.1.0`, `versionCode=1000`
+- **Device lock**: `customize.sh` menolak install dan `service.sh` menolak start
+  kalau `ro.product.device` bukan `a50`.
+- **Migrasi otomatis** dari FrameBoost 2.x: profil, stock snapshot, dan daftar game
+  disalin ke `/data/adb/secreto_space/`; modul lama, APK lama, dan file runtime lama dihapus.
+- **Path runtime baru**: `/data/local/tmp/secreto.sock`, `secreto-snapshot.json`, `secretod.log`.
+- Perilaku daemon, preset, overlay, dan telemetri tidak berubah pada rilis ini.
+
+### `v2.4.0` - 2026-11-25
 
 ```text
 fix: honest live FPS, sticky presets and stable thermal hysteresis
@@ -398,4 +410,4 @@ Testing:
 
 ## 10. Kesimpulan
 
-FrameBoost v2 sudah stabil dan layak dipakai harian. Fase berikutnya sebaiknya difokuskan pada perbaikan arsitektur, bukan penambahan fitur besar yang tidak perlu.
+Secreto Space 0.1.0 sudah stabil dan layak dipakai harian. Fase berikutnya sebaiknya difokuskan pada perbaikan arsitektur, bukan penambahan fitur besar yang tidak perlu.

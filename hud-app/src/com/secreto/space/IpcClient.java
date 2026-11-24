@@ -1,4 +1,4 @@
-package com.a50.frameboost.hud;
+package com.secreto.space;
 
 import android.net.LocalSocket;
 import android.net.LocalSocketAddress;
@@ -8,8 +8,8 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 
 public class IpcClient {
-    private static final String TAG = "FrameBoostIPC";
-    private static final String SOCK_PATH = "/data/local/tmp/frameboost.sock";
+    private static final String TAG = "SecretoIPC";
+    private static final String SOCK_PATH = "/data/local/tmp/secreto.sock";
 
     public static String sendCommand(String cmd) {
         try (LocalSocket socket = new LocalSocket()) {

@@ -1,8 +1,8 @@
-// FrameBoost Game Space Console - Controller logic v2.0.0
+// Secreto Space Console - Controller logic v0.1.0
 (function () {
   "use strict";
 
-  // Inject Native Bridge to window.ksu shim if running in FrameBoost APK
+  // Inject Native Bridge to window.ksu shim if running in Secreto Space APK
   if (window._nativeBridge) {
     window.ksu = {
       exec: async function (cmd) {
@@ -215,10 +215,10 @@
   function sendSocketCmd(cmd) {
     if (window._nativeBridge && typeof window._nativeBridge.sendSocketAsync === "function") {
       return new Promise((resolve) => {
-        const callback = `window.__frameboostIpc[${++ipcSeq}]`;
-        window.__frameboostIpc = window.__frameboostIpc || {};
-        window.__frameboostIpc[ipcSeq] = (value) => {
-          delete window.__frameboostIpc[ipcSeq];
+        const callback = `window.__secretoIpc[${++ipcSeq}]`;
+        window.__secretoIpc = window.__secretoIpc || {};
+        window.__secretoIpc[ipcSeq] = (value) => {
+          delete window.__secretoIpc[ipcSeq];
           resolve(value || null);
         };
         window._nativeBridge.sendSocketAsync(cmd, callback);
@@ -227,7 +227,7 @@
     if (window._nativeBridge && typeof window._nativeBridge.sendSocket === "function") {
       return Promise.resolve(window._nativeBridge.sendSocket(cmd) || null);
     }
-    const shell = `printf "${cmd}\\n" | nc -U /data/local/tmp/frameboost.sock 2>/dev/null`;
+    const shell = `printf "${cmd}\\n" | nc -U /data/local/tmp/secreto.sock 2>/dev/null`;
     return execCmd(shell);
   }
 
@@ -570,7 +570,7 @@
     }
     let raw = await sendSocketCmd("snapshot");
     if (!raw) {
-      raw = await execCmd("cat /data/local/tmp/frameboost-snapshot.json 2>/dev/null");
+      raw = await execCmd("cat /data/local/tmp/secreto-snapshot.json 2>/dev/null");
     }
     if (raw && typeof raw === "string") {
       try {
@@ -843,7 +843,7 @@
           </svg>
         </span>
         <p class="empty-state-title">Daemon offline</p>
-        <p class="empty-state-desc">Start <code>frameboostd</code> on the device. This screen reconnects on its own.</p>
+        <p class="empty-state-desc">Start <code>secretod</code> on the device. This screen reconnects on its own.</p>
       </div>`;
     }
   }
@@ -1579,7 +1579,7 @@
       window._nativeBridge.setHudEnabled(!running);
       setTimeout(updateHudToggleState, 250);
     } else {
-      alert("HUD Service only runs inside the FrameBoost Game Space app.");
+      alert("HUD Service only runs inside the Secreto Space app.");
     }
   });
 

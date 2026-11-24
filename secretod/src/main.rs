@@ -27,8 +27,8 @@ use rollback::restore_all;
 use snapshot::StockSnapshot;
 use sysfs::{log_line, read_file, read_u32, run_cmd};
 
-const SOCK_PATH: &str = "/data/local/tmp/frameboost.sock";
-const SNAPSHOT_FILE: &str = "/data/local/tmp/frameboost-snapshot.json";
+const SOCK_PATH: &str = "/data/local/tmp/secreto.sock";
+const SNAPSHOT_FILE: &str = "/data/local/tmp/secreto-snapshot.json";
 
 #[derive(Serialize, Clone, Default)]
 pub struct GpuState {
@@ -602,7 +602,7 @@ fn main() {
     let game_sink = Arc::new(RwLock::new(String::new()));
     let detector = Arc::new(RwLock::new(GameDetector::new()));
 
-    log_line(&format!("FrameBoost daemon v2.4.0 started (pid={})", std::process::id()));
+    log_line(&format!("Secreto Space daemon v0.1.0 started (pid={})", std::process::id()));
 
     // 1. Spawn auto daemon loop (handles game detection + thermal hysteresis)
     let auto_run = running.clone();
@@ -647,7 +647,7 @@ fn main() {
     }
 
     // Clean exit: restore all stock knobs
-    log_line("FrameBoost daemon stopping, restoring stock...");
+    log_line("Secreto Space daemon stopping, restoring stock...");
     let _ = restore_all();
     let _ = fs::remove_file(SOCK_PATH);
 }

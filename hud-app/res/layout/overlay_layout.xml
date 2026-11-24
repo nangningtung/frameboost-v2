@@ -85,7 +85,7 @@
                         android:fontFamily="monospace"
                         android:includeFontPadding="false"
                         android:letterSpacing="0.04"
-                        android:text="FRAMEBOOST"
+                        android:text="SECRETO"
                         android:textColor="#F1F5F9"
                         android:textSize="13sp"
                         android:textStyle="bold" />
@@ -671,7 +671,7 @@
                     android:layout_marginTop="8dp"
                     android:gravity="center"
                     android:letterSpacing="0.02"
-                    android:text="FrameBoost GameSpace · Swipe to close"
+                    android:text="Secreto Space GameSpace · Swipe to close"
                     android:textColor="#8798AC"
                     android:textSize="9sp" />
 

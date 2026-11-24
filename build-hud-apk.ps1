@@ -34,7 +34,7 @@ Write-Host "=== 4. Link resources & generate R.java (aapt2 link) ==="
 if ($LASTEXITCODE -ne 0) { throw "aapt2 link failed" }
 
 Write-Host "=== 5. Compile Java classes (javac) ==="
-$javaFiles = Get-ChildItem -Path "$appDir\src\com\a50\frameboost\hud\*.java", "$buildDir\gen\com\a50\frameboost\hud\*.java" | Select-Object -ExpandProperty FullName
+$javaFiles = Get-ChildItem -Path "$appDir\src\com\secreto\space\*.java", "$buildDir\gen\com\secreto\space\*.java" | Select-Object -ExpandProperty FullName
 & "$jdk\javac.exe" --release 17 -cp "$plat;$buildDir\gen" $javaFiles -d "$buildDir\obj"
 if ($LASTEXITCODE -ne 0) { throw "javac failed" }
 
@@ -50,7 +50,7 @@ cd "$appDir"
 & "$jdk\jar.exe" -uf "$buildDir\unaligned.apk" -C "." "assets"
 
 Write-Host "=== 8. Zipalign APK ==="
-& "$bt\zipalign.exe" -p -f 4 "$buildDir\unaligned.apk" "$buildDir\FrameBoost-GameSpace-aligned.apk"
+& "$bt\zipalign.exe" -p -f 4 "$buildDir\unaligned.apk" "$buildDir\SecretoSpace-aligned.apk"
 if ($LASTEXITCODE -ne 0) { throw "zipalign failed" }
 
 Write-Host "=== 9. Sign APK ==="
@@ -61,15 +61,15 @@ if (-not (Test-Path $keystore)) {
         -dname "CN=Android Debug,O=Android,C=US"
 }
 
-$finalApk = "$appDir\FrameBoost-GameSpace.apk"
-& "$bt\apksigner.bat" sign --ks $keystore --ks-pass pass:android --ks-key-alias androiddebugkey --out $finalApk "$buildDir\FrameBoost-GameSpace-aligned.apk"
+$finalApk = "$appDir\SecretoSpace.apk"
+& "$bt\apksigner.bat" sign --ks $keystore --ks-pass pass:android --ks-key-alias androiddebugkey --out $finalApk "$buildDir\SecretoSpace-aligned.apk"
 
 Write-Host "=== 10. Sync APK into module-src (ZIP payload) ==="
-$moduleApk = Join-Path (Split-Path $appDir -Parent) "module-src\FrameBoost-GameSpace.apk"
+$moduleApk = Join-Path (Split-Path $appDir -Parent) "module-src\SecretoSpace.apk"
 Copy-Item $finalApk $moduleApk -Force
-$privAppDir = Join-Path (Split-Path $appDir -Parent) "module-src\system\priv-app\FrameBoost"
+$privAppDir = Join-Path (Split-Path $appDir -Parent) "module-src\system\priv-app\SecretoSpace"
 New-Item -ItemType Directory -Path $privAppDir -Force | Out-Null
-Copy-Item $finalApk "$privAppDir\FrameBoost-GameSpace.apk" -Force
+Copy-Item $finalApk "$privAppDir\SecretoSpace.apk" -Force
 
 Write-Host "SUCCESS: $finalApk created!"
-Get-Item $finalApk, $moduleApk, "$privAppDir\FrameBoost-GameSpace.apk" | Select-Object Name, Length
+Get-Item $finalApk, $moduleApk, "$privAppDir\SecretoSpace.apk" | Select-Object Name, Length

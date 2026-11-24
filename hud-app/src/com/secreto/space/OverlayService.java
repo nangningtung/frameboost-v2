@@ -1,4 +1,4 @@
-package com.a50.frameboost.hud;
+package com.secreto.space;
 
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -31,7 +31,7 @@ import android.widget.TextView;
  * expands the GameSpace-style panel, swiping it back to the edge collapses it.
  */
 public class OverlayService extends Service {
-    private static final String CHANNEL_ID = "frameboost_hud_channel";
+    private static final String CHANNEL_ID = "secreto_hud_channel";
     private static final String PREFS = "hud_prefs";
 
     private static final int COLOR_DIM = 0xFF94A3B8;
@@ -1138,7 +1138,7 @@ public class OverlayService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
-                    "FrameBoost HUD Service",
+                    "Secreto HUD Service",
                     NotificationManager.IMPORTANCE_MIN
             );
             channel.setDescription("Running in-game overlay");
@@ -1160,7 +1160,7 @@ public class OverlayService extends Service {
         }
 
         return builder
-                .setContentTitle("FrameBoost HUD")
+                .setContentTitle("Secreto HUD")
                 .setContentText("In-game bubble and side panel are active")
                 .setSmallIcon(R.drawable.ic_launcher)
                 .setContentIntent(pendingIntent)

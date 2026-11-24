@@ -4,7 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::sysfs::{read_file, read_u32};
 
-const STOCK_PATH: &str = "/data/adb/a50_frameboost/stock_snapshot.json";
+const STOCK_PATH: &str = "/data/adb/secreto_space/stock_snapshot.json";
 
 /// Captured stock values before any modification.
 #[derive(Serialize, Deserialize, Clone, Debug)]

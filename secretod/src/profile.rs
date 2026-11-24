@@ -4,7 +4,7 @@ use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::Path;
 
-const PROFILES_CONFIG_PATH: &str = "/data/adb/a50_frameboost/game_profiles.json";
+const PROFILES_CONFIG_PATH: &str = "/data/adb/secreto_space/game_profiles.json";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Preset {

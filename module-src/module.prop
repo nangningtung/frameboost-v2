@@ -1,6 +1,6 @@
-id=a50_frameboost
-name=FrameBoost A50 - Game Space Console
-version=v2.4.0
-versionCode=240
-author=Assistant & User
-description=Game Space Console for Samsung A50 (Exynos 9610). Native Rust daemon with Network Command Center (Multi-target ping, RFC 3550 jitter, bufferbloat detection, BBR), Game Space Launcher APK with smooth edge-snap native floating HUD, auto-profile per game, wide thermal hysteresis, profile keep-alive against Samsung clock resets, stale-TimeStats recovery, and zero-fabrication telemetry.
+id=secreto_space
+name=Secreto Space
+version=v0.1.0
+versionCode=1000
+author=nangningtung
+description=Game space for Galaxy A50 (SM-A505F/GN) on GSI and One UI. Per-game profiles, background app sleep, real SurfaceFlinger FPS overlay, and guaranteed restore to stock. A50 only, refuses to install elsewhere.

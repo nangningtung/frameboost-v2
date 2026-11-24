@@ -1,4 +1,4 @@
-# FrameBoost smoke test. Run while a game is open for full coverage.
+# Secreto Space smoke test. Run while a game is open for full coverage.
 # Usage: powershell -ExecutionPolicy Bypass -File .\smoke-test.ps1
 #        powershell -ExecutionPolicy Bypass -File .\smoke-test.ps1 -Serial RR8M50C0W8T
 
@@ -29,21 +29,21 @@ if (-not $Serial) {
 Add-Result "adb device" $true $Serial
 
 # 2. Daemon process
-$daemonPid = (& $adb -s $Serial shell "pidof frameboostd").Trim()
+$daemonPid = (& $adb -s $Serial shell "pidof secretod").Trim()
 Add-Result "daemon running" ($daemonPid -ne "") $(if ($daemonPid) { "pid $daemonPid" } else { "not running" })
 
 # 3. Module version
-$moduleProp = & $adb -s $Serial shell su -c "head -3 /data/adb/modules/a50_frameboost/module.prop"
+$moduleProp = & $adb -s $Serial shell su -c "head -3 /data/adb/modules/secreto_space/module.prop"
 $moduleVersion = ($moduleProp | Select-String "version=").Line -replace "version=", ""
-Add-Result "module v2.4.0" ($moduleVersion -eq "v2.4.0") $moduleVersion
+Add-Result "module v0.1.0" ($moduleVersion -eq "v0.1.0") $moduleVersion
 
 # 4. APK version
-$pkg = & $adb -s $Serial shell dumpsys package com.a50.frameboost.hud
+$pkg = & $adb -s $Serial shell dumpsys package com.secreto.space
 $apkVersion = (($pkg | Select-String "versionName=") | Select-Object -First 1).Line.Trim()
 Add-Result "APK versionName" ($apkVersion -match "2\.4\.0") $apkVersion
 
 # 5. Snapshot
-$snapRaw = & $adb -s $Serial shell "cat /data/local/tmp/frameboost-snapshot.json"
+$snapRaw = & $adb -s $Serial shell "cat /data/local/tmp/secreto-snapshot.json"
 try {
     $snap = $snapRaw | ConvertFrom-Json
     Add-Result "snapshot readable" $true ("state=" + $snap.daemon_state)
@@ -91,12 +91,12 @@ if ($snap) {
         }
 
         # 8. Overlay layer present
-        $layers = & $adb -s $Serial shell "dumpsys SurfaceFlinger --list | grep -c com.a50.frameboost.hud"
+        $layers = & $adb -s $Serial shell "dumpsys SurfaceFlinger --list | grep -c com.secreto.space"
         $layerOk = [int]$layers -ge 1
         Add-Result "overlay layer" $layerOk ("layers=" + $layers.Trim())
 
         # 9. Watchdog pin
-        $hudPid = (& $adb -s $Serial shell "pidof com.a50.frameboost.hud").Trim()
+        $hudPid = (& $adb -s $Serial shell "pidof com.secreto.space").Trim()
         if ($hudPid) {
             $oom = (& $adb -s $Serial shell su -c "cat /proc/$hudPid/oom_score_adj").Trim()
             Add-Result "hud oom_score_adj" ($oom -eq "-800") ("adj=" + $oom)
@@ -107,7 +107,7 @@ if ($snap) {
 }
 
 # 10. No apply errors in the current log
-$logErrors = & $adb -s $Serial shell su -c "grep -c re-apply /data/local/tmp/frameboostd.log 2>/dev/null"
+$logErrors = & $adb -s $Serial shell su -c "grep -c re-apply /data/local/tmp/secretod.log 2>/dev/null"
 Add-Result "no keepalive errors" ([int]$logErrors -eq 0) ("count=" + $logErrors.Trim())
 
 # Report

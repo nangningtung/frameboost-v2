@@ -1,4 +1,4 @@
-package com.a50.frameboost.hud;
+package com.secreto.space;
 
 import org.json.JSONObject;
 import java.io.BufferedReader;
@@ -6,7 +6,7 @@ import java.io.File;
 import java.io.FileReader;
 
 public class SnapshotReader {
-    private static final String SNAPSHOT_PATH = "/data/local/tmp/frameboost-snapshot.json";
+    private static final String SNAPSHOT_PATH = "/data/local/tmp/secreto-snapshot.json";
 
     public static class SnapshotData {
         public String daemonState = "IDLE";

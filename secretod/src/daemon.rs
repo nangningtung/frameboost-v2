@@ -232,7 +232,7 @@ impl AutoDaemon {
     /// service, pins its oom_score_adj and verifies that the overlay layer is
     /// actually present (a live service with no window is still a dead HUD).
     fn ensure_hud_running(&mut self) {
-        let pids = run_cmd("pidof", &["com.a50.frameboost.hud"]);
+        let pids = run_cmd("pidof", &["com.secreto.space"]);
         if pids.trim().is_empty() {
             self.start_hud_service();
             self.hud_miss = 0;
@@ -246,7 +246,7 @@ impl AutoDaemon {
         }
 
         let layers = run_cmd("dumpsys", &["SurfaceFlinger", "--list"]);
-        if layers.contains("com.a50.frameboost.hud") {
+        if layers.contains("com.secreto.space") {
             self.hud_miss = 0;
         } else {
             self.hud_miss += 1;
@@ -263,7 +263,7 @@ impl AutoDaemon {
             &[
                 "start-foreground-service",
                 "-n",
-                "com.a50.frameboost.hud/.OverlayService",
+                "com.secreto.space/.OverlayService",
             ],
         );
         log_line("HUD overlay missing, restarting service");

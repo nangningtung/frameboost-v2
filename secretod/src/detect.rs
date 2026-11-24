@@ -7,11 +7,11 @@ use std::path::Path;
 use crate::profile::GameProfile;
 use crate::sysfs::run_cmd;
 
-const CONFIG_SH_PATH: &str = "/data/adb/a50_frameboost/config.sh";
-const GAMES_LIST_PATH: &str = "/data/adb/a50_frameboost/games.list";
-const CUSTOM_GAMES_PATH: &str = "/data/adb/a50_frameboost/custom_games.list";
-const AUTO_GAMES_PATH: &str = "/data/adb/a50_frameboost/auto_games.list";
-const DISABLED_GAMES_PATH: &str = "/data/adb/a50_frameboost/disabled_games.list";
+const CONFIG_SH_PATH: &str = "/data/adb/secreto_space/config.sh";
+const GAMES_LIST_PATH: &str = "/data/adb/secreto_space/games.list";
+const CUSTOM_GAMES_PATH: &str = "/data/adb/secreto_space/custom_games.list";
+const AUTO_GAMES_PATH: &str = "/data/adb/secreto_space/auto_games.list";
+const DISABLED_GAMES_PATH: &str = "/data/adb/secreto_space/disabled_games.list";
 
 pub static BUILTIN_GAMES: &[(&str, &str)] = &[
     ("com.mobile.legends", "Mobile Legends: Bang Bang"),
@@ -90,7 +90,7 @@ impl GameDetector {
         }
     }
 
-    /// Parse GAME_PKGS="..." dari /data/adb/a50_frameboost/config.sh
+    /// Parse GAME_PKGS="..." dari /data/adb/secreto_space/config.sh
     fn load_config_sh(set: &mut HashSet<String>) {
         if let Ok(content) = fs::read_to_string(CONFIG_SH_PATH) {
             for line in content.lines() {
@@ -138,7 +138,7 @@ impl GameDetector {
 
     fn save_manual(&self) {
         Self::save_set(CUSTOM_GAMES_PATH, &self.manual_games);
-        // Sinkronisasi ke games.list agar backward-compatible dengan FrameBoost v1
+        // Sinkronisasi ke games.list agar backward-compatible dengan versi lama
         let mut combined = self.manual_games.clone();
         for g in &self.auto_games {
             combined.insert(g.clone());
@@ -356,7 +356,7 @@ impl GameDetector {
         false
     }
 
-    /// Auto-learn game saat runtime (Persis 4 lapis FrameBoost v1):
+    /// Auto-learn game saat runtime (Persis 4 lapis versi lama):
     /// 1. config.sh GAME_PKGS
     /// 2. games.list (auto-learned)
     /// 3. dumpsys game (GameManagerService Android)

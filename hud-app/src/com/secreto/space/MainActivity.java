@@ -1,4 +1,4 @@
-package com.a50.frameboost.hud;
+package com.secreto.space;
 
 import android.app.Activity;
 import android.content.Intent;

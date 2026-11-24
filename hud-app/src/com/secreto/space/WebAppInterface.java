@@ -1,4 +1,4 @@
-package com.a50.frameboost.hud;
+package com.secreto.space;
 
 import android.content.Context;
 import android.content.Intent;
@@ -24,8 +24,8 @@ public class WebAppInterface {
         if (cmd == null || cmd.isEmpty()) return "";
 
         // Fast path 1: Reading snapshot JSON
-        if (cmd.contains("frameboost-snapshot.json")) {
-            File f = new File("/data/local/tmp/frameboost-snapshot.json");
+        if (cmd.contains("secreto-snapshot.json")) {
+            File f = new File("/data/local/tmp/secreto-snapshot.json");
             if (f.exists() && f.canRead()) {
                 try (BufferedReader br = new BufferedReader(new FileReader(f))) {
                     StringBuilder sb = new StringBuilder();
@@ -39,7 +39,7 @@ public class WebAppInterface {
         }
 
         // Fast path 2: Socket command
-        if (cmd.contains("frameboost.sock")) {
+        if (cmd.contains("secreto.sock")) {
             String snap = IpcClient.sendCommand("snapshot");
             return snap != null ? snap : "";
         }
@@ -80,7 +80,7 @@ public class WebAppInterface {
                     if (webView != null) webView.evaluateJavascript(callbackName + "(" + json + ");", null);
                 }
             });
-        }, "frameboost-ipc").start();
+        }, "secreto-ipc").start();
     }
 
     @JavascriptInterface
