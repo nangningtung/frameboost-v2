@@ -282,6 +282,7 @@ Perubahan:
 - **Thermal**: ambang Warn 87 °C, kembali ke Game di 82 °C, Crit 92 °C. Extras (swappiness, DND, renice, BBR) hanya dijalankan sekali per sesi game, bukan setiap transisi suhu.
 - **Apply**: min freq di-clamp ke `scaling_max_freq` yang sedang aktif (thermal cap), dan kegagalan satu write tidak lagi rollback ke stock; keep-alive yang retry.
 - **Telemetry**: `read_u32` sekarang mem-parse nilai berakhiran `%` (mis. `gpu_busy` 78%) supaya `busy_pct` tidak lagi 0.
+- **HUD watchdog**: kalau proses overlay mati (install APK / LMK), daemon menyalakan ulang foreground service dan menulis `oom_score_adj=-800` supaya tidak mudah dibunuh.
 - **Versi**: modul naik ke v2.4.0.
 
 Testing (Auto Chess, Galaxy A50, landscape):

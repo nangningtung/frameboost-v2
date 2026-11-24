@@ -177,6 +177,7 @@ impl AutoDaemon {
             self.last_keepalive = Instant::now();
             self.sync_active_profile();
             self.keepalive_apply();
+            self.ensure_hud_running();
         }
 
         // Clean up current_game if fully dropped to idle
@@ -219,6 +220,30 @@ impl AutoDaemon {
             if let Some(rep) = apply_profile_if_drifted(&boost) {
                 if !rep.success {
                     eprintln!("[keepalive] re-apply failed: {:?}", rep.errors);
+                }
+            }
+        }
+    }
+
+    /// The HUD process can be killed by an APK install or by the low-memory
+    /// killer. While a game is active the daemon restarts its foreground
+    /// service and pins its oom_score_adj so the monitor comes back by itself.
+    fn ensure_hud_running(&self) {
+        let pids = run_cmd("pidof", &["com.a50.frameboost.hud"]);
+        if pids.trim().is_empty() {
+            let _ = run_cmd(
+                "am",
+                &[
+                    "start-foreground-service",
+                    "-n",
+                    "com.a50.frameboost.hud/.OverlayService",
+                ],
+            );
+            eprintln!("[daemon] HUD overlay missing, restarting service");
+        } else {
+            for p in pids.split_whitespace() {
+                if !p.is_empty() {
+                    let _ = fs::write(format!("/proc/{}/oom_score_adj", p), "-800");
                 }
             }
         }
