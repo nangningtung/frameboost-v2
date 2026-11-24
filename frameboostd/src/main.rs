@@ -25,7 +25,7 @@ use fps::measure_fps;
 use net::{apply_bbr, measure_bufferbloat, multi_target_ping, restore_stock_cc, run_ping};
 use rollback::restore_all;
 use snapshot::StockSnapshot;
-use sysfs::{read_file, read_u32, run_cmd};
+use sysfs::{log_line, read_file, read_u32, run_cmd};
 
 const SOCK_PATH: &str = "/data/local/tmp/frameboost.sock";
 const SNAPSHOT_FILE: &str = "/data/local/tmp/frameboost-snapshot.json";
@@ -540,7 +540,7 @@ fn main() {
     let listener = match UnixListener::bind(SOCK_PATH) {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("Failed to bind socket: {}", e);
+            log_line(&format!("Failed to bind socket: {}", e));
             std::process::exit(1);
         }
     };
@@ -553,10 +553,7 @@ fn main() {
     let game_sink = Arc::new(RwLock::new(String::new()));
     let detector = Arc::new(RwLock::new(GameDetector::new()));
 
-    eprintln!(
-        "FrameBoost daemon v2.4.0 started (pid={})",
-        std::process::id()
-    );
+    log_line(&format!("FrameBoost daemon v2.4.0 started (pid={})", std::process::id()));
 
     // 1. Spawn auto daemon loop (handles game detection + thermal hysteresis)
     let auto_run = running.clone();
@@ -595,13 +592,13 @@ fn main() {
                 thread::spawn(move || handle_client(s, start, r, st, gm, det));
             }
             Err(e) => {
-                eprintln!("Accept error: {}", e);
+                log_line(&format!("Accept error: {}", e));
             }
         }
     }
 
     // Clean exit: restore all stock knobs
-    eprintln!("FrameBoost daemon stopping, restoring stock...");
+    log_line("FrameBoost daemon stopping, restoring stock...");
     let _ = restore_all();
     let _ = fs::remove_file(SOCK_PATH);
 }

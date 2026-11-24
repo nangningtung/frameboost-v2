@@ -9,7 +9,7 @@ use crate::detect::GameDetector;
 use crate::net::{apply_bbr, restore_stock_cc};
 use crate::profile::GameProfile;
 use crate::rollback::restore_all;
-use crate::sysfs::{read_u32, run_cmd};
+use crate::sysfs::{log_line, read_u32, run_cmd};
 
 const POLL_MS: u64 = 250;
 const DEBOUNCE_MISSES: u32 = 2; // Instant for launcher/system, 2 x 250ms = 500ms for other non-game apps
@@ -61,6 +61,7 @@ pub struct AutoDaemon {
     active_profile: Option<GameProfile>,
     last_keepalive: Instant,
     extras_pkg: String,
+    hud_miss: u32,
 }
 
 impl AutoDaemon {
@@ -73,6 +74,7 @@ impl AutoDaemon {
             active_profile: None,
             last_keepalive: Instant::now(),
             extras_pkg: String::new(),
+            hud_miss: 0,
         }
     }
 
@@ -159,10 +161,10 @@ impl AutoDaemon {
 
         // Transition actions
         if next_state != self.state {
-            eprintln!(
-                "[daemon] State transition: {:?} -> {:?} (pkg={}, temp={}mC)",
+            log_line(&format!(
+                "State transition: {:?} -> {:?} (pkg={}, temp={}mC)",
                 self.state, next_state, self.current_game, temp_big
-            );
+            ));
             self.apply_state(next_state);
             self.state = next_state;
         }
@@ -219,7 +221,7 @@ impl AutoDaemon {
             };
             if let Some(rep) = apply_profile_if_drifted(&boost) {
                 if !rep.success {
-                    eprintln!("[keepalive] re-apply failed: {:?}", rep.errors);
+                    log_line(&format!("keepalive re-apply failed: {:?}", rep.errors));
                 }
             }
         }
@@ -227,26 +229,44 @@ impl AutoDaemon {
 
     /// The HUD process can be killed by an APK install or by the low-memory
     /// killer. While a game is active the daemon restarts its foreground
-    /// service and pins its oom_score_adj so the monitor comes back by itself.
-    fn ensure_hud_running(&self) {
+    /// service, pins its oom_score_adj and verifies that the overlay layer is
+    /// actually present (a live service with no window is still a dead HUD).
+    fn ensure_hud_running(&mut self) {
         let pids = run_cmd("pidof", &["com.a50.frameboost.hud"]);
         if pids.trim().is_empty() {
-            let _ = run_cmd(
-                "am",
-                &[
-                    "start-foreground-service",
-                    "-n",
-                    "com.a50.frameboost.hud/.OverlayService",
-                ],
-            );
-            eprintln!("[daemon] HUD overlay missing, restarting service");
-        } else {
-            for p in pids.split_whitespace() {
-                if !p.is_empty() {
-                    let _ = fs::write(format!("/proc/{}/oom_score_adj", p), "-800");
-                }
+            self.start_hud_service();
+            self.hud_miss = 0;
+            return;
+        }
+
+        for p in pids.split_whitespace() {
+            if !p.is_empty() {
+                let _ = fs::write(format!("/proc/{}/oom_score_adj", p), "-800");
             }
         }
+
+        let layers = run_cmd("dumpsys", &["SurfaceFlinger", "--list"]);
+        if layers.contains("com.a50.frameboost.hud") {
+            self.hud_miss = 0;
+        } else {
+            self.hud_miss += 1;
+            if self.hud_miss >= 2 {
+                self.hud_miss = 0;
+                self.start_hud_service();
+            }
+        }
+    }
+
+    fn start_hud_service(&self) {
+        let _ = run_cmd(
+            "am",
+            &[
+                "start-foreground-service",
+                "-n",
+                "com.a50.frameboost.hud/.OverlayService",
+            ],
+        );
+        log_line("HUD overlay missing, restarting service");
     }
 
     fn apply_state(&mut self, st: DaemonState) {

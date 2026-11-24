@@ -1,5 +1,5 @@
 use crate::snapshot::StockSnapshot;
-use crate::sysfs::{read_file, write_verified};
+use crate::sysfs::{log_line, read_file, write_verified};
 
 /// Applies a profile to GPU and CPU clusters with readback verification.
 /// If any write fails its readback, the function rolls back all changed knobs
@@ -65,7 +65,7 @@ pub fn apply_profile(profile: &BoostProfile) -> ApplyReport {
     if !StockSnapshot::exists() {
         let snap = StockSnapshot::capture();
         if let Err(e) = snap.save_if_new() {
-            eprintln!("[apply] warning: failed to persist stock snapshot: {}", e);
+            log_line(&format!("warning: failed to persist stock snapshot: {}", e));
         }
     }
 
@@ -97,10 +97,10 @@ pub fn apply_profile(profile: &BoostProfile) -> ApplyReport {
         // Do not roll back to stock here: a transient write failure would drop
         // the whole profile mid-game. The keep-alive loop retries in 5s, and
         // restore_all() still returns the stock snapshot when the game exits.
-        eprintln!(
-            "[apply] partial apply for profile {}: {:?} (will retry)",
+        log_line(&format!(
+            "partial apply for profile {}: {:?} (will retry)",
             profile.name, errors
-        );
+        ));
     }
 
     ApplyReport {

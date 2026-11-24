@@ -5,7 +5,11 @@ $bt = "$sdk\build-tools\36.0.0"
 $plat = "$sdk\platforms\android-36\android.jar"
 $appDir = "C:\Users\Administrator\Documents\code\frameboost-v2\hud-app"
 $buildDir = "$appDir\build"
-$jdk = "C:\Program Files\Eclipse Adoptium\jdk-25.0.5.8-hotspot\bin"
+$jdkRoot = Get-ChildItem "C:\Program Files\Eclipse Adoptium" -Directory -Filter "jdk-*" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if (-not $jdkRoot) { throw "JDK not found in C:\Program Files\Eclipse Adoptium" }
+$jdk = Join-Path $jdkRoot.FullName "bin"
+$env:JAVA_HOME = $jdkRoot.FullName
+$env:Path = "$jdk;$env:Path"
 
 Write-Host "=== 1. Sync assets (webroot) ==="
 New-Item -ItemType Directory -Path "$appDir\assets\webroot" -Force | Out-Null
@@ -31,7 +35,7 @@ if ($LASTEXITCODE -ne 0) { throw "aapt2 link failed" }
 
 Write-Host "=== 5. Compile Java classes (javac) ==="
 $javaFiles = Get-ChildItem -Path "$appDir\src\com\a50\frameboost\hud\*.java", "$buildDir\gen\com\a50\frameboost\hud\*.java" | Select-Object -ExpandProperty FullName
-javac --release 17 -cp "$plat;$buildDir\gen" $javaFiles -d "$buildDir\obj"
+& "$jdk\javac.exe" --release 17 -cp "$plat;$buildDir\gen" $javaFiles -d "$buildDir\obj"
 if ($LASTEXITCODE -ne 0) { throw "javac failed" }
 
 Write-Host "=== 6. Convert bytecode to Dalvik dex (d8) ==="

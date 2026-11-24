@@ -33,6 +33,21 @@ pub fn read_u32(path: &str) -> u32 {
     digits.parse().unwrap_or(0)
 }
 
+/// Timestamped daemon log. The device timezone is WIB (UTC+7); using the
+/// kernel clock keeps this dependency-free while still readable in logcat.
+pub fn log_line(msg: &str) {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let local = secs + 7 * 3600;
+    let h = (local / 3600) % 24;
+    let m = (local / 60) % 60;
+    let s = local % 60;
+    eprintln!("[{:02}:{:02}:{:02}] {}", h, m, s, msg);
+}
+
 pub fn read_i32(path: &str) -> i32 {
     read_file(path).parse().unwrap_or(0)
 }

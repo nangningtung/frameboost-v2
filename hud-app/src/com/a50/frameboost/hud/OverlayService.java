@@ -966,11 +966,12 @@ public class OverlayService extends Service {
                 ? String.format(java.util.Locale.US, "%.0f", data.fps)
                 : "--";
 
+        int fpsInt = (int) Math.round(data.fps);
         int fpsColor;
-        if (data.fps >= 55) fpsColor = COLOR_ACCENT;
-        else if (data.fps >= 40) fpsColor = COLOR_GREEN;
-        else if (data.fps >= 25) fpsColor = COLOR_AMBER;
-        else if (data.fps > 0) fpsColor = COLOR_RED;
+        if (fpsInt >= 55) fpsColor = COLOR_ACCENT;
+        else if (fpsInt >= 40) fpsColor = COLOR_GREEN;
+        else if (fpsInt >= 25) fpsColor = COLOR_AMBER;
+        else if (fpsInt > 0) fpsColor = COLOR_RED;
         else fpsColor = 0xFF8798AC;
 
         if ("DETAIL".equals(hudType)) {
