@@ -286,7 +286,8 @@ Perubahan:
 - **Log**: setiap baris daemon diberi timestamp WIB; `service.sh` merotasi log di 512 KB.
 - **APK**: `versionName=2.4.0`, `versionCode=240`; warna FPS memakai nilai bulat supaya cocok dengan angka yang tampil.
 - **Build**: `build-hud-apk.ps1` mendeteksi JDK Adoptium otomatis dan mengekspor `JAVA_HOME` untuk `d8`/`apksigner`.
-- **Test**: `smoke-test.ps1` mengecek 13 titik secara otomatis dan melaporkan PASS/FAIL.
+- **Test**: `smoke-test.ps1` mengecek 14 titik secara otomatis (termasuk konsistensi DND) dan melaporkan PASS/FAIL.
+- **Sinkronisasi panel/app**: `heads_up_blocked` sekarang membaca setting asli (cache 5 detik), tombol Apply Profile memakai preset game yang dipilih dan tidak mengubah clock saat game di background (hanya menyimpan untuk launch berikutnya).
 - **Versi**: modul naik ke v2.4.0.
 
 Testing (Auto Chess, Galaxy A50, landscape):

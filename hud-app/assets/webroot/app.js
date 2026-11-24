@@ -790,16 +790,20 @@
   document.getElementById("btn-detail-launch")?.addEventListener("click", async (e) => {
     if (!selectedGamePkg) return;
     const btn = e.currentTarget;
+    const game = (allGames || []).find((g) => g.pkg === selectedGamePkg);
+    const preset = (game?.preset || "BALANCED").toUpperCase();
     btn.disabled = true;
     btn.textContent = "APPLYING...";
-    const res = await sendSocketCmd("apply_game");
-    let ok = false;
-    try { const data = JSON.parse(res); ok = data.status === "ok"; } catch (err) {}
-    btn.textContent = ok ? "✓ PROFILE APPLIED" : "✕ APPLY FAILED";
+    const res = await sendSocketCmd(`apply_preset ${preset}`);
+    let state = "fail";
+    try { const data = JSON.parse(res); state = data.status || "fail"; } catch (err) {}
+    if (state === "ok") btn.textContent = "✓ PROFILE APPLIED";
+    else if (state === "idle") btn.textContent = "✓ SAVED FOR NEXT LAUNCH";
+    else btn.textContent = "✕ APPLY FAILED";
     setTimeout(() => {
       btn.disabled = false;
       btn.textContent = "Apply Profile";
-    }, 1800);
+    }, 2200);
   });
 
   async function loadGames() {

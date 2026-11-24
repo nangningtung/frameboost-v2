@@ -50,6 +50,11 @@ try {
 }
 
 if ($snap) {
+    # DND setting must match the snapshot field (side panel and app share it)
+    $headsUp = (& $adb -s $Serial shell "settings get global heads_up_notifications_enabled").Trim()
+    $dndOk = (($headsUp -eq "0") -eq [bool]$snap.heads_up_blocked)
+    Add-Result "dnd state matches snapshot" $dndOk ("setting=" + $headsUp + " blocked=" + $snap.heads_up_blocked)
+
     $isGame = [bool]$snap.is_game
     Add-Result "game detected" $isGame ($(if ($isGame) { $snap.game_pkg } else { "no game in foreground (partial test)" }))
 

@@ -273,6 +273,7 @@ impl AutoDaemon {
         match st {
             DaemonState::Idle => {
                 let _ = restore_all();
+                crate::refresh_heads_up_cache();
                 self.extras_pkg.clear();
                 if let Some(prof) = self.active_profile.clone() {
                     if prof.auto_bbr {
@@ -304,6 +305,7 @@ impl AutoDaemon {
 
                     // 2. Gaming DND: block heads-up notifications from popping up over game
                     let _ = run_cmd("settings", &["put", "global", "heads_up_notifications_enabled", "0"]);
+                        crate::set_heads_up_cache(true);
 
                     // 3. Anti-redup: lock brightness to manual mode (prevent palm from covering ambient light sensor)
                     let _ = run_cmd("settings", &["put", "system", "screen_brightness_mode", "0"]);
@@ -337,6 +339,7 @@ impl AutoDaemon {
             }
             DaemonState::Crit => {
                 let _ = restore_all();
+                crate::refresh_heads_up_cache();
             }
         }
     }

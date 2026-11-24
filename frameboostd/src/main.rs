@@ -4,7 +4,7 @@ use std::io::{Read, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -76,6 +76,40 @@ pub struct BatteryState {
 }
 
 static GOS_DISABLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Cached "heads-up blocked" state. Reading the setting on every 250 ms
+/// snapshot would spam binder, but reporting `is_game` was a lie: turning DND
+/// off from the side panel never changed the snapshot. Cache for 5 s and
+/// update it immediately on every toggle.
+static HEADS_UP_CACHE: Mutex<Option<(bool, Instant)>> = Mutex::new(None);
+
+pub fn set_heads_up_cache(blocked: bool) {
+    if let Ok(mut c) = HEADS_UP_CACHE.lock() {
+        *c = Some((blocked, Instant::now()));
+    }
+}
+
+pub fn refresh_heads_up_cache() {
+    let out = run_cmd("settings", &["get", "global", "heads_up_notifications_enabled"]);
+    set_heads_up_cache(out.trim() == "0");
+}
+
+fn heads_up_blocked_cached() -> bool {
+    if let Ok(c) = HEADS_UP_CACHE.lock() {
+        if let Some((v, at)) = *c {
+            if at.elapsed() < Duration::from_secs(5) {
+                return v;
+            }
+        }
+    }
+    refresh_heads_up_cache();
+    HEADS_UP_CACHE
+        .lock()
+        .ok()
+        .and_then(|c| *c)
+        .map(|(v, _)| v)
+        .unwrap_or(false)
+}
 
 fn has_samsung_gos() -> bool {
     std::process::Command::new("pm")
@@ -275,7 +309,7 @@ fn take_snapshot(
         net: read_net(),
         battery: read_battery(),
         vm_swappiness: read_u32("/proc/sys/vm/swappiness"),
-        heads_up_blocked: is_g,
+        heads_up_blocked: heads_up_blocked_cached(),
         gos_disabled: GOS_DISABLED.load(Ordering::Relaxed),
         has_gos: has_samsung_gos(),
         daemon_uptime_s: start.elapsed().as_secs(),
@@ -439,7 +473,10 @@ fn handle_client(
             .args(["put", "global", "heads_up_notifications_enabled", v])
             .output();
         match out {
-            Ok(_) => format!(r#"{{"status":"ok","heads_up":"{}"}}"#, v),
+            Ok(_) => {
+                set_heads_up_cache(v == "0");
+                format!(r#"{{"status":"ok","heads_up":"{}"}}"#, v)
+            }
             Err(e) => format!(r#"{{"status":"error","message":"{}"}}"#, e),
         }
     } else if let Some(val) = req.strip_prefix("set_bypass_charge ") {
@@ -450,17 +487,29 @@ fn handle_client(
             Err(e) => format!(r#"{{"status":"error","message":"{}"}}"#, e),
         }
     } else if let Some(preset_name) = req.strip_prefix("apply_preset ") {
-        let preset = crate::profile::Preset::from_str(preset_name.trim());
-        let prof = crate::profile::GameProfile::build("MANUAL", preset, true);
-        let boost = crate::apply::BoostProfile {
-            name: prof.preset.clone(),
-            gpu_gov: prof.gpu_gov.clone(),
-            gpu_min: prof.gpu_min,
-            cpu0_min: prof.cpu0_min,
-            cpu4_min: prof.cpu4_min,
+        let fg = GameDetector::get_foreground_pkg();
+        let in_game = {
+            let mut det = detector.write().unwrap();
+            det.is_game_fast(&fg).unwrap_or_else(|| det.is_game(&fg))
         };
-        let res = crate::apply::apply_profile(&boost);
-        format!(r#"{{"status":"{}","preset":"{}"}}"#, if res.success { "ok" } else { "fail" }, prof.preset)
+        if !in_game {
+            // The console runs in the foreground while the game is paused in
+            // the background. Applying clocks there would leave them stuck, so
+            // only persist the choice; the daemon applies it on game launch.
+            r#"{"status":"idle","message":"Profile saved; applies on next launch"}"#.to_string()
+        } else {
+            let preset = crate::profile::Preset::from_str(preset_name.trim());
+            let prof = crate::profile::GameProfile::build("MANUAL", preset, true);
+            let boost = crate::apply::BoostProfile {
+                name: prof.preset.clone(),
+                gpu_gov: prof.gpu_gov.clone(),
+                gpu_min: prof.gpu_min,
+                cpu0_min: prof.cpu0_min,
+                cpu4_min: prof.cpu4_min,
+            };
+            let res = crate::apply::apply_profile(&boost);
+            format!(r#"{{"status":"{}","preset":"{}"}}"#, if res.success { "ok" } else { "fail" }, prof.preset)
+        }
     } else {
         match req {
             "ping" => r#"{"status":"ok"}"#.to_string(),
