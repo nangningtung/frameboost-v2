@@ -2087,6 +2087,10 @@ button:disabled,
 
 .home-game-play {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   min-width: 56px;
   min-height: 44px;
   padding: 0 8px;
