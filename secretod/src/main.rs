@@ -736,7 +736,7 @@ fn handle_client(
                 // Fresh foreground package for the overlay visibility loop.
                 // The detector is the same source the session engine uses,
                 // so the panel cannot disagree with the daemon.
-                let pkg = GameDetector::get_foreground_pkg();
+                let pkg = GameDetector::get_foreground_pkg_cached();
                 format!(r#"{{"status":"ok","pkg":"{}"}}"#, pkg)
             }
             "get_heads_up" => {
@@ -766,7 +766,7 @@ fn handle_client(
                 }
             }
             "fps" => {
-                let pkg = GameDetector::get_foreground_pkg();
+                let pkg = GameDetector::get_foreground_pkg_cached();
                 let rep = measure_fps(&pkg);
                 serde_json::to_string(&rep).unwrap_or_default()
             }

@@ -304,16 +304,16 @@ public class OverlayService extends Service {
                 SnapshotReader.SnapshotData data = null;
                 try {
                     ensureGameSet();
-                    // Every ~400 ms, ask the daemon for the fresh foreground
+                    // Every tick (~200 ms), ask the daemon for the fresh
                     // package. On some ROMs UsageStats events flush late, so
                     // this is the authoritative correction (same source the
                     // session engine uses; ROR does the same with dumpsys).
-                    tickCount++;
-                    if (tickCount % 2 == 0) {
+                    {
                         String res = IpcClient.sendCommand("fg");
                         if (res != null) {
                             String pkg = new org.json.JSONObject(res).optString("pkg", "");
                             if (!pkg.equals(daemonFgPkg)) {
+                                daemonFgPkg = pkg;
                                 android.util.Log.d("SecretoOverlay", "daemon fg: " + pkg);
                             }
                         }

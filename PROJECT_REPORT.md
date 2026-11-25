@@ -423,6 +423,18 @@ Gunakan checklist ini setiap kali ada perubahan.
 
 ### `sidepanel-instant-hide` - 2026-11-25
 
+### `sidepanel-fg-fix` - 2026-11-25
+
+`fix: assignment daemonFgPkg hilang dari patch + `fg` pakai cache daemon`
+
+Perubahan:
+- `daemonFgPkg` tidak pernah diisi oleh patch sebelumnya (assignment hilang), sehingga overlay masih memakai fallback rantai lama; diperbaiki.
+- Daemon: cache foreground `FG_CACHE` di `detect.rs`; command `fg` membaca cache yang di-refresh loop deteksi tiap 250 ms, jadi app bisa poll tiap 200 ms tanpa spawn dumpsys sendiri.
+
+Testing:
+- device: latensi HOME -> instant hide terukur 245-375 ms di 3 run (sebelumnya 0,9-1,2 s); smoke test PASS setelah reboot.
+
+
 `feat: deteksi keluar game instan untuk side panel + tumpukan UI dirapikan`
 
 Perubahan:

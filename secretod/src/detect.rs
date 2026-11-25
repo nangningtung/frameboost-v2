@@ -70,6 +70,9 @@ pub struct GameDetector {
     disabled_games: HashSet<String>,
 }
 
+static FG_CACHE: std::sync::Mutex<Option<(std::time::Instant, String)>> =
+    std::sync::Mutex::new(None);
+
 impl GameDetector {
     pub fn new() -> Self {
         let mut config = HashSet::new();
@@ -188,6 +191,53 @@ impl GameDetector {
     /// 2. dumpsys activity top (ACTIVITY / topResumedActivity)
     pub fn get_foreground_pkg() -> String {
         // ponytail: window displays is 3x faster than full window dump and contains focus target
+        let win_dump = run_cmd("dumpsys", &["window", "displays"]);
+        let mut result = Self::parse_fg(&win_dump);
+        if result.is_empty() {
+            let act_dump = run_cmd("dumpsys", &["activity", "top"]);
+            for line in act_dump.lines() {
+                if line.contains("ACTIVITY") || line.contains("topResumedActivity") {
+                    if let Some(pkg) = Self::parse_pkg_from_line(line) {
+                        result = pkg;
+                        break;
+                    }
+                }
+            }
+        }
+        // Cache for the overlay "fg" IPC: the daemon detect loop and the
+        // overlay both need the same value, so one dumpsys serves both.
+        if let Ok(mut c) = FG_CACHE.lock() {
+            *c = Some((std::time::Instant::now(), result.clone()));
+        }
+        result
+    }
+
+    /// Cached foreground for the cheap "fg" IPC path. The daemon detect
+    /// loop refreshes it every 250 ms, so the overlay never spawns its
+    /// own dumpsys and always reads a value at most ~300 ms old.
+    pub fn get_foreground_pkg_cached() -> String {
+        if let Ok(c) = FG_CACHE.lock() {
+            if let Some((t, pkg)) = c.as_ref() {
+                if t.elapsed() < std::time::Duration::from_millis(300) {
+                    return pkg.clone();
+                }
+            }
+        }
+        Self::get_foreground_pkg()
+    }
+
+    fn parse_fg(win_dump: &str) -> String {
+        for line in win_dump.lines() {
+            if line.contains("mCurrentFocus") || line.contains("mFocusedApp") {
+                if let Some(pkg) = Self::parse_pkg_from_line(line) {
+                    return pkg;
+                }
+            }
+        }
+        String::new()
+    }
+
+    pub fn get_foreground_pkg_live() -> String {
         let win_dump = run_cmd("dumpsys", &["window", "displays"]);
         for line in win_dump.lines() {
             if line.contains("mCurrentFocus") || line.contains("mFocusedApp") {
