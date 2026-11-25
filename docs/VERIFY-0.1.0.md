@@ -223,3 +223,4 @@ tidak dibaca oleh versi lama, jadi profil perlu disalin kembali ke
 | Unit test Rust | PASS, 20 test dijalankan di A50, 20 lulus |
 | Smoke test | PASS penuh 17 cek, termasuk sesi aktif dan journal |
 | Per-app layout | PASS, MLBB (left, Y299, FULL) dan Auto Chess (right, Y93, DETAIL) tidak saling menimpa setelah berganti game dua arah; panel 720p scroll utuh |
+| State machine overlay | PASS, transisi `HIDDEN -> DOCKED -> DRAGGING -> DOCKED -> PANEL_OPEN -> DOCKED -> HIDDEN` tercatat di logcat; semua interaksi terverifikasi |

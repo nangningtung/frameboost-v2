@@ -362,7 +362,7 @@ Belum termasuk fase ini:
 - [x] Per-app layout side panel
 - [x] Fallback FPS `gfxinfo framestats` saat SurfaceFlinger tidak punya layer (Choreographer sengaja tidak dipakai karena menghasilkan angka palsu)
 - [x] Capability probe terpisah (System tab)
-- [ ] State machine overlay murni
+- [x] State machine overlay murni
 - [x] Quick action tambahan (Boost RAM, Notifs, Bypass CHG, No GOS)
 - [ ] A/B render scale terkontrol di dalam match (indikasi sudah ada: `gpu_busy` 79,6% → 68,5% dan 49,1 → 58,9 FPS, tetapi scene berubah selama sampel)
 - [ ] Uji layout GSI pada 720p/900p untuk semua layar game, bukan hanya Auto Chess
@@ -472,6 +472,18 @@ Gunakan checklist ini setiap kali ada perubahan.
     dihitung dua kali.
   - 20 unit test Rust, dijalankan di A50. Drill device: recovery `kill -9`, single-instance,
     24 panggilan `fps` beruntun, dan smoke test 17/17 PASS.
+- **State machine overlay murni (2026-11-25)**:
+  - State overlay disatukan ke enum `OverlayState { HIDDEN, DOCKED, DRAGGING,
+    PANEL_OPEN }` dengan transisi terpusat lewat `enterState()`. Sebelumnya
+    state tersebar di boolean `panelOpen` plus flag drag di touch handler.
+  - Setiap transisi dicatat di logcat (`SecretoOverlay: DOCKED -> PANEL_OPEN`)
+    sehingga lifecycle bisa di-debug tanpa menebak dari UI.
+  - Visibilitas overlay dan keputusan posisi bercabang pada satu field, tidak
+    lagi pada beberapa boolean yang bisa tidak sinkron.
+  - Verifikasi device: transisi `HIDDEN -> DOCKED` saat game dibuka,
+    `DOCKED -> DRAGGING -> DOCKED` saat drag, `DOCKED -> PANEL_OPEN -> DOCKED`
+    saat tap buka/tutup panel, `DOCKED -> HIDDEN` saat game ditutup. Per-app
+    layout tetap bekerja; 17/17 smoke test PASS.
 - **Per-app layout panel (2026-11-25)**:
   - Posisi edge, Y, dan mode HUD (OFF / COMPACT / DETAIL / FULL) disimpan per package
     game di `hud_prefs.xml` dengan key `layout_<pkg>_right`, `layout_<pkg>_y`,

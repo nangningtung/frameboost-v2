@@ -96,10 +96,33 @@ public class OverlayService extends Service {
     private java.util.concurrent.ExecutorService actionExecutor;
     private android.animation.ValueAnimator snapAnimator;
 
-    private boolean panelOpen = false;
-    private boolean panelMerged = false;
     private boolean autoHide = true;
     private boolean fpsOverlayEnabled = true;
+
+    /**
+     * Single source of truth for the overlay lifecycle.
+     *
+     * <pre>
+     *   HIDDEN      overlay root gone (no game, daemon away)
+     *     ↕ autoHide / applyHudData
+     *   DOCKED      bubble snapped to an edge
+     *     ↕ drag start / end
+     *   DRAGGING    bubble follows the finger, panel is closed
+     *     ↕ release
+     *   DOCKED      (snap or place)
+     *     ↕ tap / fling inward
+     *   PANEL_OPEN  side panel visible, bubble hidden
+     *     ↕ close / reset
+     *   DOCKED
+     * </pre>
+     *
+     * Keeping this explicit means every visibility and position decision can
+     * branch on a single field instead of guessing from scattered booleans.
+     */
+    enum OverlayState { HIDDEN, DOCKED, DRAGGING, PANEL_OPEN }
+
+    private OverlayState state = OverlayState.HIDDEN;
+    private boolean panelMerged = false;
     private boolean dndEnabled = true;
     private boolean bypassEnabled = false;
     private boolean gosDisabled = false;
@@ -383,7 +406,7 @@ public class OverlayService extends Service {
     }
 
     private void clampY() {
-        int contentHeight = panelOpen ? viewSidePanel.getHeight() : bubbleHeight();
+        int contentHeight = isPanelOpen() ? viewSidePanel.getHeight() : bubbleHeight();
         if (contentHeight <= 0) contentHeight = dp(BUBBLE_SIZE_DP);
         int maxY = Math.max(0, usableHeight() - contentHeight);
         params.y = Math.max(0, Math.min(params.y, maxY));
@@ -397,7 +420,7 @@ public class OverlayService extends Service {
     }
 
     private void placeBubble() {
-        panelOpen = false;
+        enterState(OverlayState.DOCKED);
         if (bubbleY >= 0) params.y = bubbleY;
         clampY();
         bubbleY = params.y;
@@ -406,10 +429,27 @@ public class OverlayService extends Service {
         savePosition();
     }
 
+    /** Convenience predicate kept for readability at call sites. */
+    private boolean isPanelOpen() {
+        return state == OverlayState.PANEL_OPEN;
+    }
+
+    /**
+     * Centralised state transition. Every visibility change goes through here
+     * so that logcat can reveal the exact lifecycle and no code path can leave
+     * the views in a half-open state.
+     */
+    private void enterState(OverlayState next) {
+        if (state == next) return;
+        android.util.Log.d("SecretoOverlay",
+                state + " -> " + next);
+        state = next;
+    }
+
     /** Collapse the panel without animation, e.g. when the game closes. */
     private void resetPanel() {
-        if (!panelOpen) return;
-        panelOpen = false;
+        if (!isPanelOpen()) return;
+        enterState(OverlayState.DOCKED);
         viewSidePanel.animate().cancel();
         viewSidePanel.setAlpha(1f);
         viewSidePanel.setScaleX(1f);
@@ -484,6 +524,7 @@ public class OverlayService extends Service {
         snapAnimator.addListener(new android.animation.AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(android.animation.Animator animation) {
+                enterState(OverlayState.DOCKED);
                 savePosition();
             }
         });
@@ -492,7 +533,7 @@ public class OverlayService extends Service {
 
     private void savePosition() {
         try {
-            if (!panelOpen) bubbleY = params.y;
+            if (!isPanelOpen()) bubbleY = params.y;
             android.content.SharedPreferences.Editor editor = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                     .edit()
                     .putBoolean("hud_right", dockedRight)
@@ -521,7 +562,7 @@ public class OverlayService extends Service {
             // While the panel borrows the window, params.y is the panel's top.
             // The bubble's own Y is kept in bubbleY, so never overwrite the
             // saved bubble position with the panel position.
-            int layoutY = (panelOpen && bubbleY >= 0) ? bubbleY : params.y;
+            int layoutY = (isPanelOpen() && bubbleY >= 0) ? bubbleY : params.y;
             android.content.SharedPreferences.Editor editor = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                     .edit()
                     .putBoolean(layoutKey(pkg, "right"), dockedRight)
@@ -546,7 +587,7 @@ public class OverlayService extends Service {
             String rightKey = layoutKey(pkg, "right");
             // The panel borrows the window, so params.y is the panel's top while
             // it is open. Collapse it first to get the bubble's own position back.
-            if (panelOpen) resetPanel();
+            if (isPanelOpen()) resetPanel();
             if (!prefs.contains(rightKey)) {
                 bubbleY = params.y;
                 return;
@@ -611,6 +652,7 @@ public class OverlayService extends Service {
                         if (dist >= slop) {
                             isDrag = true;
                             touchMoved = true;
+                            enterState(OverlayState.DRAGGING);
                         }
                         if (isDrag) {
                             yAutoCentered = false;
@@ -656,6 +698,7 @@ public class OverlayService extends Service {
                         viewBubble.setAlpha(1.0f);
                         viewBubble.setScaleX(1.0f);
                         viewBubble.setScaleY(1.0f);
+                        enterState(OverlayState.DOCKED);
                         snapToEdge(params.x);
                         return true;
                 }
@@ -667,8 +710,8 @@ public class OverlayService extends Service {
     // ------------------------------------------------------------- side panel
 
     private void openPanel() {
-        if (panelOpen) return;
-        panelOpen = true;
+        if (isPanelOpen()) return;
+        enterState(OverlayState.PANEL_OPEN);
         bubbleY = params.y;
         triggerHaptic();
 
@@ -719,9 +762,9 @@ public class OverlayService extends Service {
     }
 
     private void closePanel() {
-        if (!panelOpen) return;
+        if (!isPanelOpen()) return;
         triggerHaptic();
-        panelOpen = false;
+        enterState(OverlayState.DOCKED);
 
         viewSidePanel.animate()
                 .alpha(0f)
@@ -1011,9 +1054,9 @@ public class OverlayService extends Service {
 
         updateBubbleOrientation();
 
-        if (!panelOpen && viewBubble.getVisibility() == View.VISIBLE) {
+        if (state != OverlayState.PANEL_OPEN && viewBubble.getVisibility() == View.VISIBLE) {
             viewBubble.post(() -> {
-                if (!panelOpen && viewBubble != null) {
+                if (state != OverlayState.PANEL_OPEN && viewBubble != null) {
                     params.x = dockedX(targetBubbleWidth());
                     centerBubbleY();
                     clampY();
@@ -1049,6 +1092,7 @@ public class OverlayService extends Service {
             // over a non-game app when the daemon has really gone away.
             if (++missedReads >= 4) {
                 resetPanel();
+                enterState(OverlayState.HIDDEN);
                 overlayRoot.setVisibility(View.GONE);
             }
             return;
@@ -1068,7 +1112,7 @@ public class OverlayService extends Service {
         if (sw != lastScreenW || sh != lastScreenH) {
             lastScreenW = sw;
             lastScreenH = sh;
-            if (panelOpen) {
+            if (isPanelOpen()) {
                 int pw = panelWidth();
                 int maxAllowedH = usableHeight() - dp(PANEL_MARGIN_DP * 2);
                 int ph = viewSidePanel.getHeight();
@@ -1109,9 +1153,11 @@ public class OverlayService extends Service {
 
         if (autoHide && !data.isGame) {
             resetPanel();
+            enterState(OverlayState.HIDDEN);
             overlayRoot.setVisibility(View.GONE);
             return;
         }
+        if (state == OverlayState.HIDDEN) enterState(OverlayState.DOCKED);
         overlayRoot.setVisibility(View.VISIBLE);
 
         // Thermal status dot on bubble (and panel header uses the same drawable).
@@ -1391,7 +1437,7 @@ public class OverlayService extends Service {
         super.onConfigurationChanged(newConfig);
         if (overlayRoot == null || windowManager == null) return;
         overlayRoot.post(() -> {
-            if (panelOpen) {
+            if (isPanelOpen()) {
                 int pw = panelWidth();
                 params.x = dockedRight
                         ? Math.max(0, usableWidth() - pw - dp(PANEL_MARGIN_DP))
