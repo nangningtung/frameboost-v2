@@ -1073,18 +1073,18 @@
         c.style.transition = "";
       });
       if (swipeDeltaX < -threshold) {
-        // Swipe left -> next (velocity boost = +1 extra)
+        // Swipe left -> next
         if (carouselFiltered.length > 0) {
           let step = fastFlick ? 2 : 1;
-          carouselIndex = Math.min(carouselIndex + step, carouselFiltered.length - 1);
+          carouselIndex = (carouselIndex + step) % carouselFiltered.length;
           layoutCarousel(0, false);
           updateHeroAndDots(carouselFiltered);
         }
       } else if (swipeDeltaX > threshold) {
-        // Swipe right -> prev (velocity boost = +1 extra)
+        // Swipe right -> prev
         if (carouselFiltered.length > 0) {
           let step = fastFlick ? 2 : 1;
-          carouselIndex = Math.max(carouselIndex - step, 0);
+          carouselIndex = (carouselIndex - step + carouselFiltered.length) % carouselFiltered.length;
           layoutCarousel(0, false);
           updateHeroAndDots(carouselFiltered);
         }
@@ -1122,16 +1122,16 @@
       if (Math.abs(dx) > 40) {
         if (carouselFiltered.length > 0) {
           if (dx < 0) {
-            carouselIndex = Math.min(carouselIndex + 1, carouselFiltered.length - 1);
+            carouselIndex = (carouselIndex + 1) % carouselFiltered.length;
           } else {
-            carouselIndex = Math.max(carouselIndex - 1, 0);
+            carouselIndex = (carouselIndex - 1 + carouselFiltered.length) % carouselFiltered.length;
           }
           layoutCarousel(0, false);
           updateHeroAndDots(carouselFiltered);
         }
       } else {
         // Snap back
-        renderCarousel(carouselFiltered);
+        layoutCarousel(0, false);
       }
     });
     carouselStage.addEventListener("mouseleave", () => {
@@ -1158,15 +1158,24 @@
   // - rotateY clamped to ±52deg max
   // - translateZ pushes far cards back for depth
   // - Only compositor-friendly props change (x, rotateY, z, scale, opacity)
+  // - Infinite wrap: with N games, offsets wrap modulo N so cards appear
+  //   on both sides even with only 2 games.
   function layoutCarousel(dragPx, noTransition) {
     const cards = carouselStage.querySelectorAll(".cover-card");
     if (!cards.length) return;
-    const SPACING = 130;
+    const N = carouselFiltered.length || cards.length;
+    const SPACING = 120;
     const dragInSlots = dragPx / SPACING;
+    // Find the center DOM index: the copy whose gameIdx === carouselIndex
+    // and is closest to the middle of the DOM card list.
+    const totalCards = cards.length;
+    const copies = Math.floor(totalCards / N);
+    const centerCopy = Math.floor(copies / 2);
+    const centerDomIdx = centerCopy * N + carouselIndex;
     cards.forEach((card) => {
       card.style.transition = noTransition ? "none" : "";
-      const idx = parseInt(card.dataset.idx, 10);
-      const offset = idx - carouselIndex - dragInSlots;
+      const domIdx = parseInt(card.dataset.idx, 10);
+      const offset = domIdx - centerDomIdx + dragInSlots;
       const abs = Math.abs(offset);
       const sign = offset > 0 ? 1 : (offset < 0 ? -1 : 0);
       // Telescoping X: first unit full spacing, rest compressed to 55%
@@ -1203,40 +1212,52 @@
 
     if (carouselIndex >= games.length) carouselIndex = 0;
 
-    // Build DOM only if card count changed (avoids re-creating elements
-    // so CSS transitions can animate between states).
+    // Render N*3 cards (tripled) so there are always cards on both sides
+    // even with only 2 games. Each card has data-idx (0..3N-1) and
+    // data-game-idx (0..N-1, repeating).
+    const N = games.length;
+    const copies = 3;
+    const totalCards = N * copies;
+
+    // Build DOM only if card count changed.
     const existing = carouselStage.querySelectorAll(".cover-card");
-    if (existing.length !== games.length) {
-      carouselStage.innerHTML = games.map((game, idx) => {
-        const d = buildGameCardData(game);
-        return `
-          <div class="cover-card"
-               data-pkg="${game.pkg}"
-               data-idx="${idx}"
-               style="--tile-hue: ${d.hue};">
-            <div class="game-tile-top">
-              <span class="game-tile-source ${d.sourceClass}">${d.sourceLabel}</span>
-              <span class="game-tile-preset preset-badge preset-badge-${d.currentPreset.toLowerCase()}">${d.currentPreset}</span>
+    if (existing.length !== totalCards) {
+      let html = "";
+      for (let c = 0; c < copies; c++) {
+        games.forEach((game, gi) => {
+          const d = buildGameCardData(game);
+          const domIdx = c * N + gi;
+          html += `
+            <div class="cover-card"
+                 data-pkg="${game.pkg}"
+                 data-idx="${domIdx}"
+                 data-game-idx="${gi}"
+                 style="--tile-hue: ${d.hue};">
+              <div class="game-tile-top">
+                <span class="game-tile-source ${d.sourceClass}">${d.sourceLabel}</span>
+                <span class="game-tile-preset preset-badge preset-badge-${d.currentPreset.toLowerCase()}">${d.currentPreset}</span>
+              </div>
+              <div class="game-tile-initial">${d.initial}</div>
+              <div class="game-tile-bottom">
+                <div class="game-tile-title">${game.name}</div>
+                <div class="game-tile-sub">${game.pkg}</div>
+              </div>
             </div>
-            <div class="game-tile-initial">${d.initial}</div>
-            <div class="game-tile-bottom">
-              <div class="game-tile-title">${game.name}</div>
-              <div class="game-tile-sub">${game.pkg}</div>
-            </div>
-          </div>
-        `;
-      }).join("");
+          `;
+        });
+      }
+      carouselStage.innerHTML = html;
 
       // Bind click on cover cards once.
       carouselStage.querySelectorAll(".cover-card").forEach((card) => {
         card.addEventListener("click", (e) => {
           if (e.target.closest("button,input,select")) return;
           if (swipeMoved) return;
-          const idx = parseInt(card.dataset.idx, 10);
-          if (idx === carouselIndex) {
+          const gameIdx = parseInt(card.dataset.gameIdx, 10);
+          if (gameIdx === carouselIndex) {
             openGameDetail(card.dataset.pkg);
           } else {
-            carouselIndex = idx;
+            carouselIndex = gameIdx;
             layoutCarousel(0, false);
             updateHeroAndDots(games);
           }
@@ -1244,23 +1265,26 @@
       });
       bindGameCardEvents(carouselStage);
     } else {
-      // Update card content/data in-place (game list same length but
-      // might have different packages after rescan).
-      games.forEach((game, idx) => {
-        const card = carouselStage.querySelector(`.cover-card[data-idx="${idx}"]`);
-        if (!card) return;
-        const d = buildGameCardData(game);
-        card.dataset.pkg = game.pkg;
-        card.style.setProperty("--tile-hue", d.hue);
-        card.querySelector(".game-tile-source").className = "game-tile-source " + d.sourceClass;
-        card.querySelector(".game-tile-source").textContent = d.sourceLabel;
-        const preset = card.querySelector(".game-tile-preset");
-        preset.textContent = d.currentPreset;
-        preset.className = "game-tile-preset preset-badge preset-badge-" + d.currentPreset.toLowerCase();
-        card.querySelector(".game-tile-initial").textContent = d.initial;
-        card.querySelector(".game-tile-title").textContent = game.name;
-        card.querySelector(".game-tile-sub").textContent = game.pkg;
-      });
+      // Update card content/data in-place.
+      for (let c = 0; c < copies; c++) {
+        games.forEach((game, gi) => {
+          const domIdx = c * N + gi;
+          const card = carouselStage.querySelector(`.cover-card[data-idx="${domIdx}"]`);
+          if (!card) return;
+          const d = buildGameCardData(game);
+          card.dataset.pkg = game.pkg;
+          card.dataset.gameIdx = String(gi);
+          card.style.setProperty("--tile-hue", d.hue);
+          card.querySelector(".game-tile-source").className = "game-tile-source " + d.sourceClass;
+          card.querySelector(".game-tile-source").textContent = d.sourceLabel;
+          const preset = card.querySelector(".game-tile-preset");
+          preset.textContent = d.currentPreset;
+          preset.className = "game-tile-preset preset-badge preset-badge-" + d.currentPreset.toLowerCase();
+          card.querySelector(".game-tile-initial").textContent = d.initial;
+          card.querySelector(".game-tile-title").textContent = game.name;
+          card.querySelector(".game-tile-sub").textContent = game.pkg;
+        });
+      }
     }
 
     // Apply transforms with transition (animated snap)

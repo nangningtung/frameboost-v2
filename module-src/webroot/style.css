@@ -1124,7 +1124,7 @@ button:disabled,
 .carousel-stage {
   position: relative;
   width: 100%;
-  height: 300px;
+  height: 340px;
   flex: none;
   display: flex;
   align-items: center;
@@ -1137,11 +1137,11 @@ button:disabled,
 
 .cover-card {
   position: absolute;
-  width: 200px;
-  height: 268px;
-  padding: 12px;
+  width: 230px;
+  height: 300px;
+  padding: 14px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 26px;
+  border-radius: 28px;
   overflow: hidden;
   cursor: pointer;
   color: #fff;
