@@ -732,6 +732,13 @@ fn handle_client(
     } else {
         match req {
             "ping" => r#"{"status":"ok"}"#.to_string(),
+            "fg" => {
+                // Fresh foreground package for the overlay visibility loop.
+                // The detector is the same source the session engine uses,
+                // so the panel cannot disagree with the daemon.
+                let pkg = GameDetector::get_foreground_pkg();
+                format!(r#"{{"status":"ok","pkg":"{}"}}"#, pkg)
+            }
             "get_heads_up" => {
                 let out = std::process::Command::new("settings")
                     .args(["get", "global", "heads_up_notifications_enabled"])

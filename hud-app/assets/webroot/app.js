@@ -23,8 +23,6 @@
   const heroTemp = document.getElementById("hero-temp");
   const heroGpuClk = document.getElementById("hero-gpu-clk");
   const heroCpuClk = document.getElementById("hero-cpu-clk");
-  const heroGpuGov = document.getElementById("hero-gpu-gov");
-  const heroCpuGov = document.getElementById("hero-cpu-gov");
   const heroStutterGov = document.getElementById("hero-stutter-gov");
   const radialCpuFill = document.getElementById("radial-cpu-fill");
   const radialGpuFill = document.getElementById("radial-gpu-fill");
@@ -618,8 +616,6 @@
     if (presetIdleHint) presetIdleHint.classList.toggle("hidden", !!currentForegroundPkg);
 
     // Badges
-    heroGpuGov.textContent = `GPU: ${data.gpu?.governor || "Interactive"}`;
-    heroCpuGov.textContent = `CPU: ${data.cpu?.big?.gov || "energy_adaptive"}`;
     if (heroStutterGov) {
       if (data.is_game) {
         heroStutterGov.textContent = "Anti-Stutter";

@@ -47,8 +47,18 @@ FrameBoost v2 adheres to open-source software licenses and community attribution
   - Added edge-snapping on release (`animateSnap`) to dock the pill smoothly on screen edges.
   - Decoupled disk snapshot reading to background executor (`ioExecutor`) so main UI thread never blocks on disk I/O.
   - Did NOT adopt dangerous kernel tweaks (e.g. `drop_caches 3` on launch, forced 240Hz, or unverified charge bypass).
+- **Foreground detection pattern** (`PowerButtonGestureService.isTargetForeground`): polling the fresh foreground package and hiding the overlay immediately when the game is gone. Our implementation polls the daemon instead of UsageStatsManager, because `queryEvents` flushes launcher events late on the target GSI.
+
+## 4. Liliya2727/AZenith
 
 ---
+
+- **Repository**: https://github.com/Liliya2727/AZenith
+- **License**: Apache License 2.0
+- **Concepts & Architecture Referenced**:
+  - "Focused task poll as authority": one authoritative foreground source that corrects event-based detection, used for overlay visibility.
+- **FrameBoost Adaptations & Safety Changes**:
+  - Implemented as a lightweight `fg` IPC command on the existing secretod daemon (`dumpsys window displays`), not a separate binder daemon; GPL code was not copied.
 
 ## 4. MaheshSharan/FrameX-Android
 

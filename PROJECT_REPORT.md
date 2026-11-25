@@ -421,6 +421,20 @@ Gunakan checklist ini setiap kali ada perubahan.
 
 ## 9. Changelog
 
+### `sidepanel-instant-hide` - 2026-11-25
+
+`feat: deteksi keluar game instan untuk side panel + tumpukan UI dirapikan`
+
+Perubahan:
+- Overlay visibility kini bertanya foreground package langsung ke daemon (`fg`, `dumpsys window displays`, ~400 ms), bukan menunggu rantai state daemon -> snapshot -> overlay (0,5-0,9 s). Pola "focused task as authority" ala AZenith/dumpsys fallback ala ROR; kredit di THIRD_PARTY_NOTICES.
+- Loop telemetri overlay pindah ke HandlerThread khusus dengan repost tanpa syarat: main thread tidak bisa diblokir IPC, dan rantai tidak bisa mati oleh satu exception.
+- UsageStatsManager dicoba dulu, tetapi `queryEvents` di ROM ini memflush event launcher telat; dibuang agar satu sumber kebenaran (daemon fg), tanpa izin PACKAGE_USAGE_STATS.
+- Session tab: gov-rail (GPU/CPU governor) dihapus karena duplikat dengan Policy/System.
+
+Testing:
+- build: daemon tanpa warning, APK sukses.
+- device: keluar game -> `instant hide` tercatat dan bubble hilang di launcher; smoke test PASS; `fg` menjawab foreground fresh.
+
 ### `pembersihan-0.1.0` - 2026-11-25
 
 `refactor: hapus fitur gimmick dan rapikan repo`

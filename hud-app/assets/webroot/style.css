@@ -714,32 +714,6 @@ button:disabled,
   font-weight: 700;
 }
 
-.gov-rail {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.gov-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text-mid);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  padding: 3px 8px;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.gov-item strong {
-  font-weight: 700;
-}
-
 /* ---------------------------------------------------------------- HOME: quick tools */
 
 .quick-dock-grid {

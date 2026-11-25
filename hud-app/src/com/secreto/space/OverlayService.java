@@ -92,6 +92,12 @@ public class OverlayService extends Service {
     private Handler handler;
     private Runnable updateRunnable;
     private java.util.concurrent.ExecutorService ioExecutor;
+    // Telemetry loop runs on its own HandlerThread: background work can
+    // never stall the main thread, and the tick reposts unconditionally.
+    private android.os.HandlerThread teleThread;
+    private android.os.Handler teleHandler;
+    private volatile boolean teleChecking = false;
+    private int tickCount = 0;
     private java.util.concurrent.ExecutorService actionExecutor;
     private android.animation.ValueAnimator snapAnimator;
 
@@ -142,6 +148,14 @@ public class OverlayService extends Service {
     // Last rendered strings, to skip redundant layout passes at 2 Hz.
     private String lastBubbleText = "";
     private SnapshotReader.SnapshotData lastData;
+
+    // Instant foreground detection (community GameSpace pattern): the overlay
+    // asks the daemon for the fresh foreground package every ~400 ms, the
+    // same source the session engine uses, so the panel can never disagree
+    // with the daemon. Preset and session keep their own debounce there.
+    private volatile String daemonFgPkg = "";
+    private volatile java.util.HashSet<String> gamePkgSet = new java.util.HashSet<>();
+    private volatile long gameSetFetchedAt = 0;
     private String lastMFps = "";
     private String lastMFpsStatus = "";
     private String lastMGpu = "";
@@ -265,22 +279,81 @@ public class OverlayService extends Service {
         handler = main;
         ioExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
         actionExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
-        updateRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (!running) return;
-                ioExecutor.execute(() -> {
-                    final SnapshotReader.SnapshotData data = SnapshotReader.read();
-                    // Sequential telemetry: schedule the next read only after this one
-                    // has finished, so slow IPC cannot pile up in the executor queue.
-                    handler.post(() -> {
-                        applyHudData(data);
-                        if (running) handler.postDelayed(updateRunnable, 200);
-                    });
+        startTelemetryLoop();
+    }
+
+    private void startTelemetryLoop() {
+        teleThread = new android.os.HandlerThread("SecretoTelemetry");
+        teleThread.start();
+        teleHandler = new android.os.Handler(teleThread.getLooper());
+        teleHandler.post(telemetryTick);
+    }
+
+    /**
+     * Telemetry loop on its own HandlerThread (community GameSpace pattern).
+     * Background work can never stall the main thread, and the tick reposts
+     * unconditionally so the chain cannot die from a single throw or a slow
+     * IPC. Game-set prefetch lives here too, never on the main thread.
+     */
+    private final Runnable telemetryTick = new Runnable() {
+        @Override
+        public void run() {
+            if (!running) return;
+            if (!teleChecking) {
+                teleChecking = true;
+                SnapshotReader.SnapshotData data = null;
+                try {
+                    ensureGameSet();
+                    // Every ~400 ms, ask the daemon for the fresh foreground
+                    // package. On some ROMs UsageStats events flush late, so
+                    // this is the authoritative correction (same source the
+                    // session engine uses; ROR does the same with dumpsys).
+                    tickCount++;
+                    if (tickCount % 2 == 0) {
+                        String res = IpcClient.sendCommand("fg");
+                        if (res != null) {
+                            String pkg = new org.json.JSONObject(res).optString("pkg", "");
+                            if (!pkg.equals(daemonFgPkg)) {
+                                android.util.Log.d("SecretoOverlay", "daemon fg: " + pkg);
+                            }
+                        }
+                    }
+                    data = SnapshotReader.read();
+                } catch (Throwable t) {
+                    android.util.Log.d("SecretoOverlay", "tick error: " + t);
+                } finally {
+                    teleChecking = false;
+                }
+                final SnapshotReader.SnapshotData d = data;
+                handler.post(() -> {
+                    try {
+                        applyHudData(d);
+                    } catch (Throwable t) {
+                        android.util.Log.d("SecretoOverlay", "apply error: " + t);
+                    }
                 });
             }
-        };
-        handler.post(updateRunnable);
+            // Unconditional repost: no exception or hiccup can break the chain.
+            teleHandler.postDelayed(this, 200);
+        }
+    };
+
+    private void ensureGameSet() {
+        long now = android.os.SystemClock.elapsedRealtime();
+        if (now - gameSetFetchedAt < 60_000) return;
+        gameSetFetchedAt = now;
+        try {
+            String res = IpcClient.sendCommand("list_games");
+            if (res == null || res.isEmpty()) return;
+            org.json.JSONArray arr = new org.json.JSONArray(res);
+            java.util.HashSet<String> set = new java.util.HashSet<>();
+            for (int i = 0; i < arr.length(); i++) {
+                String pkg = arr.getJSONObject(i).optString("pkg", "");
+                if (!pkg.isEmpty()) set.add(pkg);
+            }
+            if (!set.isEmpty()) gamePkgSet = set;
+        } catch (Throwable ignored) {
+        }
     }
 
     // ---------------------------------------------------------------- layout
@@ -1128,11 +1201,25 @@ public class OverlayService extends Service {
             }
         }
 
-        if (autoHide && !data.isGame) {
-            resetPanel();
-            enterState(OverlayState.HIDDEN);
-            overlayRoot.setVisibility(View.GONE);
-            return;
+        if (autoHide) {
+            // Daemon fg is the authority: it decides visibility without
+            // waiting for the snapshot chain. Fallback to the snapshot
+            // when the daemon has not answered yet.
+            boolean away;
+            if (!daemonFgPkg.isEmpty()) {
+                away = !gamePkgSet.contains(daemonFgPkg);
+            } else {
+                away = !data.isGame;
+            }
+            if (away) {
+                if (state != OverlayState.HIDDEN) {
+                    android.util.Log.d("SecretoOverlay", "instant hide (fg=" + daemonFgPkg + ")");
+                }
+                resetPanel();
+                enterState(OverlayState.HIDDEN);
+                overlayRoot.setVisibility(View.GONE);
+                return;
+            }
         }
         if (state == OverlayState.HIDDEN) enterState(OverlayState.DOCKED);
         overlayRoot.setVisibility(View.VISIBLE);
@@ -1436,6 +1523,12 @@ public class OverlayService extends Service {
         running = false;
         if (handler != null && updateRunnable != null) {
             handler.removeCallbacks(updateRunnable);
+        }
+        if (teleHandler != null) {
+            teleHandler.removeCallbacks(telemetryTick);
+        }
+        if (teleThread != null) {
+            teleThread.quitSafely();
         }
         if (ioExecutor != null) {
             ioExecutor.shutdownNow();
