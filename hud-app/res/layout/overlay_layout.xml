@@ -500,7 +500,7 @@
                     android:textSize="9sp"
                     android:textStyle="bold" />
 
-                <!-- Row 1: RAM & DND -->
+                <!-- Row 1: DND (full width) -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
@@ -508,33 +508,9 @@
                     android:orientation="horizontal">
 
                     <Button
-                        android:id="@+id/btn_quick_ram"
-                        android:layout_width="0dp"
-                        android:layout_height="match_parent"
-                        android:layout_marginEnd="4dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_segment_track"
-                        android:drawableStart="@drawable/ic_quick_ram"
-                        android:drawablePadding="7dp"
-                        android:drawableTint="#94A3B8"
-                        android:fontFamily="monospace"
-                        android:gravity="center"
-                        android:minHeight="48dp"
-                        android:minWidth="0dp"
-                        android:paddingStart="10dp"
-                        android:paddingEnd="6dp"
-                        android:text="BOOST RAM"
-                        android:textAllCaps="false"
-                        android:textColor="#F1F5F9"
-                        android:textSize="10.5sp"
-                        android:textStyle="bold" />
-
-                    <Button
                         android:id="@+id/btn_quick_dnd"
-                        android:layout_width="0dp"
+                        android:layout_width="match_parent"
                         android:layout_height="match_parent"
-                        android:layout_marginStart="4dp"
-                        android:layout_weight="1"
                         android:background="@drawable/bg_segment_active"
                         android:drawableStart="@drawable/ic_quick_notif"
                         android:drawablePadding="7dp"

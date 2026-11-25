@@ -84,7 +84,6 @@ public class OverlayService extends Service {
     private Button btnPresetBal;
     private Button btnPresetPerf;
     private Button btnPresetEsp;
-    private Button btnQuickRam;
     private Button btnQuickDnd;
     private Button btnQuickBypass;
     private Button btnQuickGos;
@@ -222,7 +221,6 @@ public class OverlayService extends Service {
         btnPresetBal = overlayRoot.findViewById(R.id.btn_preset_balanced);
         btnPresetPerf = overlayRoot.findViewById(R.id.btn_preset_perf);
         btnPresetEsp = overlayRoot.findViewById(R.id.btn_preset_esports);
-        btnQuickRam = overlayRoot.findViewById(R.id.btn_quick_ram);
         btnQuickDnd = overlayRoot.findViewById(R.id.btn_quick_dnd);
         btnQuickBypass = overlayRoot.findViewById(R.id.btn_quick_bypass);
         btnQuickGos = overlayRoot.findViewById(R.id.btn_quick_gos);
@@ -876,27 +874,6 @@ public class OverlayService extends Service {
                         .edit().putBoolean("fps_overlay_enabled", fpsOverlayEnabled).apply();
                 applyFpsOverlayState();
                 saveLayoutForCurrentGame();
-            });
-        }
-
-        if (btnQuickRam != null) {
-            btnQuickRam.setOnClickListener(v -> {
-                triggerHaptic();
-                btnQuickRam.setText("FREED");
-                btnQuickRam.setTextColor(COLOR_GREEN);
-                tintQuickIcon(btnQuickRam, COLOR_GREEN);
-                if (actionExecutor != null) {
-                    actionExecutor.execute(() -> IpcClient.sendCommand("clean_ram"));
-                }
-                if (handler != null) {
-                    handler.postDelayed(() -> {
-                        if (btnQuickRam != null) {
-                            btnQuickRam.setText("BOOST RAM");
-                            btnQuickRam.setTextColor(COLOR_TEXT);
-                            tintQuickIcon(btnQuickRam, COLOR_DIM);
-                        }
-                    }, 1200);
-                }
             });
         }
 

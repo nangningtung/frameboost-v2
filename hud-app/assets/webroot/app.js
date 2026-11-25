@@ -30,11 +30,9 @@
   const radialGpuFill = document.getElementById("radial-gpu-fill");
   const heroGpuLoadSub = document.getElementById("hero-gpu-load-sub");
   const heroPresetTag = document.getElementById("hero-preset-tag");
-  const btnQuickCleanRam = document.getElementById("btn-quick-clean-ram");
   const btnQuickBypass = document.getElementById("btn-quick-bypass");
   const btnQuickDnd = document.getElementById("btn-quick-dnd");
   const btnQuickGosWeb = document.getElementById("btn-quick-gos-web");
-  const lblQuickRam = document.getElementById("lbl-quick-ram");
   const lblQuickBypass = document.getElementById("lbl-quick-bypass");
   const lblQuickDnd = document.getElementById("lbl-quick-dnd");
   const lblQuickGosWeb = document.getElementById("lbl-quick-gos-web");
@@ -618,8 +616,6 @@
     }
     const presetIdleHint = document.getElementById("preset-idle-hint");
     if (presetIdleHint) presetIdleHint.classList.toggle("hidden", !!currentForegroundPkg);
-    const boostBtn = document.getElementById("btn-toggle-boost");
-    if (boostBtn) boostBtn.disabled = !currentForegroundPkg;
 
     // Badges
     heroGpuGov.textContent = `GPU: ${data.gpu?.governor || "Interactive"}`;
@@ -788,7 +784,6 @@
       "btn-gos-disable",
       "btn-gos-restore",
       "btn-scan-games",
-      "btn-quick-clean-ram",
       "btn-quick-bypass",
       "btn-quick-dnd",
       "btn-quick-gos-web",
@@ -1860,18 +1855,6 @@
   // ==========================================
 
   // Action: Quick Gaming Dock
-  if (btnQuickCleanRam) {
-    btnQuickCleanRam.addEventListener("click", async () => {
-      btnQuickCleanRam.classList.add("success");
-      if (lblQuickRam) lblQuickRam.textContent = "✓ FREED!";
-      await sendSocketCmd("clean_ram");
-      setTimeout(() => {
-        btnQuickCleanRam.classList.remove("success");
-        if (lblQuickRam) lblQuickRam.textContent = "BOOST RAM";
-      }, 1200);
-    });
-  }
-
   let bypassActive = false;
   if (btnQuickBypass) {
     btnQuickBypass.addEventListener("click", async () => {
@@ -1917,18 +1900,6 @@
       });
     });
   }
-
-  // Action: Manual Boost Override
-  const btnToggleBoost = document.getElementById("btn-toggle-boost");
-  btnToggleBoost?.addEventListener("click", async () => {
-    btnToggleBoost.textContent = "APPLYING...";
-    await sendSocketCmd("apply_game");
-    setTimeout(() => {
-      btnToggleBoost.textContent = "BOOST APPLIED";
-      setTimeout(() => (btnToggleBoost.textContent = "APPLY BOOST"), 2000);
-    }, 500);
-  });
-
 
   // Action: Network BBR & Stock
   const btnNetStock = document.getElementById("btn-net-stock");

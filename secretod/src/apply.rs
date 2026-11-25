@@ -13,19 +13,8 @@ pub struct BoostProfile {
     pub cpu4_min: u32,
 }
 
-pub fn profile_game() -> BoostProfile {
-    BoostProfile {
-        name: "GAME".into(),
-        gpu_gov: "Booster".into(),
-        gpu_min: 455000,
-        cpu0_min: 910000,
-        cpu4_min: 1352000,
-    }
-}
-
 /// Result of an apply operation with fine-grained per-knob status.
 pub struct ApplyReport {
-    pub profile: String,
     pub success: bool,
     pub errors: Vec<String>,
 }
@@ -104,7 +93,6 @@ pub fn apply_profile(profile: &BoostProfile) -> ApplyReport {
     }
 
     ApplyReport {
-        profile: profile.name.clone(),
         success,
         errors,
     }

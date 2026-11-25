@@ -421,6 +421,21 @@ Gunakan checklist ini setiap kali ada perubahan.
 
 ## 9. Changelog
 
+### `pembersihan-0.1.0` - 2026-11-25
+
+`refactor: hapus fitur gimmick dan rapikan repo`
+
+Perubahan:
+- Hapus Boost RAM (`drop_caches`) dari WebUI, side panel, dan daemon (`clean_ram`).
+- Hapus tombol Apply boost di Policy dan command `apply_game` di daemon (idempotent, tidak memakai preset terpilih).
+- Side panel: bar DND menjadi full width, drawable `ic_quick_ram` dihapus.
+- Bersihkan repo root: screenshot sementara dan file referensi HTML dihapus, `cdp-eval.ps1` pindah ke `tools/`.
+
+Testing:
+- build: daemon release tanpa warning, APK sukses, parity webroot 3/3.
+- device: `clean_ram`/`apply_game` -> unknown command, smoke test PASS, side panel terverifikasi di game tanpa BOOST RAM.
+- WebUI: quick dock 3 tombol (bypass/DND/GOS), tidak ada error JS.
+
 ### `v0.1.0` - 2026-11-25
 
 - **Identitas baru**: FrameBoost v2 menjadi Secreto Space 0.1.0.

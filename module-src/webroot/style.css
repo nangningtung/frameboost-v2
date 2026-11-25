@@ -791,16 +791,6 @@ button:disabled,
   color: var(--accent);
 }
 
-.quick-action-btn.success {
-  border-color: rgba(129, 201, 149, 0.40);
-  background: var(--ok-soft);
-  color: var(--ok);
-}
-
-.quick-action-btn.success .btn-icon {
-  color: var(--ok);
-}
-
 .quick-action-btn:disabled {
   opacity: 1;
   border-color: var(--line);
@@ -2742,12 +2732,6 @@ button:disabled,
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-dim);
-}
-
-.policy-boost {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
 }
 
 /* ---------------------------------------------------------------- SYSTEM */

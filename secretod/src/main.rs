@@ -21,7 +21,6 @@ mod session;
 mod snapshot;
 mod sysfs;
 
-use apply::{apply_profile, profile_game};
 use daemon::{spawn_auto_daemon, DaemonState};
 use detect::GameDetector;
 use fps::measure_fps;
@@ -733,14 +732,6 @@ fn handle_client(
     } else {
         match req {
             "ping" => r#"{"status":"ok"}"#.to_string(),
-            "clean_ram" => {
-                let _ = std::process::Command::new("sync").output();
-                let res = std::fs::write("/proc/sys/vm/drop_caches", "3");
-                match res {
-                    Ok(_) => r#"{"status":"ok","message":"RAM cleaned"}"#.to_string(),
-                    Err(e) => format!(r#"{{"status":"error","message":"{}"}}"#, e),
-                }
-            }
             "get_heads_up" => {
                 let out = std::process::Command::new("settings")
                     .args(["get", "global", "heads_up_notifications_enabled"])
@@ -753,15 +744,6 @@ fn handle_client(
                 let chg = read_file("/sys/class/power_supply/battery/charging_enabled");
                 let bypass = chg.trim() == "0";
                 format!(r#"{{"status":"ok","bypass":{}}}"#, bypass)
-            }
-            "apply_game" => {
-                let r = apply_profile(&profile_game());
-                format!(
-                    r#"{{"status":"{}","profile":"{}","errors":{:?}}}"#,
-                    if r.success { "ok" } else { "fail" },
-                    r.profile,
-                    r.errors
-                )
             }
             "restore_all" => {
                 // Same contract as the console's End session: wake the apps,
