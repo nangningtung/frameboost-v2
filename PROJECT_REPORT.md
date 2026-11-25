@@ -514,6 +514,15 @@ Gunakan checklist ini setiap kali ada perubahan.
     tidak overlap title. Ambient glow backdrop di belakang app container
     sync dengan hue game aktif. Diverifikasi: hero Play launch MLBB, hero Tune
     buka detail view, semua tap target >= 44dp (CDP), tidak ada error logcat.
+  - Bug fix: grid dan carousel tidak lagi muncul bersamaan saat pindah dari
+    Session ke Games tab. renderGamesList sekarang menyembunyikan grid saat
+    mode carousel aktif (sebelumnya grid DOM selalu di-built tapi tidak
+    di-hidden). Diverifikasi via CDP: bothVisible=false dalam semua skenario
+    (grid, carousel, session->games round-trip).
+  - Toolbar Games tab di-rapikan: judul "Game library" dengan sparkle icon
+    hijau (indikator auto-detect), search bar full-width dengan icon
+    magnifier, tombol refresh/add/toggle jadi icon-only 44dp pill dengan
+    stroke-based SVG. Cache buser bump ke v0.1.0-ui2.
 - **State machine overlay murni (2026-11-25)**:
   - State overlay disatukan ke enum `OverlayState { HIDDEN, DOCKED, DRAGGING,
     PANEL_OPEN }` dengan transisi terpusat lewat `enterState()`. Sebelumnya

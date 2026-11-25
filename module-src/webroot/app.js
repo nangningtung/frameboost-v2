@@ -1002,7 +1002,14 @@
     carouselFiltered = games;
     if (carouselIndex >= games.length) carouselIndex = 0;
     if (gamesViewMode === "carousel") {
+      // Hide grid, show carousel, render it
+      gamesContainer.classList.add("hidden");
+      if (gamesCarouselView) gamesCarouselView.classList.remove("hidden");
       renderCarousel(games);
+    } else {
+      // Grid mode: ensure carousel is hidden
+      if (gamesCarouselView) gamesCarouselView.classList.add("hidden");
+      gamesContainer.classList.remove("hidden");
     }
   }
 
@@ -1210,8 +1217,8 @@
   }
 
   const viewToggleIcons = {
-    grid: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z"/></svg>',
-    carousel: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 2l-3 3M17 2l3 3M7 22l-3-3M17 22l3-3"/></svg>'
+    grid: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
+    carousel: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="18" rx="2.5"/><path d="M2.5 8v8M21.5 8v8"/></svg>'
   };
 
   function applyFilter() {

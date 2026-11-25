@@ -292,16 +292,31 @@ button:disabled,
 
 .section-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
   padding: 2px 2px 0;
+  margin-bottom: 8px;
 }
 
 .section-header h2 {
   font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.auto-badge {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ok);
+}
+
+.auto-badge svg {
+  width: 15px;
+  height: 15px;
 }
 
 .sub-hint {
@@ -1017,18 +1032,38 @@ button:disabled,
 /* ---------------------------------------------------------------- GAMES */
 
 .games-toolbar {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.games-search-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.toolbar-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: var(--text-dim);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.toolbar-search {
+  padding-left: 36px !important;
 }
 
 .games-actions-row {
   display: flex;
-  gap: 8px;
+  gap: 6px;
+  flex: 0 0 auto;
 }
 
 .games-actions-row .btn {
-  flex: 1;
+  flex: none;
 }
 
 .btn-icon-only {
@@ -1056,7 +1091,10 @@ button:disabled,
 .btn-icon-only svg {
   width: 18px;
   height: 18px;
-  fill: currentColor;
+}
+
+.btn-icon-only:active {
+  transform: scale(0.94);
 }
 
 .add-game-drawer {
