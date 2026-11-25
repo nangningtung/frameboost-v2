@@ -1,8 +1,7 @@
 # Secreto Space 0.1.0 - Project Report
 
-Status: **M0 sampai M3 selesai di kode dan terverifikasi di device; pipeline FPS, recovery, dan single-instance sudah diuji dengan data; gain render scale in-match belum terukur**  
-Commit terakhir sebelum rebrand: `0221973`  
-Device uji: `RR8M50C0W8T` (Samsung Galaxy A50, GSI API 36)
+Status: **rilis harian untuk A50; semua fitur inti terverifikasi di device; side panel keluar-masuk game instan (245-375 ms); tanpa fitur gimmick; commit terakhir `42f52ec`**  
+Device uji: `RR8M50C0W8T` (Samsung Galaxy A50, GSI API 36)  
 
 ---
 
@@ -844,4 +843,38 @@ Testing:
 
 ## 10. Kesimpulan
 
-Secreto Space 0.1.0 sudah stabil dan layak dipakai harian. Fase berikutnya sebaiknya difokuskan pada perbaikan arsitektur, bukan penambahan fitur besar yang tidak perlu.
+Secreto Space 0.1.0 stabil dan layak dipakai harian. Fase berikutnya sebaiknya difokuskan pada perbaikan arsitektur, bukan penambahan fitur besar yang tidak perlu.
+
+---
+
+## 11. Laporan Terbaru (2026-11-25, sesi pembersihan & side panel instan)
+
+### Yang dihapus (gimmick)
+
+| Fitur | Alasan |
+|---|---|
+| Boost RAM (`clean_ram` / `drop_caches`) | Cache langsung terisi balik; di 4 GB bisa picu jank sesaat. Hapus dari WebUI, side panel, dan daemon. |
+| Tombol Apply boost (`apply_game`) | Idempotent dan tidak memakai preset terpilih; preset per game sudah otomatis saat sesi mulai. |
+| `gov-rail` di tab Session | Duplikat info governor yang sudah ada di Policy/System. |
+| File sisa repo root | Screenshot sementara dan file referensi HTML dihapus; `cdp-eval.ps1` pindah ke `tools/`. |
+
+### Side panel instan (komparasi komunitas)
+
+Bedah kode asli komunitas: ROR memakai `UsageStatsManager.queryEvents` window besar + fallback `dumpsys`, dengan loop monitor yang selalu repost; AZenith memakai `IProcessObserver` binder push plus koreksi focused-task tiap 1 detik (pola "focused task as authority").
+
+Adopsi (pola, bukan copy; kredit di `THIRD_PARTY_NOTICES.md`):
+
+- Command `fg` baru di daemon: foreground package dari cache `FG_CACHE` yang di-refresh loop deteksi tiap 250 ms (`dumpsys window displays`).
+- Overlay bertanya foreground tiap 200 ms via socket, dan menyembunyikan bubble begitu fg bukan game.
+- Loop telemetri overlay pindah ke `HandlerThread` khusus dengan repost tanpa syarat, jadi main thread tidak bisa diblokir IPC dan rantai tidak bisa mati.
+- `UsageStatsManager` dibuang setelah terbukti `queryEvents` memflush event launcher telat di GSI ini; satu sumber kebenaran lebih bersih dan tanpa izin ekstra.
+
+Hasil terukur: HOME -> bubble hilang **245-375 ms** (3 run), sebelumnya 0,9-1,2 s.
+
+### Verifikasi akhir
+
+- Smoke test **PASS** setelah reboot; daemon 635.752 byte persisten via `ksud module install`.
+- `clean_ram` dan `apply_game` dibalas `unknown command` di daemon baru.
+- Device bersih: state IDLE, layar native 1080x2340, journal kosong; `/data/local/tmp` hanya berisi file runtime (snapshot, socket, log).
+- Sinkronisasi dua arah app <-> side panel tetap PASS (preset, DND, bypass, HUD).
+- Git: commit `42f52ec` ter-push ke `origin/main`; working tree bersih.
