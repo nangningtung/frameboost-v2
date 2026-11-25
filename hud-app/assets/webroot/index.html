@@ -294,16 +294,20 @@
           </div>
         </div>
 
-        <div id="add-game-drawer" class="add-game-drawer hidden">
-          <div class="drawer-head">
-            <span class="drawer-title">Add game</span>
-            <button id="btn-cancel-add-game" class="btn-icon-only" aria-label="Close">✕</button>
+        <!-- Add Game Modal -->
+        <div id="add-game-modal" class="modal-backdrop hidden">
+          <div class="modal-sheet">
+            <div class="modal-handle"></div>
+            <div class="drawer-head">
+              <span class="drawer-title">Add game</span>
+              <button id="btn-cancel-add-game" class="btn-icon-only" aria-label="Close">✕</button>
+            </div>
+            <select id="installed-apps-select" class="hud-select" aria-label="Select installed app">
+              <option value="">Select installed app</option>
+            </select>
+            <input type="text" id="custom-pkg-input" class="hud-input" placeholder="Or enter package name (e.g. com.mobile.legends)" aria-label="Package name">
+            <button id="btn-submit-add-game" class="btn btn-primary btn-block">Add game</button>
           </div>
-          <select id="installed-apps-select" class="hud-select" aria-label="Select installed app">
-            <option value="">Select installed app</option>
-          </select>
-          <input type="text" id="custom-pkg-input" class="hud-input" placeholder="Or enter package name (e.g. com.mobile.legends)" aria-label="Package name">
-          <button id="btn-submit-add-game" class="btn btn-primary btn-block">Add game</button>
         </div>
 
         <div id="games-list-view">
@@ -386,6 +390,7 @@
           </div>
 
           <button id="btn-detail-launch" class="btn btn-primary game-detail-launch">Apply profile</button>
+          <button id="btn-detail-remove" class="btn btn-secondary game-detail-remove">Remove from library</button>
         </div>
       </section>
 

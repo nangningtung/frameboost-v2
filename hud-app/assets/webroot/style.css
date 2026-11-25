@@ -1072,44 +1072,89 @@ button:disabled,
   transform: scale(0.94);
 }
 
-.add-game-drawer {
+/* ---------------------------------------------------------------- ADD GAME MODAL */
+.btn-block {
+  width: 100%;
+  min-height: 48px;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.modal-backdrop:not(.hidden) {
+  opacity: 1;
+}
+
+.modal-backdrop.hidden {
+  display: none;
+}
+
+.modal-sheet {
+  width: 100%;
+  max-width: 540px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 16px;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-lg);
+  padding: 8px 20px calc(20px + env(safe-area-inset-bottom));
   background: var(--bg-surface);
+  border-radius: 24px 24px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 -8px 32px -4px rgba(0, 0, 0, 0.5);
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.drawer-head {
+.modal-backdrop:not(.hidden) .modal-sheet {
+  transform: translateY(0);
+}
+
+.modal-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 0 auto 2px;
+  flex: none;
+}
+
+.modal-sheet .drawer-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
-.drawer-title {
-  font-size: 14px;
+.modal-sheet .drawer-title {
+  font-size: 16px;
   font-weight: 600;
   color: var(--text);
 }
 
-.drawer-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.drawer-actions .btn:first-child {
-  flex: 2;
-}
-
-.drawer-actions .btn:last-child {
-  flex: 1;
-}
-
-.btn-block {
+.modal-sheet .hud-select,
+.modal-sheet .hud-input {
   width: 100%;
-  min-height: 44px;
+  min-height: 48px;
+}
+
+/* ---------------------------------------------------------------- GAME DETAIL */
+.game-detail-remove {
+  width: 100%;
+  color: var(--bad);
+  border-color: rgba(242, 139, 130, 0.25);
+  margin-top: 8px;
+}
+
+.game-detail-remove:active {
+  background: rgba(242, 139, 130, 0.12);
 }
 
 .games-list {
@@ -2305,7 +2350,6 @@ button:disabled,
 
   .tab-panel.active > .section-header,
   .tab-panel.active > .games-toolbar,
-  .tab-panel.active > .add-game-drawer,
   .tab-panel.active > .target-chips-row,
   .tab-panel.active > .custom-target-box,
   .tab-panel.active > #games-list-view,

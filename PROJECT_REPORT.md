@@ -558,6 +558,18 @@ Gunakan checklist ini setiap kali ada perubahan.
     - Default tab saat buka app: Games dengan carousel (sebelumnya Session).
     - CSS home-games yang tidak terpakai dibersihkan.
     - Cache buser bump ke v0.1.0-ui4.
+- **Remove from library + add game modal (2026-11-26)**:
+  - Game detail view mendapat tombol "Remove from library" yang mengirim
+    `remove_game <pkg>` ke daemon. Daemon menghapus game dari manual, auto,
+    config, dan builtin (disabled). Setelah hapus, detail view tertutup,
+    carousel diperbarui, dan toast "Game removed from library" muncul.
+    Verifikasi device: hapus MLBB -> carousel berkurang dari 2 ke 1 card,
+    toast muncul, detail view tertutup.
+  - Add game drawer diubah menjadi modal bottom sheet popup. Backdrop
+    semi-transparan dengan blur, sheet naik dari bawah dengan animasi
+    spring. Tap di backdrop menutup sheet. Drag handle di atas sheet.
+    Verifikasi device: tap tombol Add -> modal naik dari bawah, tap
+    backdrop -> modal tutup, add game via modal -> toast + card baru.
 - **State machine overlay murni (2026-11-25)**:
   - State overlay disatukan ke enum `OverlayState { HIDDEN, DOCKED, DRAGGING,
     PANEL_OPEN }` dengan transisi terpusat lewat `enterState()`. Sebelumnya

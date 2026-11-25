@@ -86,7 +86,7 @@
   const btnViewToggle = document.getElementById("btn-view-toggle");
   const btnScanGames = document.getElementById("btn-scan-games");
   const btnToggleAddDrawer = document.getElementById("btn-toggle-add-drawer");
-  const addGameDrawer = document.getElementById("add-game-drawer");
+  const addGameModal = document.getElementById("add-game-modal");
   const installedAppsSelect = document.getElementById("installed-apps-select");
   const customPkgInput = document.getElementById("custom-pkg-input");
   const btnSubmitAddGame = document.getElementById("btn-submit-add-game");
@@ -1401,7 +1401,7 @@
     });
     if (gamesListView) gamesListView.classList.add("hidden");
     if (gamesToolbar) gamesToolbar.classList.add("hidden");
-    if (addGameDrawer) addGameDrawer.classList.add("hidden");
+    if (addGameModal) addGameModal.classList.add("hidden");
     if (gameDetailView) gameDetailView.classList.remove("hidden");
     loadGameReports(pkg);
     loadRenderScale(pkg);
@@ -1480,6 +1480,22 @@
       btn.disabled = false;
       btn.textContent = "Apply Profile";
     }, 2200);
+  });
+
+  document.getElementById("btn-detail-remove")?.addEventListener("click", async () => {
+    if (!selectedGamePkg) return;
+    const res = await sendSocketCmd(`remove_game ${selectedGamePkg}`);
+    let ok = false;
+    try {
+      const data = JSON.parse(res);
+      if (data.status === "ok" && data.games) {
+        allGames = data.games;
+        ok = true;
+      }
+    } catch (e) {}
+    closeGameDetail();
+    applyFilter();
+    showToast(ok ? "Game removed from library" : "Failed to remove game");
   });
 
   async function loadGames() {
@@ -1597,18 +1613,23 @@
     showToast("Game library refreshed");
   });
 
-  // Toggle Add Drawer
+  // Toggle Add Modal
   btnToggleAddDrawer?.addEventListener("click", () => {
-    addGameDrawer?.classList.toggle("hidden");
-    if (!addGameDrawer?.classList.contains("hidden")) {
+    addGameModal?.classList.toggle("hidden");
+    if (!addGameModal?.classList.contains("hidden")) {
       loadInstalledApps();
-      // Don't auto-focus input: prevents keyboard from popping up
-      // unexpectedly on touch devices.
     }
   });
 
   btnCancelAddGame?.addEventListener("click", () => {
-    addGameDrawer?.classList.add("hidden");
+    addGameModal?.classList.add("hidden");
+  });
+
+  // Tapping the backdrop closes the sheet.
+  addGameModal?.addEventListener("click", (e) => {
+    if (e.target === addGameModal) {
+      addGameModal.classList.add("hidden");
+    }
   });
 
   installedAppsSelect?.addEventListener("change", () => {
@@ -1636,7 +1657,7 @@
           applyFilter();
           customPkgInput.value = "";
           installedAppsSelect.value = "";
-          addGameDrawer?.classList.add("hidden");
+          addGameModal?.classList.add("hidden");
           showToast("Game added successfully.");
           return;
         } else if (data.status === "error") {
@@ -1648,7 +1669,7 @@
       }
     }
     await loadGames();
-    addGameDrawer?.classList.add("hidden");
+    addGameModal?.classList.add("hidden");
     showToast("Game added.");
   });
 
