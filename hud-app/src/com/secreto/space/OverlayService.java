@@ -43,6 +43,7 @@ public class OverlayService extends Service {
     private static final int COLOR_RED = 0xFFFF1744;
 
     private static final int BUBBLE_SIZE_DP = 56;
+    private static final int BUBBLE_VISIBLE_WIDTH_DP = 36;
     private static final int HANDLE_WIDTH_DP = 40;
     private static final int HANDLE_HEIGHT_DP = 40;
     private static final int HANDLE_SMALL_WIDTH_DP = 14;
@@ -53,6 +54,7 @@ public class OverlayService extends Service {
     private WindowManager windowManager;
     private View overlayRoot;
     private View viewBubble;
+    private View bubbleSurface;
     private View bubbleContent;
     private View edgeAccent;
     private View viewSidePanel;
@@ -164,6 +166,7 @@ public class OverlayService extends Service {
         overlayRoot = inflater.inflate(R.layout.overlay_layout, null);
 
         viewBubble = overlayRoot.findViewById(R.id.view_bubble);
+        bubbleSurface = overlayRoot.findViewById(R.id.bubble_surface);
         bubbleContent = overlayRoot.findViewById(R.id.bubble_content);
         edgeAccent = overlayRoot.findViewById(R.id.edge_accent);
         viewSidePanel = overlayRoot.findViewById(R.id.view_sidepanel);
@@ -341,7 +344,15 @@ public class OverlayService extends Service {
 
     private void updateBubbleOrientation() {
         if (viewBubble == null) return;
-        viewBubble.setBackgroundResource(dockedRight ? R.drawable.bg_edge_handle : R.drawable.bg_edge_handle_left);
+
+        // The visible surface hugs the bezel; the inner strip stays transparent
+        // so the window can keep a 44dp tap target without covering the game.
+        if (bubbleSurface != null) {
+            bubbleSurface.setBackgroundResource(dockedRight ? R.drawable.bg_edge_handle : R.drawable.bg_edge_handle_left);
+            FrameLayout.LayoutParams slp = (FrameLayout.LayoutParams) bubbleSurface.getLayoutParams();
+            slp.gravity = (dockedRight ? Gravity.END : Gravity.START) | Gravity.CENTER_VERTICAL;
+            bubbleSurface.setLayoutParams(slp);
+        }
 
         // The status rail always faces the screen, never the bezel.
         if (edgeAccent != null) {
@@ -352,9 +363,14 @@ public class OverlayService extends Service {
             edgeAccent.setLayoutParams(rlp);
         }
         if (bubbleContent != null) {
-            bubbleContent.setPaddingRelative(
-                    dockedRight ? dp(8) : dp(5), 0,
-                    dockedRight ? dp(5) : dp(8), 0);
+            if (fpsOverlayEnabled) {
+                bubbleContent.setPaddingRelative(
+                        dockedRight ? dp(6) : dp(3), 0,
+                        dockedRight ? dp(3) : dp(6), 0);
+            } else {
+                // OFF mode: keep the grip centered in the narrow handle.
+                bubbleContent.setPaddingRelative(dp(3), 0, dp(3), 0);
+            }
         }
     }
 
@@ -871,6 +887,16 @@ public class OverlayService extends Service {
         viewBubble.setLayoutParams(lp);
         viewBubble.setMinimumWidth(0);
         viewBubble.setMinimumHeight(0);
+
+        if (bubbleSurface != null) {
+            FrameLayout.LayoutParams slp = (FrameLayout.LayoutParams) bubbleSurface.getLayoutParams();
+            slp.width = fpsOverlayEnabled
+                    ? dp(BUBBLE_VISIBLE_WIDTH_DP)
+                    : FrameLayout.LayoutParams.MATCH_PARENT;
+            slp.height = FrameLayout.LayoutParams.MATCH_PARENT;
+            bubbleSurface.setLayoutParams(slp);
+        }
+
         updateBubbleOrientation();
 
         if (!panelOpen && viewBubble.getVisibility() == View.VISIBLE) {
@@ -1023,7 +1049,7 @@ public class OverlayService extends Service {
         if ("DETAIL".equals(hudType)) {
             sb.append("\n");
             appendSpan(sb, temp, tempColor, 0.78f);
-            size = 12.5f;
+            size = 12f;
             lastBubbleText = fps + "\n" + temp;
         } else if ("FULL".equals(hudType)) {
             String gpu = data.gpuClockMhz > 0 ? (data.gpuClockMhz + "M") : "--";
@@ -1031,13 +1057,13 @@ public class OverlayService extends Service {
             appendSpan(sb, temp, tempColor, 0.8f);
             sb.append("\n");
             appendSpan(sb, gpu, 0xFF8798AC, 0.72f);
-            size = 11f;
+            size = 10.5f;
             lastBubbleText = fps + "\n" + temp + "\n" + gpu;
         } else {
             // COMPACT: a small FPS caption makes the number self-explanatory.
             sb.append("\n");
             appendSpan(sb, "FPS", 0xFF64748B, 0.46f);
-            size = 15f;
+            size = 14f;
             lastBubbleText = fps;
         }
 

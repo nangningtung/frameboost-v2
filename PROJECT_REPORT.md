@@ -56,14 +56,15 @@ Prinsip utama: **ringan, cepat, rapi, dan jujur terhadap data**.
 | Mode | Ukuran | Isi |
 |---|---|---|
 | OFF | 14 × 48 dp | grip bar cyan (tap target 48 dp) |
-| FPS (COMPACT) | 44 × 44 dp | angka FPS + label kecil `FPS` |
-| + TEMP (DETAIL) | 44 × 48 dp | FPS + suhu |
-| + GPU (FULL) | 44 × 54 dp | FPS + suhu + GPU clock |
+| FPS (COMPACT) | 36 × 44 dp terlihat, 44 dp tap | angka FPS + label kecil `FPS` |
+| + TEMP (DETAIL) | 36 × 48 dp terlihat, 44 dp tap | FPS + suhu |
+| + GPU (FULL) | 36 × 54 dp terlihat, 44 dp tap | FPS + suhu + GPU clock |
 
 Detail perilaku:
 
 - Sisi bezel memakai layer-list dengan inset negatif `-3dp`, sehingga permukaan menempel tepat di tepi layar tanpa garis tepi ganda.
 - Permukaan memakai gradient gelap halus dan hairline 1 dp; bukan lagi border cyan penuh.
+- Lebar permukaan 36 dp, tetapi window sentuh tetap 44 dp. Sisa 8 dp di sisi dalam transparan, jadi bubble terlihat lebih tipis tanpa mengorbankan tap target.
 - Rail status 2 dp di sisi dalam (menghadap layar) mengikuti warna FPS, dengan inset 9 dp dari atas dan bawah.
 - Sudut sisi dalam rounded 12 dp; konten selalu center (vertikal dan horizontal).
 - Teks bertingkat: angka FPS dominan, suhu dan GPU clock memakai `RelativeSizeSpan` yang lebih kecil.
@@ -373,8 +374,9 @@ Gunakan checklist ini setiap kali ada perubahan.
     SELinux lewat perintah `probe`.
   - Guard `ro.product.device=a50` juga ada di binary daemon.
   - Copy Indonesia di UI disapu ke English, termasuk `(referensi)` menjadi `(reference)`.
-- **Floating monitor (redesign)**: lebar tetap 44 dp agar tap target aman, DETAIL 44 × 48 dp,
-  FULL 44 × 54 dp. Border cyan penuh diganti gradient gelap, hairline 1 dp, dan rail status
+- **Floating monitor (redesign)**: permukaan terlihat 36 dp dengan window sentuh 44 dp,
+  DETAIL 36 × 48 dp, FULL 36 × 54 dp. Sisa 8 dp di sisi dalam transparan tetapi tetap
+  bisa disentuh. Border cyan penuh diganti gradient gelap, hairline 1 dp, dan rail status
   2 dp di sisi dalam yang mengikuti warna FPS. COMPACT kini memberi label kecil `FPS`, dan
   suhu/GPU memakai ukuran relatif supaya hierarki teks lebih rapi.
 
