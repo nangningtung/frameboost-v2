@@ -93,7 +93,23 @@ batas bawah. Jadi game 30 FPS yang stabil tidak lagi dilaporkan 97% jank.
 
 Spike 2026-11-25 di Auto Chess: native 60,1 FPS / jank 2,0% / 71 °C; 720p 59,4 FPS /
 jank 1,7% / 67 °C. Menu kena vsync cap, jadi selisih FPS belum membuktikan gain in-match.
-`gpu_busy` mengembalikan 0 saat menu, jadi A/B beban GPU in-match masih terbuka.
+
+Uji lanjutan di lobby MLBB: native 59,3 FPS, 720p 59,0 FPS, keduanya kena vsync cap.
+Saat match berjalan, `gpu_busy` baru terbaca valid (bukan 0):
+
+| Sampel | `gpu_busy` rata-rata | FPS | Suhu |
+|---|---:|---:|---:|
+| Native (awal) | 79,6% | 49,1 | 84,0 °C |
+| 720p | 68,5% | 58,9 | 84,5 °C |
+| Native (akhir) | 58,5% | 56,4 | 82,8 °C |
+
+Angka ini menunjukkan 720p menurunkan beban GPU dan menaikkan FPS dibanding sampel
+native pertama, tetapi scene match berubah selama pengukuran sehingga ini bukan A/B
+terkontrol. Sampel native kedua membuktikan drift scene: beban turun tanpa mengubah
+setting. Karena itu hasilnya dicatat sebagai indikasi, bukan bukti gain terkontrol.
+
+Bubble HUD di 720p tetap utuh di layar: `frame=[1444,188][1560,304]` pada display
+1560x720, tidak terpotong.
 
 ## 5e. Overlay sesi
 
@@ -128,6 +144,29 @@ jank 1,7% / 67 °C. Menu kena vsync cap, jadi selisih FPS belum membuktikan gain
 | Sesi tidak tersentuh | setelah daemon kedua | PID lama tetap, journal tetap, 720p tetap aktif, tidak ada baris recovery baru |
 | FPS beruntun | 24 panggilan `fps` beruntun saat game render | semua berisi angka; `age_ms` < 2000; `total_frames` naik monoton |
 
+## 5h. Perbandingan komunitas dan intervensi resmi
+
+Audit lengkap ada di `docs/COMMUNITY-COMPARISON.md`. Yang diuji langsung di A50:
+
+| Cek | Perintah | Hasil |
+|---|---|---|
+| Game Mode downscale | `cmd game set --downscale 0.667 com.mobile.legends` | mode `custom`, `Scaling:0.667`, SurfaceFlinger transform 1.4088 (buffer ~766x1660) |
+| Game Mode reset | `cmd game reset com.mobile.legends` | konfigurasi hilang, tetapi layer tetap ter-scale sampai surface game dibuat ulang |
+| Game Mode performance | `cmd game mode performance com.mobile.legends` | `performance not supported`, hanya `standard` dan `custom` |
+| Affinity RenderThread | `cat /proc/<tid>/status` | `Cpus_allowed_list: 4-7`, mask `f0`; game sudah menempatkan render di big core |
+| Thermal cap | `cat cpu4/cpufreq/scaling_max_freq` | 2.314.000 kHz saat 64 °C, turun ke 1.768.000-1.898.000 kHz saat 83-84 °C |
+| I/O stock | `cat /sys/block/sda/queue/*` | `cfq`, readahead 128, dirty 20/10 |
+
+Kesimpulan:
+
+- `wm size` tetap dipakai untuk render scale karena reset-nya langsung dan berjurnal.
+  Game Mode resmi bekerja, tetapi tidak memenuhi janji restore langsung.
+- Tidak ada perubahan affinity: thread render sudah di big core tanpa bantuan kita.
+  `/proc/<tid>/stat` field 39 sempat terbaca `1` sementara `status` menunjukkan `4-7`;
+  karena `status` dan `taskset` sepakat, tidak ada klaim gain dari pinning.
+- Preset tidak menulis `scaling_max_freq`, jadi thermal HAL tetap menjadi pengaman.
+- Tidak ada knob I/O baru; nilai stock sudah setara saran modul komunitas.
+
 ## 6. Rollback
 
 Kalau install 0.1.0 gagal, modul lama sudah dihapus oleh `customize.sh`. ZIP lama
@@ -154,7 +193,14 @@ tidak dibaca oleh versi lama, jadi profil perlu disalin kembali ke
 | Whitelist | PASS, `com.whatsapp` dan `com.discord` di whitelist tidak masuk journal (31 dari 33) |
 | Toggle sleep | PASS, `set_sleep_enabled 0` dan `1` tersimpan |
 | 5c Riwayat sesi | PASS, 4 sesi Auto Chess tersimpan dan tampil di detail game; saran `null` karena belum ada 3 sesi >= 5 menit |
-| 5d Skala render | PASS mekanisme: 720p diterapkan (`720x1560`), reset saat `session_end`, journal bersih; gain FPS in-match belum terukur |
+| 5d Skala render | PASS mekanisme: 720p diterapkan (`720x1560`), reset saat `session_end`, journal bersih; indikasi gain in-match: `gpu_busy` 79,6% → 68,5% dan 49,1 → 58,9 FPS, dengan catatan scene berubah (bukan A/B terkontrol) |
+| 5d HUD di 720p | PASS, bubble tetap utuh di `frame=[1444,188][1560,304]` pada display 1560x720 |
+| 5h Game Mode downscale | PASS mekanisme (`Scaling:0.667`, transform 1.4088), ditolak sebagai produk karena `reset` tidak langsung mengembalikan layer |
+| 5h Game Mode performance | N/A, MLBB menjawab `performance not supported`; hanya `standard` dan `custom` |
+| 5h Affinity | PASS audit, RenderThread sudah `Cpus_allowed_list: 4-7` dan mask `f0`; tidak ada perubahan yang diklaim |
+| 5h Thermal cap | PASS, `cpu4` max 2.314 GHz saat 64 °C, turun ke 1.768-1.898 GHz saat 83-84 °C; preset hanya menulis min |
+| 5h I/O stock | PASS, `cfq`, readahead 128, dirty 20/10; tidak ada knob baru |
+| Parity webroot | PASS, 3 file `module-src/webroot` identik SHA256 dengan `hud-app/assets/webroot` |
 | 5e Overlay | PASS, strip `SESSION 0:47 / JANK 8% / ASLEEP 33 / THERMAL OK` saat Auto Chess berjalan |
 | 5f Probe | PASS, `a50`, GSI, GOS absent, `appops + force-stop`, `wm size` didukung, cpuset `memory` |
 | Jank | PASS, Auto Chess 30 FPS stabil berubah dari 97,3% menjadi 2,0% setelah definisi memakai median frame time |

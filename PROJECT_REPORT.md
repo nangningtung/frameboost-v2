@@ -35,10 +35,10 @@ Prinsip utama: **ringan, cepat, rapi, dan jujur terhadap data**.
 ### 2.2 Halaman Detail Game
 
 - 4 preset:
-  - Battery — hijau
-  - Balanced — biru
-  - Performance — kuning
-  - Esports — pink
+  - Battery - hijau
+  - Balanced - biru
+  - Performance - kuning
+  - Esports - pink
 - BBR ON/OFF.
 - Riwayat 10 sesi terakhir untuk game itu: waktu, durasi, rata-rata FPS, 1% low, jank,
   suhu puncak, jumlah app tidur, preset, dan event throttle.
@@ -186,11 +186,15 @@ Sesi adalah unit yang dilaporkan console, bukan sekadar kumpulan tweak.
 - Reset terjadi di akhir sesi, saat daemon start, di `service.sh`, dan di `uninstall.sh`,
   jadi reboot atau crash tidak bisa meninggalkan layar dalam mode scaled.
 - Spike 2026-11-25 di Auto Chess: native 60,1 FPS / jank 2,0% / 71 °C; 720p 59,4 FPS /
-  jank 1,7% / 67 °C. Menu kena vsync cap, jadi selisih FPS belum membuktikan gain in-match.
-  `gpu_busy` tidak bisa dipakai sebagai pembanding beban karena node ini mengembalikan 0
-  saat menu, sehingga A/B beban GPU in-match masih terbuka.
+  jank 1,7% / 67 °C. Menu kena vsync cap, jadi selisih FPS di menu tidak membuktikan gain.
+- Uji in-match MLBB (scene berjalan, `gpu_busy` valid): native 79,6% / 49,1 FPS,
+  720p 68,5% / 58,9 FPS, lalu native lagi 58,5% / 56,4 FPS pada 82,8-84,5 °C. Arahnya
+  mendukung 720p, tetapi scene match berubah selama pengukuran, jadi ini indikasi dan
+  bukan A/B terkontrol. Klaim resmi tetap: mekanisme terbukti, gain in-match belum
+  dipisahkan dari variasi scene.
+- Bubble HUD tetap utuh di 720p: `frame=[1444,188][1560,304]` pada display 1560x720.
 
-### 2.9 Hasil uji device (2026-11-25)
+### 2.8 Hasil uji device (2026-11-25)
 
 Semua angka di bawah diambil dari device, bukan estimasi.
 
@@ -210,13 +214,37 @@ Semua angka di bawah diambil dari device, bukan estimasi.
   game aktif tidak ikut ditidurkan.
 - **Unit test Rust**: 20 test dijalankan di A50 (`aarch64-linux-android`), 20 lulus.
 
-### 2.8 Capability probe
+### 2.9 Capability probe
 
 Perintah `probe` dan kartu System menampilkan device, model, Android, ROM (GSI / One UI /
 AOSP), ada tidaknya GOS, primitif freeze yang benar-benar bekerja, dukungan `wm size`,
 cpuset dan controller-nya, root, serta status SELinux. Di A50 GSI hasilnya: `a50`,
 Android 16, GSI, GOS absent, `appops + force-stop`, `wm size` didukung, cpuset hanya
 `memory`.
+
+### 2.10 Perbandingan dengan proyek komunitas (2026-11-25)
+
+Audit lengkap ada di `docs/COMMUNITY-COMPARISON.md`. Ringkasnya:
+
+- Proyek yang dicek: `uperf` (3.408 bintang), `fas-rs` (1.124), `AZenith` (151),
+  `GameSpace` (44), `zkmnext-gamespace` (26), `PerfGame` (10), `ROR` (5).
+- `uperf` dan `fas-rs` adalah engine performa. `GameSpace` adalah UI Android Game Mode
+  yang butuh patch ROM, bukan modul root.
+- Game Mode downscale resmi diuji di MLBB: `Scaling:0.667` bekerja dan SurfaceFlinger
+  menunjukkan transform 1.4088, tetapi `cmd game reset` tidak mengembalikan layer sampai
+  game membuat surface baru. Karena itu `wm size` tetap dipakai.
+- Game Mode `performance` ditolak MLBB (`performance not supported`); hanya
+  `standard` dan `custom` yang tersedia.
+- `RenderThread` MLBB sudah di big core (`4-7`, mask `f0`), jadi affinity bukan gap.
+- Saat dingin `cpu4` max 2.314 GHz; thermal HAL menurunkannya ke 1.768-1.898 GHz saat
+  83-84 °C. Preset tidak melawan thermal.
+- I/O dan VM stock sudah `cfq`, readahead 128, dirty 20/10; tidak ada knob baru.
+- Render scale di lobby MLBB: native 59,3 FPS vs 720p 59,0 FPS, keduanya kena vsync cap.
+  Mekanisme dan HUD terbukti; in-match ada indikasi gain, tetapi belum A/B terkontrol.
+
+Keputusan: 0.1.0 tetap memakai preset statis + keep-alive + thermal, tanpa injeksi
+SurfaceFlinger dan tanpa controller per frame. Frame aware scheduling ala `fas-rs`
+dicatat sebagai kandidat v0.2, bukan ditambahkan diam-diam ke 0.1.0.
 
 ---
 
@@ -331,8 +359,10 @@ Belum termasuk fase ini:
 - [x] Capability probe terpisah (System tab)
 - [ ] State machine overlay murni
 - [x] Quick action tambahan (Boost RAM, Notifs, Bypass CHG, No GOS)
-- [ ] Gain FPS render scale di dalam match (spike baru mengukur menu yang kena vsync cap)
+- [ ] A/B render scale terkontrol di dalam match (indikasi sudah ada: `gpu_busy` 79,6% → 68,5% dan 49,1 → 58,9 FPS, tetapi scene berubah selama sampel)
 - [ ] Uji layout GSI pada 720p/900p untuk semua layar game, bukan hanya Auto Chess
+- [x] Audit proyek komunitas dan intervensi Game Mode resmi (lihat `docs/COMMUNITY-COMPARISON.md`)
+- [ ] Frame aware scheduling dengan target FPS per game (kandidat v0.2, sengaja tidak masuk 0.1.0)
 
 ---
 
@@ -437,6 +467,21 @@ Gunakan checklist ini setiap kali ada perubahan.
     dihitung dua kali.
   - 20 unit test Rust, dijalankan di A50. Drill device: recovery `kill -9`, single-instance,
     24 panggilan `fps` beruntun, dan smoke test 17/17 PASS.
+- **Audit komunitas dan intervensi resmi (2026-11-25)**:
+  - Pembanding: `uperf` (3.408 bintang), `fas-rs` (1.124), `AZenith` (151), `GameSpace` (44),
+    `PerfGame` (10), `ROR` (5). Detail di `docs/COMMUNITY-COMPARISON.md`.
+  - Game Mode `--downscale 0.667` terbukti bekerja di MLBB (`Scaling:0.667`, transform
+    1.4088), tetapi `reset` tidak mengembalikan layer sampai surface game dibuat ulang.
+    Karena itu render scale tetap memakai `wm size`.
+  - Game Mode `performance` ditolak MLBB (`performance not supported`); hanya `standard`
+    dan `custom` yang tersedia.
+  - Affinity tidak diubah: `RenderThread` sudah `Cpus_allowed_list: 4-7` dengan mask `f0`.
+  - Thermal HAL menurunkan `cpu4` max dari 2.314 GHz ke 1.768-1.898 GHz saat 83-84 °C.
+    Preset hanya menulis `scaling_min_freq`, jadi thermal tetap menjadi pengaman.
+  - I/O stock sudah `cfq`, readahead 128, dirty 20/10; tidak ada knob baru.
+  - Render scale in-match: `gpu_busy` 79,6% → 68,5%, FPS 49,1 → 58,9, tetapi scene berubah
+    selama sampel. Dicatat sebagai indikasi, bukan A/B terkontrol. Bubble HUD tetap utuh
+    di 720p (`frame=[1444,188][1560,304]`).
 
 ### `v2.4.0` - 2026-11-25
 
@@ -493,7 +538,7 @@ Catatan: thermal HAL Samsung tetap membatasi CPU big ke ~1.77-1.98 GHz saat 80-8
 
 ---
 
-### `0aa121d` — 2026-11-24
+### `0aa121d` - 2026-11-24
 
 ```text
 feat: seamless edge monitor, cockpit panel and SurfaceFlinger FPS
@@ -527,7 +572,7 @@ Testing:
 
 ---
 
-### `f72310c` — 2026-11-24
+### `f72310c` - 2026-11-24
 
 ```text
 feat: polished GameSpace UI, edge FPS handle, preset theming and dead-code cleanup
@@ -549,7 +594,7 @@ Perubahan:
 ### Template entri baru
 
 ```markdown
-### `<hash>` — `<tanggal>`
+### `<hash>` - `<tanggal>`
 
 `feat/fix/refactor: <judul singkat>`
 

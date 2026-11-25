@@ -187,11 +187,12 @@ dan itu justru jujur.
 | M0 | Selesai | Modul `secreto_space`, guard A50, migrasi data, APK baru |
 | M1 | Selesai | 33 app tidur, journal, restore setelah reboot, smoke test |
 | M2 | Selesai | Riwayat 10 sesi per game, kartu detail, saran preset, strip overlay |
-| M3 | Selesai, satu catatan | Empat tab, probe, skala render dengan reset berjurnal; gain FPS in-match belum diukur |
+| M3 | Selesai, satu catatan | Empat tab, probe, skala render dengan reset berjurnal; indikasi gain in-match ada, A/B terkontrol belum |
 
-Catatan M3: skala render terbukti bekerja dan aman, tetapi belum terbukti menaikkan FPS
-di dalam match. Jangan memasarkannya sebagai peningkatan FPS sampai ada pengukuran
-in-match di Auto Chess atau MLBB.
+Catatan M3: skala render terbukti bekerja dan aman. Uji in-match MLBB menunjukkan arah
+yang mendukung 720p (`gpu_busy` 79,6% → 68,5%, FPS 49,1 → 58,9), tetapi scene match
+berubah selama sampel sehingga itu bukan A/B terkontrol. Jangan memasarkannya sebagai
+peningkatan FPS yang pasti sampai ada pengukuran dengan scene terkunci.
 
 ## 9. Verifikasi 2026-11-25
 
@@ -202,5 +203,14 @@ in-match di Auto Chess atau MLBB.
   snapshot daemon 59,8-60,4 FPS.
 - 20 unit test Rust lulus di A50; smoke test 17/17 PASS.
 - Sesi MLBB 168 detik: rata-rata 50,6 FPS, 1% low 30,3, jank 3,1%, puncak 87 °C.
+- Game Mode `--downscale 0.667` bekerja (`Scaling:0.667`, transform 1.4088), tetapi
+  `reset` tidak mengembalikan layer sampai surface game dibuat ulang.
+- Game Mode `performance` tidak didukung MLBB; hanya `standard` dan `custom`.
+- `RenderThread` MLBB sudah `Cpus_allowed_list: 4-7` dengan mask `f0`; affinity tidak diubah.
+- Thermal HAL menurunkan `cpu4` max ke 1.768-1.898 GHz saat 83-84 °C; preset hanya
+  menulis `scaling_min_freq`.
+- I/O stock `cfq`, readahead 128, dirty 20/10; tidak ada knob baru.
+- Render scale in-match: `gpu_busy` 79,6% → 68,5%, FPS 49,1 → 58,9, dengan catatan scene
+  berubah. Bubble HUD tetap utuh di 720p.
 
 Detail perintah dan hasil per cek ada di `docs/VERIFY-0.1.0.md`.
