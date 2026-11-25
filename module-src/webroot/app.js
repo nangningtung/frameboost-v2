@@ -92,6 +92,23 @@
   const btnSubmitAddGame = document.getElementById("btn-submit-add-game");
   const btnCancelAddGame = document.getElementById("btn-cancel-add-game");
 
+  // Toast notification helper
+  let toastTimer = null;
+  function showToast(msg) {
+    const toast = document.getElementById("toast");
+    if (!toast) return;
+    toast.textContent = msg;
+    toast.classList.remove("hidden");
+    // Force reflow then show
+    void toast.offsetWidth;
+    toast.classList.add("show");
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      toast.classList.remove("show");
+      setTimeout(() => toast.classList.add("hidden"), 300);
+    }, 3000);
+  }
+
   // Local development preview only. It never runs in the APK/production WebUI.
   const previewAllowed = location.hostname === "localhost" || location.hostname === "127.0.0.1";
   const previewParams = new URLSearchParams(location.search);
@@ -950,7 +967,7 @@
         if (window._nativeBridge && typeof window._nativeBridge.launchGame === "function") {
           window._nativeBridge.launchGame(btn.dataset.pkg);
         } else {
-          alert("Could not launch game. Make sure the package is installed.");
+          showToast("Could not launch game. Make sure it is installed.");
         }
       });
     });
@@ -1311,7 +1328,7 @@
         if (window._nativeBridge && typeof window._nativeBridge.launchGame === "function") {
           window._nativeBridge.launchGame(pkg);
         } else {
-          alert("Could not launch game. Make sure the package is installed.");
+          showToast("Could not launch game. Make sure it is installed.");
         }
       });
     }
@@ -1351,7 +1368,6 @@
   };
 
   function applyFilter() {
-    renderHomeGames();
     renderGamesList(allGames);
   }
 
@@ -1508,20 +1524,37 @@
   }
 
   async function loadInstalledApps() {
-    if (installedApps.length > 0) return;
+    if (installedApps.length > 0) {
+      populateAppSelect();
+      return;
+    }
+    // Prefer native bridge (PackageManager) for real app labels
+    if (window._nativeBridge && typeof window._nativeBridge.getInstalledApps === "function") {
+      try {
+        const raw = window._nativeBridge.getInstalledApps();
+        if (raw) {
+          const apps = JSON.parse(raw);
+          if (Array.isArray(apps) && apps.length > 0) {
+            installedApps = apps.map((a) => ({ pkg: a.pkg, label: a.label || a.pkg }));
+            populateAppSelect();
+            return;
+          }
+        }
+      } catch (e) {
+        console.error("native getInstalledApps error:", e);
+      }
+    }
+    // Fallback: daemon list_installed_apps
     const res = await sendSocketCmd("list_installed_apps");
     if (res) {
       try {
         const apps = JSON.parse(res);
         if (Array.isArray(apps)) {
-          installedApps = apps;
-          installedAppsSelect.innerHTML = '<option value="">-- Select an installed app --</option>';
-          apps.forEach((app) => {
-            const opt = document.createElement("option");
-            opt.value = app;
-            opt.textContent = app;
-            installedAppsSelect.appendChild(opt);
+          installedApps = apps.map((a) => {
+            if (typeof a === "string") return { pkg: a, label: a };
+            return { pkg: a.pkg, label: a.label || a.pkg };
           });
+          populateAppSelect();
         }
       } catch (e) {
         console.error("parse installed apps error:", e);
@@ -1529,20 +1562,31 @@
     }
   }
 
+  function populateAppSelect() {
+    if (!installedAppsSelect) return;
+    installedAppsSelect.innerHTML = '<option value="">-- Select app --</option>';
+    installedApps.forEach((app) => {
+      const opt = document.createElement("option");
+      opt.value = app.pkg;
+      opt.textContent = app.label && app.label !== app.pkg
+        ? `${app.label} (${app.pkg})`
+        : app.pkg;
+      installedAppsSelect.appendChild(opt);
+    });
+  }
+
   // Scan device button
   btnScanGames?.addEventListener("click", async () => {
     btnScanGames.disabled = true;
-    btnScanGames.innerHTML = '<span>⟳</span> Refreshing installed games...';
     const res = await sendSocketCmd("scan_games");
     btnScanGames.disabled = false;
-    btnScanGames.innerHTML = '<span>⟳</span> Refresh installed games';
     if (res) {
       try {
         const data = JSON.parse(res);
         if (data.games) {
           allGames = data.games;
           applyFilter();
-          alert(`Scan complete. Found ${data.found || 0} new games.`);
+          showToast("Game library refreshed");
           return;
         }
       } catch (e) {
@@ -1550,6 +1594,7 @@
       }
     }
     await loadGames();
+    showToast("Game library refreshed");
   });
 
   // Toggle Add Drawer
@@ -1557,7 +1602,8 @@
     addGameDrawer?.classList.toggle("hidden");
     if (!addGameDrawer?.classList.contains("hidden")) {
       loadInstalledApps();
-      customPkgInput?.focus();
+      // Don't auto-focus input: prevents keyboard from popping up
+      // unexpectedly on touch devices.
     }
   });
 
@@ -1574,11 +1620,11 @@
   btnSubmitAddGame?.addEventListener("click", async () => {
     const pkg = (customPkgInput?.value || "").trim();
     if (!pkg) {
-      alert("Masukkan nama package terlebih dahulu.");
+      showToast("Enter a package name first.");
       return;
     }
     btnSubmitAddGame.disabled = true;
-    btnSubmitAddGame.textContent = "Menyimpan...";
+    btnSubmitAddGame.textContent = "Saving...";
     const res = await sendSocketCmd(`add_game ${pkg}`);
     btnSubmitAddGame.disabled = false;
     btnSubmitAddGame.textContent = "Add game";
@@ -1591,9 +1637,10 @@
           customPkgInput.value = "";
           installedAppsSelect.value = "";
           addGameDrawer?.classList.add("hidden");
+          showToast("Game added successfully.");
           return;
         } else if (data.status === "error") {
-          alert(`Failed: ${data.message}`);
+          showToast(`Failed: ${data.message}`);
           return;
         }
       } catch (e) {
@@ -1602,6 +1649,7 @@
     }
     await loadGames();
     addGameDrawer?.classList.add("hidden");
+    showToast("Game added.");
   });
 
   // View mode toggle (grid <-> carousel)
@@ -2286,7 +2334,7 @@
     }
     if (window._nativeBridge) {
       if (!window._nativeBridge.canDrawOverlays()) {
-        alert("Allow 'Display over other apps' to enable the floating HUD.");
+        showToast("Allow 'Display over other apps' to enable the floating HUD.");
         window._nativeBridge.requestOverlayPermission();
         return;
       }
@@ -2294,53 +2342,18 @@
       window._nativeBridge.setHudEnabled(!running);
       setTimeout(updateHudToggleState, 250);
     } else {
-      alert("HUD Service only runs inside the Secreto Space app.");
+      showToast("HUD Service only runs inside the Secreto Space app.");
     }
   });
 
   updateHudToggleState();
 
-  // Compact game list on Home. Full management lives in the Games tab.
-  const homeGames = document.getElementById("home-games");
-  const homeGamesCount = document.getElementById("home-games-count");
-  function renderHomeGames() {
-    if (!homeGames) return;
-    if (!allGames || !allGames.length) {
-      homeGames.innerHTML = '<div class="home-game-row"><span class="home-game-sub">No games detected yet</span></div>';
-      if (homeGamesCount) homeGamesCount.textContent = "";
-      return;
-    }
-    const esc = (s) => String(s == null ? "" : s).replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]));
-    homeGames.innerHTML = allGames.slice(0, 4).map((g) => {
-      const name = esc(g.name || g.pkg || "?");
-      const preset = esc((g.preset || "BALANCED").toUpperCase());
-      const pkg = esc(g.pkg || "");
-      const initial = esc((g.name || g.pkg || "?").charAt(0).toUpperCase());
-      const hue = charSumHue(g.pkg || g.name || "?");
-      return '<div class="home-game-row" style="--tile-hue:' + hue + '">' +
-        '<span class="home-game-icon">' + initial + '</span>' +
-        '<span class="home-game-meta"><span class="home-game-name">' + name + '</span>' +
-        '<span class="home-game-sub">' + preset + ' | ' + pkg + '</span></span>' +
-        '<button class="home-game-play" data-home-launch="' + pkg + '">PLAY</button>' +
-        '</div>';
-    }).join("");
-    if (homeGamesCount) {
-      const total = allGames.length;
-      const shown = Math.min(4, total);
-      homeGamesCount.textContent = shown + " of " + total + " games";
-    }
-  }
 
-  document.getElementById("btn-home-see-games")?.addEventListener("click", () => {
-    document.querySelector('[data-tab="tab-games"]')?.click();
-  });
-  homeGames?.addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-home-launch]");
-    if (!btn) return;
-    const pkg = btn.getAttribute("data-home-launch");
-    if (window._nativeBridge && typeof window._nativeBridge.launchGame === "function") {
-      window._nativeBridge.launchGame(pkg);
-    }
-  });
+  // Open app on Games tab with carousel by default
+  document.querySelector('[data-tab="tab-games"]')?.click();
+  // Ensure carousel mode is active on first load
+  if (gamesViewMode !== "carousel") {
+    setGamesViewMode("carousel");
+  }
 })();
 

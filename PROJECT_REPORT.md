@@ -539,6 +539,25 @@ Gunakan checklist ini setiap kali ada perubahan.
     (drag 30% strength) saat swipe di ujung supaya terasa responsif tapi
     tidak melompat. Swipe kiri/kanan ter-verifikasi: MLBB <-> Auto Chess,
     mentok di kedua ujung tidak loop.
+  - UI optimization pass (2026-11-26):
+    - Toast notification system menggantikan semua alert(). Refresh button
+      cukup menampilkan toast "Game library refreshed" (tidak lagi mengubah
+      teks tombol). Add game flow menggunakan toast untuk feedback.
+    - Add game drawer di-redesign: close button (X) di header, select dan
+      input lebih bersih, tombol Add full-width. Tidak ada auto-focus yang
+      memunculkan keyboard secara tak terduga.
+    - Native bridge `getInstalledApps()` via PackageManager: daftar app di
+      Add Game drawer sekarang menampilkan nama app asli (e.g. "Discord",
+      "Brave", "Gemini") dengan package name di bawahnya, bukan hanya
+      package name mentah.
+    - Daemon `derive_label()`: nama game manual/auto/config yang tidak ada
+      di BUILTIN_GAMES sekarang di-resolve dari segment terakhir package
+      (title-cased) sebagai fallback bila tidak ada di builtin database.
+    - "Your games" section dihapus dari tab Session. Tab Session sekarang
+      fokus ke instrument cluster dan quick tools saja.
+    - Default tab saat buka app: Games dengan carousel (sebelumnya Session).
+    - CSS home-games yang tidak terpakai dibersihkan.
+    - Cache buser bump ke v0.1.0-ui4.
 - **State machine overlay murni (2026-11-25)**:
   - State overlay disatukan ke enum `OverlayState { HIDDEN, DOCKED, DRAGGING,
     PANEL_OPEN }` dengan transisi terpusat lewat `enterState()`. Sebelumnya

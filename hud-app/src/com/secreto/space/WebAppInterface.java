@@ -2,6 +2,8 @@ package com.secreto.space;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
@@ -10,6 +12,10 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 
 public class WebAppInterface {
     private final Context context;
@@ -109,6 +115,60 @@ public class WebAppInterface {
             }
         } catch (Exception ignored) {}
         return false;
+    }
+
+    @JavascriptInterface
+    public String getInstalledApps() {
+        try {
+            PackageManager pm = context.getPackageManager();
+            List<ApplicationInfo> apps = pm.getInstalledApplications(PackageManager.GET_META_DATA);
+            ArrayList<String> entries = new ArrayList<>();
+            for (ApplicationInfo ai : apps) {
+                // Only third-party (non-system) apps
+                if ((ai.flags & ApplicationInfo.FLAG_SYSTEM) != 0) continue;
+                String pkg = ai.packageName;
+                if (pkg == null || pkg.isEmpty()) continue;
+                String label = pm.getApplicationLabel(ai).toString();
+                if (label == null || label.isEmpty()) label = pkg;
+                entries.add("{\"pkg\":\"" + escapeJson(pkg) + "\",\"label\":\"" + escapeJson(label) + "\"}");
+            }
+            Collections.sort(entries, new Comparator<String>() {
+                @Override
+                public int compare(String a, String b) {
+                    return a.toLowerCase().compareTo(b.toLowerCase());
+                }
+            });
+            StringBuilder sb = new StringBuilder("[");
+            for (int i = 0; i < entries.size(); i++) {
+                if (i > 0) sb.append(",");
+                sb.append(entries.get(i));
+            }
+            sb.append("]");
+            return sb.toString();
+        } catch (Exception e) {
+            return "[]";
+        }
+    }
+
+    private static String escapeJson(String s) {
+        if (s == null) return "";
+        StringBuilder sb = new StringBuilder();
+        for (char c : s.toCharArray()) {
+            switch (c) {
+                case '"': sb.append("\\\""); break;
+                case '\\': sb.append("\\\\"); break;
+                case '\n': sb.append("\\n"); break;
+                case '\r': sb.append("\\r"); break;
+                case '\t': sb.append("\\t"); break;
+                default:
+                    if (c < 0x20) {
+                        sb.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        sb.append(c);
+                    }
+            }
+        }
+        return sb.toString();
     }
 
     @JavascriptInterface

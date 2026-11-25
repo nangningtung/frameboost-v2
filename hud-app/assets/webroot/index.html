@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <title>Secreto Space</title>
-  <link rel="stylesheet" href="style.css?v=0.1.0-ui3">
+  <link rel="stylesheet" href="style.css?v=0.1.0-ui4">
 </head>
 <body>
   <div class="app-container">
@@ -36,7 +36,7 @@
 
     <main class="hud-main">
       <!-- ===================== 1. SESSION ===================== -->
-      <section class="tab-panel active" id="tab-session">
+      <section class="tab-panel" id="tab-session">
 
         <!-- Instrument cluster: identity + readouts + governor rail -->
         <div class="panel cluster">
@@ -150,16 +150,6 @@
             <button class="hud-btn danger" id="btn-session-end">End session &amp; restore</button>
           </div>
           <input type="hidden" id="session-slept" value="0">
-        </section>
-
-        <!-- Compact game library -->
-        <section class="panel" aria-labelledby="home-games-title">
-          <div class="panel-head">
-            <h2 class="panel-title" id="home-games-title">Your games</h2>
-            <button class="panel-link" id="btn-home-see-games">See all</button>
-          </div>
-          <div id="home-games" class="home-games-list"></div>
-          <p class="home-games-count" id="home-games-count"></p>
         </section>
 
         <!-- Quick tools: 2x2 tactical tiles -->
@@ -278,7 +268,7 @@
       </section>
 
       <!-- ===================== 2. GAMES ===================== -->
-      <section class="tab-panel" id="tab-games">
+      <section class="tab-panel active" id="tab-games">
         <div class="section-header">
           <h2>
             Game library
@@ -305,15 +295,15 @@
         </div>
 
         <div id="add-game-drawer" class="add-game-drawer hidden">
-          <div class="drawer-title">Add game to Game Space</div>
-          <select id="installed-apps-select" class="hud-select" aria-label="Choose an installed app">
-            <option value="">Choose an installed app</option>
-          </select>
-          <input type="text" id="custom-pkg-input" class="hud-input" placeholder="Or type a package (e.g. org.cutwire.drift)" aria-label="Package name">
-          <div class="drawer-actions">
-            <button id="btn-submit-add-game" class="btn btn-primary">Add game</button>
-            <button id="btn-cancel-add-game" class="btn btn-secondary">Cancel</button>
+          <div class="drawer-head">
+            <span class="drawer-title">Add game</span>
+            <button id="btn-cancel-add-game" class="btn-icon-only" aria-label="Close">✕</button>
           </div>
+          <select id="installed-apps-select" class="hud-select" aria-label="Select installed app">
+            <option value="">Select installed app</option>
+          </select>
+          <input type="text" id="custom-pkg-input" class="hud-input" placeholder="Or enter package name (e.g. com.mobile.legends)" aria-label="Package name">
+          <button id="btn-submit-add-game" class="btn btn-primary btn-block">Add game</button>
         </div>
 
         <div id="games-list-view">
@@ -755,7 +745,7 @@
     </main>
 
     <nav class="hud-nav" aria-label="Main navigation">
-      <button class="nav-tab" data-tab="tab-games">
+      <button class="nav-tab active" data-tab="tab-games">
         <span class="nav-indicator">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <rect x="3" y="7" width="18" height="10" rx="4"/>
@@ -764,7 +754,7 @@
         </span>
         <span class="nav-label">GAMES</span>
       </button>
-      <button class="nav-tab active" data-tab="tab-session">
+      <button class="nav-tab" data-tab="tab-session">
         <span class="nav-indicator">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M3 12h3.5l2.5-7 4.5 14 2.5-7H21"/>
@@ -794,6 +784,8 @@
     </nav>
   </div>
 
-  <script src="app.js?v=0.1.0-ui3"></script>
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js?v=0.1.0-ui4"></script>
 </body>
 </html>

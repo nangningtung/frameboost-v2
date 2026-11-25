@@ -48,6 +48,12 @@ pub static BUILTIN_GAMES: &[(&str, &str)] = &[
 ];
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct AppInfo {
+    pub pkg: String,
+    pub label: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct GameEntry {
     pub pkg: String,
     pub name: String,
@@ -215,7 +221,7 @@ impl GameDetector {
     }
 
     /// Get all third-party apps installed on the device (pm list packages -3)
-    pub fn get_installed_user_apps() -> Vec<String> {
+    pub fn get_installed_user_apps() -> Vec<AppInfo> {
         let mut out = run_cmd("/system/bin/pm", &["list", "packages", "-3"]);
         if out.is_empty() {
             out = run_cmd("/system/bin/cmd", &["package", "list", "packages", "-3"]);
@@ -226,12 +232,43 @@ impl GameDetector {
             if let Some(pkg) = trimmed.strip_prefix("package:") {
                 let clean = pkg.trim();
                 if !clean.is_empty() && clean.contains('.') && !Self::is_system_pkg(clean) {
-                    apps.push(clean.to_string());
+                    let label = Self::derive_label(clean);
+                    apps.push(AppInfo {
+                        pkg: clean.to_string(),
+                        label,
+                    });
                 }
             }
         }
-        apps.sort();
+        apps.sort_by(|a, b| a.label.to_lowercase().cmp(&b.label.to_lowercase()));
         apps
+    }
+
+    /// Derive a human-readable label from a package name.
+    /// Takes the last meaningful segment and title-cases it.
+    /// e.g. "com.mobile.legends" -> "Legends"
+    ///      "com.mobilechess.gp" -> "Gp"
+    ///      "com.dts.freefireth" -> "Freefireth"
+    fn derive_label(pkg: &str) -> String {
+        let segments: Vec<&str> = pkg.split('.').filter(|s| !s.is_empty()).collect();
+        if segments.is_empty() {
+            return pkg.to_string();
+        }
+        // Skip common prefixes like com, org, io, xyz, app
+        let skip = ["com", "org", "io", "xyz", "app", "net", "dev", "uk", "co", "me", "my"];
+        let mut last = segments[segments.len() - 1];
+        if segments.len() > 1 && skip.contains(&segments[0]) && segments.len() > 2 {
+            // Use second-to-last if last is too short (like "gp", "th")
+            if last.len() <= 2 {
+                last = segments[segments.len() - 2];
+            }
+        }
+        // Title-case: capitalize first letter
+        let mut chars = last.chars();
+        match chars.next() {
+            Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
+            None => last.to_string(),
+        }
     }
 
     /// Add a manual game to custom list
@@ -438,7 +475,7 @@ impl GameDetector {
 
     /// List only game profiles whose packages are installed on device.
     pub fn list_all_games(&self) -> Vec<GameEntry> {
-        let installed: HashSet<String> = Self::get_installed_user_apps().into_iter().collect();
+        let installed: HashSet<String> = Self::get_installed_user_apps().into_iter().map(|a| a.pkg).collect();
         let mut map: HashMap<String, GameEntry> = HashMap::new();
 
         // 1. Builtin games
@@ -467,7 +504,7 @@ impl GameDetector {
                     .iter()
                     .find(|(p, _)| *p == pkg.as_str())
                     .map(|(_, n)| n.to_string())
-                    .unwrap_or_else(|| pkg.clone());
+                    .unwrap_or_else(|| Self::derive_label(pkg));
                 map.insert(
                     pkg.clone(),
                     GameEntry {
@@ -490,7 +527,7 @@ impl GameDetector {
                     .iter()
                     .find(|(p, _)| *p == pkg.as_str())
                     .map(|(_, n)| n.to_string())
-                    .unwrap_or_else(|| pkg.clone());
+                    .unwrap_or_else(|| Self::derive_label(pkg));
                 map.insert(
                     pkg.clone(),
                     GameEntry {
@@ -515,7 +552,7 @@ impl GameDetector {
                 .iter()
                 .find(|(p, _)| *p == pkg.as_str())
                 .map(|(_, n)| n.to_string())
-                .unwrap_or_else(|| pkg.clone());
+                .unwrap_or_else(|| Self::derive_label(pkg));
             map.insert(
                 pkg.clone(),
                 GameEntry {
