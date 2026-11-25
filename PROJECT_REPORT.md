@@ -472,6 +472,19 @@ Gunakan checklist ini setiap kali ada perubahan.
     dihitung dua kali.
   - 20 unit test Rust, dijalankan di A50. Drill device: recovery `kill -9`, single-instance,
     24 panggilan `fps` beruntun, dan smoke test 17/17 PASS.
+- **WebUI Material You redesign (2026-11-25)**:
+  - Palet warna diubah dari obsidian-cyan ke Material You dark
+    (`#111318` / `#1B1F27` / accent `#A8C7FA`), mengikuti referensi Pixel OS
+    Game Space.
+  - Radius kartu 24px, border tipis `rgba(255,255,255,0.08)`, button dan badge
+    pill-shaped, nav indicator pill dengan accent-soft background.
+  - Font stack Inter + JetBrains Mono (dengan fallback system fonts karena
+    WebView KSU tidak punya akses internet).
+  - Transisi `cubic-bezier(0.2, 0, 0, 1)` (emphasized) untuk semua interaksi.
+  - Semua ID binding dan logika `app.js` tetap utuh; tidak ada fitur baru.
+  - Verifikasi device: 4 tab (Session, Games, Policy, System) terender benar,
+    game detail dengan segmented control dan badge EXPERIMENTAL utuh, tidak
+    ada error di logcat. Webroot parity 3/3 MATCH.
 - **State machine overlay murni (2026-11-25)**:
   - State overlay disatukan ke enum `OverlayState { HIDDEN, DOCKED, DRAGGING,
     PANEL_OPEN }` dengan transisi terpusat lewat `enterState()`. Sebelumnya
