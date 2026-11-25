@@ -522,7 +522,9 @@ Gunakan checklist ini setiap kali ada perubahan.
   - Toolbar Games tab di-rapikan: judul "Game library" dengan sparkle icon
     hijau (indikator auto-detect), search bar full-width dengan icon
     magnifier, tombol refresh/add/toggle jadi icon-only 44dp pill dengan
-    stroke-based SVG. Cache buser bump ke v0.1.0-ui2.
+    stroke-based SVG. Cache buser bump ke v0.1.0-ui2. Search bar dihapus dari
+    Games tab karena game list biasanya sedikit (2-5 game) sehingga filter
+    tidak diperlukan.
 - **State machine overlay murni (2026-11-25)**:
   - State overlay disatukan ke enum `OverlayState { HIDDEN, DOCKED, DRAGGING,
     PANEL_OPEN }` dengan transisi terpusat lewat `enterState()`. Sebelumnya

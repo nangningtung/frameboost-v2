@@ -1031,31 +1031,6 @@ button:disabled,
 
 /* ---------------------------------------------------------------- GAMES */
 
-.games-toolbar {
-  margin-bottom: 10px;
-}
-
-.games-search-wrap {
-  position: relative;
-  width: 100%;
-}
-
-.toolbar-search-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 16px;
-  height: 16px;
-  color: var(--text-dim);
-  pointer-events: none;
-  z-index: 1;
-}
-
-.toolbar-search {
-  padding-left: 36px !important;
-}
-
 .games-actions-row {
   display: flex;
   gap: 6px;

@@ -84,7 +84,6 @@
   const carouselHeroPlay = document.getElementById("carousel-hero-play");
   const carouselHeroTune = document.getElementById("carousel-hero-tune");
   const btnViewToggle = document.getElementById("btn-view-toggle");
-  const gameSearchInput = document.getElementById("game-search-input");
   const btnScanGames = document.getElementById("btn-scan-games");
   const btnToggleAddDrawer = document.getElementById("btn-toggle-add-drawer");
   const addGameDrawer = document.getElementById("add-game-drawer");
@@ -1223,18 +1222,7 @@
 
   function applyFilter() {
     renderHomeGames();
-    const q = (gameSearchInput?.value || "").toLowerCase().trim();
-    if (!q) {
-      renderGamesList(allGames);
-      return;
-    }
-    const filtered = allGames.filter(
-      (g) =>
-        (g.name && g.name.toLowerCase().includes(q)) ||
-        (g.pkg && g.pkg.toLowerCase().includes(q)) ||
-        (g.source && g.source.toLowerCase().includes(q))
-    );
-    renderGamesList(filtered);
+    renderGamesList(allGames);
   }
 
   const gamesListView = document.getElementById("games-list-view");
@@ -1485,8 +1473,6 @@
     await loadGames();
     addGameDrawer?.classList.add("hidden");
   });
-
-  gameSearchInput?.addEventListener("input", applyFilter);
 
   // View mode toggle (grid <-> carousel)
   if (btnViewToggle) {
