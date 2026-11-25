@@ -136,6 +136,17 @@ Bubble HUD di 720p tetap utuh di layar: `frame=[1444,188][1560,304]` pada displa
 
 ## 5g. Crash recovery dan single-instance
 
+## 5i. Per-app layout panel
+
+| Cek | Perintah | Harapan |
+|---|---|---|
+| Layout tersimpan | buka game A, drag bubble ke posisi X, ganti mode → `su -c "cat /data/data/com.secreto.space/shared_prefs/hud_prefs.xml"` | `layout_<pkg>_right`, `_y`, `_type`, `_fps` ada untuk game A |
+| Layout terpisah | buka game B, drag ke posisi berbeda, ganti mode → baca prefs | `layout_<pkgB>_...` ada, layout game A tidak berubah |
+| Layout dipulihkan | tutup game B, buka game A lagi | bubble kembali ke edge/Y/mode game A; `dumpsys window windows` menunjukkan posisi game A |
+| Game baru fallback | buka game C yang belum punya layout | bubble memakai layout global, tidak crash |
+| Panel 720p | set render scale 720p, buka panel | semua tombol mode dan preset terjangkau via scroll |
+| Global tetap sync | setelah interaksi di game A | `hud_right`, `hud_y`, `hud_type`, `fps_overlay_enabled` ikut diperbarui |
+
 | Cek | Perintah | Harapan |
 |---|---|---|
 | Recovery setelah SIGKILL | sesi aktif dengan 720p + app tidur, `su -c "kill -9 $(pidof secretod)"` | watchdog menyalakan ulang, `wm size` kembali 1080x2340, kedua journal hilang, appops dan governor stock |
@@ -211,3 +222,4 @@ tidak dibaca oleh versi lama, jadi profil perlu disalin kembali ke
 | FPS vs SurfaceFlinger | PASS, 598 frame / 10 detik = 59,8 FPS di luar daemon; snapshot daemon 59,8-60,4 FPS |
 | Unit test Rust | PASS, 20 test dijalankan di A50, 20 lulus |
 | Smoke test | PASS penuh 17 cek, termasuk sesi aktif dan journal |
+| Per-app layout | PASS, MLBB (left, Y299, FULL) dan Auto Chess (right, Y93, DETAIL) tidak saling menimpa setelah berganti game dua arah; panel 720p scroll utuh |

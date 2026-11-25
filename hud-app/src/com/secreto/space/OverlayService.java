@@ -97,6 +97,7 @@ public class OverlayService extends Service {
     private android.animation.ValueAnimator snapAnimator;
 
     private boolean panelOpen = false;
+    private boolean panelMerged = false;
     private boolean autoHide = true;
     private boolean fpsOverlayEnabled = true;
     private boolean dndEnabled = true;
@@ -113,6 +114,8 @@ public class OverlayService extends Service {
     private String hudType = "COMPACT";
     private String activePreset = "BALANCED";
     private String currentGamePkg = "";
+    /** Package whose saved layout is currently applied, to avoid re-applying every tick. */
+    private String appliedLayoutPkg = "";
 
     // Last rendered strings, to skip redundant layout passes at 2 Hz.
     private String lastBubbleText = "";
@@ -397,6 +400,7 @@ public class OverlayService extends Service {
         panelOpen = false;
         if (bubbleY >= 0) params.y = bubbleY;
         clampY();
+        bubbleY = params.y;
         params.x = dockedX(bubbleWidth());
         updateLayout();
         savePosition();
@@ -412,17 +416,57 @@ public class OverlayService extends Service {
         viewSidePanel.setScaleY(1f);
         viewSidePanel.setTranslationX(0f);
         viewSidePanel.setVisibility(View.GONE);
+        restorePanelSize();
         viewBubble.setVisibility(View.VISIBLE);
         if (yAutoCentered) centerBubbleY();
         else if (bubbleY >= 0) params.y = bubbleY;
         clampY();
+        bubbleY = params.y;
         updateLayout();
+    }
+
+    /**
+     * On a short display (720p render scale, split screen) the fixed cockpit is
+     * taller than the panel. Merge it into the scroll content so every control
+     * stays reachable instead of being clipped below the screen edge.
+     */
+    private void setPanelMerged(boolean merged) {
+        if (merged == panelMerged) return;
+        View fixedTop = viewSidePanel.findViewById(R.id.sidepanel_fixed_top);
+        View scrollContent = viewSidePanel.findViewById(R.id.sidepanel_scroll_content);
+        if (fixedTop == null || scrollContent == null) return;
+        ViewGroup parent = (ViewGroup) fixedTop.getParent();
+        if (parent == null) return;
+        parent.removeView(fixedTop);
+        ViewGroup target = (ViewGroup) (merged ? scrollContent : viewSidePanel);
+        target.addView(fixedTop, 0, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        panelMerged = merged;
+    }
+
+    /** Returns the panel to its natural wrap_content size. */
+    private void restorePanelSize() {
+        setPanelMerged(false);
+        ViewGroup.LayoutParams lp = viewSidePanel.getLayoutParams();
+        if (lp != null && lp.height != ViewGroup.LayoutParams.WRAP_CONTENT) {
+            lp.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+            viewSidePanel.setLayoutParams(lp);
+        }
+        View scroll = viewSidePanel.findViewById(R.id.sidepanel_scroll);
+        if (scroll != null) {
+            LinearLayout.LayoutParams slp = (LinearLayout.LayoutParams) scroll.getLayoutParams();
+            slp.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+            slp.weight = 0f;
+            scroll.setLayoutParams(slp);
+        }
     }
 
     private void snapToEdge(int fromX) {
         // A drag can end past the bottom edge; bring the bubble back in bounds
         // before the edge animation so it always docks fully visible.
         clampY();
+        bubbleY = params.y;
         int width = bubbleWidth();
         boolean right = (fromX + width / 2) >= usableWidth() / 2;
         dockedRight = right;
@@ -448,6 +492,7 @@ public class OverlayService extends Service {
 
     private void savePosition() {
         try {
+            if (!panelOpen) bubbleY = params.y;
             android.content.SharedPreferences.Editor editor = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                     .edit()
                     .putBoolean("hud_right", dockedRight)
@@ -455,6 +500,79 @@ public class OverlayService extends Service {
             if (yAutoCentered) editor.remove("hud_y");
             else editor.putInt("hud_y", params.y);
             editor.apply();
+            saveLayoutForCurrentGame();
+        } catch (Exception ignored) {}
+    }
+
+    // --------------------------------------------------------- per-game layout
+
+    private String layoutKey(String pkg, String suffix) {
+        return "layout_" + pkg + "_" + suffix;
+    }
+
+    /**
+     * Saves the current edge, Y and HUD mode for the running game. The global
+     * keys stay in sync as a fallback for a game that has never been seen.
+     */
+    private void saveLayoutForCurrentGame() {
+        if (currentGamePkg == null || currentGamePkg.isEmpty()) return;
+        try {
+            String pkg = currentGamePkg;
+            // While the panel borrows the window, params.y is the panel's top.
+            // The bubble's own Y is kept in bubbleY, so never overwrite the
+            // saved bubble position with the panel position.
+            int layoutY = (panelOpen && bubbleY >= 0) ? bubbleY : params.y;
+            android.content.SharedPreferences.Editor editor = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(layoutKey(pkg, "right"), dockedRight)
+                    .putBoolean(layoutKey(pkg, "auto"), yAutoCentered)
+                    .putString(layoutKey(pkg, "type"), hudType)
+                    .putBoolean(layoutKey(pkg, "fps"), fpsOverlayEnabled);
+            if (yAutoCentered) editor.remove(layoutKey(pkg, "y"));
+            else editor.putInt(layoutKey(pkg, "y"), layoutY);
+            editor.apply();
+        } catch (Exception ignored) {}
+    }
+
+    /**
+     * Restores a game's saved layout. A game without saved keys inherits the
+     * current global layout, so existing installs keep working unchanged.
+     */
+    private void applyLayoutFor(String pkg) {
+        if (pkg == null || pkg.isEmpty()) return;
+        appliedLayoutPkg = pkg;
+        try {
+            SharedPreferences prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            String rightKey = layoutKey(pkg, "right");
+            // The panel borrows the window, so params.y is the panel's top while
+            // it is open. Collapse it first to get the bubble's own position back.
+            if (panelOpen) resetPanel();
+            if (!prefs.contains(rightKey)) {
+                bubbleY = params.y;
+                return;
+            }
+
+            dockedRight = prefs.getBoolean(rightKey, dockedRight);
+            yAutoCentered = prefs.getBoolean(layoutKey(pkg, "auto"), yAutoCentered);
+            if (yAutoCentered) {
+                bubbleY = -1;
+            } else {
+                int savedY = prefs.getInt(layoutKey(pkg, "y"), params.y);
+                bubbleY = savedY;
+                params.y = savedY;
+            }
+            hudType = prefs.getString(layoutKey(pkg, "type"), hudType);
+            fpsOverlayEnabled = prefs.getBoolean(layoutKey(pkg, "fps"), fpsOverlayEnabled);
+
+            highlightHudType();
+            applyFpsOverlayState();
+            viewBubble.post(() -> {
+                if (yAutoCentered) centerBubbleY();
+                else if (bubbleY >= 0) params.y = bubbleY;
+                clampY();
+                params.x = dockedX(bubbleWidth());
+                updateLayout();
+            });
         } catch (Exception ignored) {}
     }
 
@@ -501,6 +619,7 @@ public class OverlayService extends Service {
                             int maxY = Math.max(0, usableHeight() - bubbleHeight());
                             params.x = Math.max(0, Math.min(initialX + (int) dx, usable - bw));
                             params.y = Math.max(0, Math.min(initialY + (int) dy, maxY));
+                            bubbleY = params.y;
                             updateLayout();
                         }
                         return true;
@@ -578,6 +697,7 @@ public class OverlayService extends Service {
                     slp.weight = 1f;
                     scroll.setLayoutParams(slp);
                 }
+                setPanelMerged(true);
                 ph = maxAllowedH;
             }
             viewSidePanel.setPivotX(dockedRight ? pw : 0f);
@@ -612,18 +732,7 @@ public class OverlayService extends Service {
                 .setInterpolator(new android.view.animation.AccelerateInterpolator())
                 .withEndAction(() -> {
                     viewSidePanel.setVisibility(View.GONE);
-                    ViewGroup.LayoutParams lp = viewSidePanel.getLayoutParams();
-                    if (lp != null && lp.height != ViewGroup.LayoutParams.WRAP_CONTENT) {
-                        lp.height = ViewGroup.LayoutParams.WRAP_CONTENT;
-                        viewSidePanel.setLayoutParams(lp);
-                    }
-                    View scroll = viewSidePanel.findViewById(R.id.sidepanel_scroll);
-                    if (scroll != null) {
-                        LinearLayout.LayoutParams slp = (LinearLayout.LayoutParams) scroll.getLayoutParams();
-                        slp.height = ViewGroup.LayoutParams.WRAP_CONTENT;
-                        slp.weight = 0f;
-                        scroll.setLayoutParams(slp);
-                    }
+                    restorePanelSize();
                     viewBubble.setVisibility(View.VISIBLE);
                     viewBubble.post(OverlayService.this::placeBubble);
                 })
@@ -672,6 +781,7 @@ public class OverlayService extends Service {
                         .edit().putBoolean("fps_overlay_enabled", false).apply();
                 applyFpsOverlayState();
                 highlightHudType();
+                saveLayoutForCurrentGame();
             });
         }
         if (btnTypeCompact != null) {
@@ -722,6 +832,7 @@ public class OverlayService extends Service {
                 getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                         .edit().putBoolean("fps_overlay_enabled", fpsOverlayEnabled).apply();
                 applyFpsOverlayState();
+                saveLayoutForCurrentGame();
             });
         }
 
@@ -833,6 +944,7 @@ public class OverlayService extends Service {
         if (lastData != null) {
             refreshBubbleText(lastData);
         }
+        saveLayoutForCurrentGame();
     }
 
     private void applyPreset(String preset) {
@@ -985,7 +1097,15 @@ public class OverlayService extends Service {
             }
         }
 
-        currentGamePkg = data.gamePkg == null ? "" : data.gamePkg;
+        String pkg = data.gamePkg == null ? "" : data.gamePkg;
+        if (!pkg.equals(currentGamePkg)) {
+            currentGamePkg = pkg;
+            if (pkg.isEmpty()) {
+                appliedLayoutPkg = "";
+            } else if (!pkg.equals(appliedLayoutPkg)) {
+                applyLayoutFor(pkg);
+            }
+        }
 
         if (autoHide && !data.isGame) {
             resetPanel();

@@ -71,6 +71,9 @@ Detail perilaku:
 - Warna FPS: cyan ≥55, hijau ≥40, amber ≥25, merah <25; rail ikut warna yang sama.
 - Warna suhu: amber ≥78 °C, merah ≥85 °C; GPU clock abu-abu.
 - Drag bebas, lepas → snap ke sisi terdekat; posisi X/Y tersimpan.
+- Posisi edge, Y, dan mode HUD disimpan per game: setiap game punya layout
+  sendiri, dan game baru mewarisi layout global. Berganti game memulihkan
+  layout masing-masing tanpa saling menimpa.
 - Tap vs drag dipisah touch slop dinamis (`max(12dp, getScaledTouchSlop())`), disertai press state (alpha 0.72 + scale 0.95).
 - Tap atau fling inward → side panel.
 
@@ -82,6 +85,8 @@ Detail perilaku:
 - Preset switcher 4 tombol (ECO / BAL / PERF / ESPORTS).
 - Segmen Floating Monitor: OFF / FPS / + TEMP / + GPU.
 - Muncul dari sisi tempat handle menempel; tutup lewat tombol X atau swipe.
+- Di layar pendek (720p render scale), blok status tetap bergabung ke area
+  scroll sehingga preset dan mode tetap terjangkau jari.
 
 ### 2.4 Telemetry
 
@@ -354,7 +359,7 @@ WebUI: tidak ada error JS
 
 Belum termasuk fase ini:
 
-- [ ] Per-app layout side panel
+- [x] Per-app layout side panel
 - [x] Fallback FPS `gfxinfo framestats` saat SurfaceFlinger tidak punya layer (Choreographer sengaja tidak dipakai karena menghasilkan angka palsu)
 - [x] Capability probe terpisah (System tab)
 - [ ] State machine overlay murni
@@ -467,6 +472,23 @@ Gunakan checklist ini setiap kali ada perubahan.
     dihitung dua kali.
   - 20 unit test Rust, dijalankan di A50. Drill device: recovery `kill -9`, single-instance,
     24 panggilan `fps` beruntun, dan smoke test 17/17 PASS.
+- **Per-app layout panel (2026-11-25)**:
+  - Posisi edge, Y, dan mode HUD (OFF / COMPACT / DETAIL / FULL) disimpan per package
+    game di `hud_prefs.xml` dengan key `layout_<pkg>_right`, `layout_<pkg>_y`,
+    `layout_<pkg>_auto`, `layout_<pkg>_type`, `layout_<pkg>_fps`.
+  - Saat game berganti, layout tersimpan dimuat otomatis; game baru tanpa layout
+    tersimpan mewarisi layout global sebagai fallback.
+  - Pref global (`hud_right`, `hud_y`, `hud_type`, `fps_overlay_enabled`) tetap
+    diperbarui sehingga upgrade atau game baru mendapat posisi yang konsisten.
+  - Panel di 720p: bila tinggi layar tidak cukup, blok status tetap di scroll
+    sehingga semua tombol mode dan preset tetap terjangkau (`setPanelMerged`).
+  - `bubbleY` selalu mengikuti posisi bubble terakhir, jadi berganti game tidak
+    menimpa posisi game sebelumnya dengan posisi panel yang sedang terbuka.
+  - Smoke test `fps live` kini mencoba ulang sekali setelah 2 detik bila snapshot
+    pertama masih `null`, sama seperti cek `oom_score_adj`.
+  - Verifikasi device: MLBB kiri-Y299-FULL, Auto Chess kanan-Y93-DETAIL. Berganti
+    game dua arah, posisi dan mode masing-masing tetap. Panel 720p scroll utuh,
+    semua tombol terjangkau. 17/17 smoke test PASS.
 - **Audit komunitas dan intervensi resmi (2026-11-25)**:
   - Pembanding: `uperf` (3.408 bintang), `fas-rs` (1.124), `AZenith` (151), `GameSpace` (44),
     `PerfGame` (10), `ROR` (5). Detail di `docs/COMMUNITY-COMPARISON.md`.

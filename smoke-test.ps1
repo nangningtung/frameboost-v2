@@ -66,9 +66,20 @@ if ($snap) {
     }
 
     if ($isGame) {
-        # 6. FPS sanity
-        $fpsOk = ($null -ne $snap.fps) -and ([double]$snap.fps -gt 0) -and ([double]$snap.fps -le 120)
-        Add-Result "fps live" $fpsOk ("fps=" + $snap.fps)
+        # 6. FPS sanity. The first snapshot after a game comes to the foreground
+        # can land before the frame baseline exists; retry once instead of
+        # failing on that one-tick window.
+        $fpsValue = $snap.fps
+        $fpsOk = ($null -ne $fpsValue) -and ([double]$fpsValue -gt 0) -and ([double]$fpsValue -le 120)
+        if (-not $fpsOk) {
+            Start-Sleep -Seconds 2
+            try {
+                $snapRetry = ((& $adb -s $Serial shell "cat /data/local/tmp/secreto-snapshot.json") -join "`n") | ConvertFrom-Json
+                $fpsValue = $snapRetry.fps
+                $fpsOk = ($null -ne $fpsValue) -and ([double]$fpsValue -gt 0) -and ([double]$fpsValue -le 120)
+            } catch {}
+        }
+        Add-Result "fps live" $fpsOk ("fps=" + $fpsValue)
         if ($null -ne $snap.p1_low_fps) {
             $p1Ok = [double]$snap.p1_low_fps -le [double]$snap.fps
             Add-Result "p1 low <= fps" $p1Ok ("p1=" + $snap.p1_low_fps)
