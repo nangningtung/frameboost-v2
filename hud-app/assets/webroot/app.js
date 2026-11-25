@@ -613,8 +613,11 @@
         } else {
           btn.classList.remove("active");
         }
+        btn.disabled = !currentForegroundPkg;
       });
     }
+    const presetIdleHint = document.getElementById("preset-idle-hint");
+    if (presetIdleHint) presetIdleHint.classList.toggle("hidden", !!currentForegroundPkg);
 
     // Badges
     heroGpuGov.textContent = `GPU: ${data.gpu?.governor || "Interactive"}`;

@@ -846,6 +846,18 @@ button:disabled,
   color: var(--accent);
 }
 
+.preset-segment-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.preset-idle-hint {
+  margin: 6px 2px 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
 /* ---------------------------------------------------------------- HOME: charts */
 
 #frametime-canvas,
