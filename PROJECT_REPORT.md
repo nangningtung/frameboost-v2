@@ -56,15 +56,18 @@ Prinsip utama: **ringan, cepat, rapi, dan jujur terhadap data**.
 | Mode | Ukuran | Isi |
 |---|---|---|
 | OFF | 14 × 48 dp | grip bar cyan (tap target 48 dp) |
-| FPS (COMPACT) | 44 × 44 dp | angka FPS |
-| + TEMP (DETAIL) | 46 × 48 dp | FPS + suhu |
-| + GPU (FULL) | 48 × 62 dp | FPS + suhu + GPU clock |
+| FPS (COMPACT) | 44 × 44 dp | angka FPS + label kecil `FPS` |
+| + TEMP (DETAIL) | 44 × 48 dp | FPS + suhu |
+| + GPU (FULL) | 44 × 54 dp | FPS + suhu + GPU clock |
 
 Detail perilaku:
 
-- Sisi bezel memakai layer-list dengan inset negatif `-3dp`, sehingga stroke luar terpotong tepat di tepi layar (tidak ada garis tepi ganda).
-- Sudut sisi dalam rounded 10 dp; konten selalu center (vertikal dan horizontal).
-- Warna FPS: cyan ≥55, hijau ≥40, amber ≥25, merah <25.
+- Sisi bezel memakai layer-list dengan inset negatif `-3dp`, sehingga permukaan menempel tepat di tepi layar tanpa garis tepi ganda.
+- Permukaan memakai gradient gelap halus dan hairline 1 dp; bukan lagi border cyan penuh.
+- Rail status 2 dp di sisi dalam (menghadap layar) mengikuti warna FPS, dengan inset 9 dp dari atas dan bawah.
+- Sudut sisi dalam rounded 12 dp; konten selalu center (vertikal dan horizontal).
+- Teks bertingkat: angka FPS dominan, suhu dan GPU clock memakai `RelativeSizeSpan` yang lebih kecil.
+- Warna FPS: cyan ≥55, hijau ≥40, amber ≥25, merah <25; rail ikut warna yang sama.
 - Warna suhu: amber ≥78 °C, merah ≥85 °C; GPU clock abu-abu.
 - Drag bebas, lepas → snap ke sisi terdekat; posisi X/Y tersimpan.
 - Tap vs drag dipisah touch slop dinamis (`max(12dp, getScaledTouchSlop())`), disertai press state (alpha 0.72 + scale 0.95).
@@ -370,6 +373,10 @@ Gunakan checklist ini setiap kali ada perubahan.
     SELinux lewat perintah `probe`.
   - Guard `ro.product.device=a50` juga ada di binary daemon.
   - Copy Indonesia di UI disapu ke English, termasuk `(referensi)` menjadi `(reference)`.
+- **Floating monitor (redesign)**: lebar tetap 44 dp agar tap target aman, DETAIL 44 × 48 dp,
+  FULL 44 × 54 dp. Border cyan penuh diganti gradient gelap, hairline 1 dp, dan rail status
+  2 dp di sisi dalam yang mengikuti warna FPS. COMPACT kini memberi label kecil `FPS`, dan
+  suhu/GPU memakai ukuran relatif supaya hierarki teks lebih rapi.
 
 ### `v2.4.0` - 2026-11-25
 

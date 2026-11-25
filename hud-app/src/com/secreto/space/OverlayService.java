@@ -53,6 +53,8 @@ public class OverlayService extends Service {
     private WindowManager windowManager;
     private View overlayRoot;
     private View viewBubble;
+    private View bubbleContent;
+    private View edgeAccent;
     private View viewSidePanel;
     private View dotState;
     private View dotPanelState;
@@ -162,6 +164,8 @@ public class OverlayService extends Service {
         overlayRoot = inflater.inflate(R.layout.overlay_layout, null);
 
         viewBubble = overlayRoot.findViewById(R.id.view_bubble);
+        bubbleContent = overlayRoot.findViewById(R.id.bubble_content);
+        edgeAccent = overlayRoot.findViewById(R.id.edge_accent);
         viewSidePanel = overlayRoot.findViewById(R.id.view_sidepanel);
         dotState = overlayRoot.findViewById(R.id.dot_state);
         dotPanelState = overlayRoot.findViewById(R.id.dot_panel_state);
@@ -306,14 +310,14 @@ public class OverlayService extends Service {
 
     private int targetBubbleWidth() {
         if (!fpsOverlayEnabled) return dp(HANDLE_SMALL_WIDTH_DP);
-        if ("FULL".equals(hudType)) return dp(48);
-        if ("DETAIL".equals(hudType)) return dp(46);
+        // 44dp is the minimum comfortable tap target; the visual weight comes
+        // from the slim rail and the type scale, not from a smaller window.
         return dp(44);
     }
 
     private int targetBubbleHeight() {
         if (!fpsOverlayEnabled) return dp(HANDLE_SMALL_HEIGHT_DP);
-        if ("FULL".equals(hudType)) return dp(62);
+        if ("FULL".equals(hudType)) return dp(54);
         if ("DETAIL".equals(hudType)) return dp(48);
         return dp(44);
     }
@@ -338,6 +342,20 @@ public class OverlayService extends Service {
     private void updateBubbleOrientation() {
         if (viewBubble == null) return;
         viewBubble.setBackgroundResource(dockedRight ? R.drawable.bg_edge_handle : R.drawable.bg_edge_handle_left);
+
+        // The status rail always faces the screen, never the bezel.
+        if (edgeAccent != null) {
+            FrameLayout.LayoutParams rlp = (FrameLayout.LayoutParams) edgeAccent.getLayoutParams();
+            rlp.gravity = (dockedRight ? Gravity.START : Gravity.END) | Gravity.CENTER_VERTICAL;
+            rlp.setMarginStart(dockedRight ? dp(2) : 0);
+            rlp.setMarginEnd(dockedRight ? 0 : dp(2));
+            edgeAccent.setLayoutParams(rlp);
+        }
+        if (bubbleContent != null) {
+            bubbleContent.setPaddingRelative(
+                    dockedRight ? dp(8) : dp(5), 0,
+                    dockedRight ? dp(5) : dp(8), 0);
+        }
     }
 
     private int panelWidth() {
@@ -875,6 +893,9 @@ public class OverlayService extends Service {
         if (txtBubbleFps != null) {
             txtBubbleFps.setVisibility(fpsOverlayEnabled ? View.VISIBLE : View.GONE);
         }
+        if (edgeAccent != null) {
+            edgeAccent.setVisibility(fpsOverlayEnabled ? View.VISIBLE : View.GONE);
+        }
         if (txtTelemetryState != null) {
             txtTelemetryState.setText(fpsOverlayEnabled ? "ON" : "OFF");
             txtTelemetryState.setTextColor(fpsOverlayEnabled ? COLOR_ACCENT : COLOR_DIM);
@@ -984,61 +1005,57 @@ public class OverlayService extends Service {
         else if (fpsInt >= 40) fpsColor = COLOR_GREEN;
         else if (fpsInt >= 25) fpsColor = COLOR_AMBER;
         else if (fpsInt > 0) fpsColor = COLOR_RED;
-        else fpsColor = 0xFF8798AC;
+        else fpsColor = 0xFF64748B;
+
+        // The rail is the only loud element, so the bubble stays readable
+        // without a neon frame around the whole card.
+        if (edgeAccent != null) {
+            edgeAccent.setBackgroundTintList(ColorStateList.valueOf(fpsColor));
+        }
+
+        String temp = data.tempBigC > 0 ? (data.tempBigC + "°") : "--°";
+        int tempColor = data.tempBigC >= 85 ? COLOR_RED : (data.tempBigC >= 78 ? COLOR_AMBER : 0xFF94A3B8);
+
+        android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder();
+        appendSpan(sb, fps, fpsColor, 1f);
+        float size;
 
         if ("DETAIL".equals(hudType)) {
-            String temp = data.tempBigC > 0 ? (data.tempBigC + "°") : "--°";
-            int tempColor = data.tempBigC >= 85 ? COLOR_RED : (data.tempBigC >= 78 ? COLOR_AMBER : 0xFF94A3B8);
-
-            android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder();
-            sb.append(fps);
-            sb.setSpan(new android.text.style.ForegroundColorSpan(fpsColor),
-                    0, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-
-            int startTemp = sb.length();
-            sb.append("\n").append(temp);
-            sb.setSpan(new android.text.style.ForegroundColorSpan(tempColor),
-                    startTemp + 1, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-
-            txtBubbleFps.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 10.5f);
-            txtBubbleFps.setLineSpacing(0f, 1.05f);
-            txtBubbleFps.setText(sb);
+            sb.append("\n");
+            appendSpan(sb, temp, tempColor, 0.78f);
+            size = 12.5f;
             lastBubbleText = fps + "\n" + temp;
         } else if ("FULL".equals(hudType)) {
-            String temp = data.tempBigC > 0 ? (data.tempBigC + "°") : "--°";
-            int tempColor = data.tempBigC >= 85 ? COLOR_RED : (data.tempBigC >= 78 ? COLOR_AMBER : 0xFF94A3B8);
             String gpu = data.gpuClockMhz > 0 ? (data.gpuClockMhz + "M") : "--";
-
-            android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder();
-            sb.append(fps);
-            sb.setSpan(new android.text.style.ForegroundColorSpan(fpsColor),
-                    0, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-
-            int startTemp = sb.length();
-            sb.append("\n").append(temp);
-            sb.setSpan(new android.text.style.ForegroundColorSpan(tempColor),
-                    startTemp + 1, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-
-            int startGpu = sb.length();
-            sb.append("\n").append(gpu);
-            sb.setSpan(new android.text.style.ForegroundColorSpan(0xFF8798AC),
-                    startGpu + 1, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-
-            txtBubbleFps.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 9f);
-            txtBubbleFps.setLineSpacing(0f, 1.05f);
-            txtBubbleFps.setText(sb);
+            sb.append("\n");
+            appendSpan(sb, temp, tempColor, 0.8f);
+            sb.append("\n");
+            appendSpan(sb, gpu, 0xFF8798AC, 0.72f);
+            size = 11f;
             lastBubbleText = fps + "\n" + temp + "\n" + gpu;
         } else {
-            // COMPACT
-            android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder();
-            sb.append(fps);
-            sb.setSpan(new android.text.style.ForegroundColorSpan(fpsColor),
-                    0, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-
-            txtBubbleFps.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12f);
-            txtBubbleFps.setLineSpacing(0f, 1.0f);
-            txtBubbleFps.setText(sb);
+            // COMPACT: a small FPS caption makes the number self-explanatory.
+            sb.append("\n");
+            appendSpan(sb, "FPS", 0xFF64748B, 0.46f);
+            size = 15f;
             lastBubbleText = fps;
+        }
+
+        txtBubbleFps.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, size);
+        txtBubbleFps.setLineSpacing(0f, 0.94f);
+        txtBubbleFps.setText(sb);
+    }
+
+    /** Append a colored run, optionally scaled against the bubble's base size. */
+    private static void appendSpan(android.text.SpannableStringBuilder sb, String text,
+                                   int color, float relativeSize) {
+        int start = sb.length();
+        sb.append(text);
+        sb.setSpan(new android.text.style.ForegroundColorSpan(color),
+                start, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        if (relativeSize != 1f) {
+            sb.setSpan(new android.text.style.RelativeSizeSpan(relativeSize),
+                    start, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
     }
 
