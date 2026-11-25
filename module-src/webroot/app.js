@@ -618,6 +618,8 @@
     }
     const presetIdleHint = document.getElementById("preset-idle-hint");
     if (presetIdleHint) presetIdleHint.classList.toggle("hidden", !!currentForegroundPkg);
+    const boostBtn = document.getElementById("btn-toggle-boost");
+    if (boostBtn) boostBtn.disabled = !currentForegroundPkg;
 
     // Badges
     heroGpuGov.textContent = `GPU: ${data.gpu?.governor || "Interactive"}`;

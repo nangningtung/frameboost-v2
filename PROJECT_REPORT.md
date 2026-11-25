@@ -166,9 +166,10 @@ melaporkan game yang sama sekitar 2%.
 - BBR per game.
 - Multi-target ping.
 - Quick Boost.
-- Preset di Policy hanya aktif kalau ada game yang sedang terdeteksi. Saat idle
-  tombolnya dinonaktifkan dan ada catatan `Select a game first to change its preset.`,
-  karena `apply_preset` tidak menyimpan apa pun saat tidak ada game.
+- Preset dan Apply boost di Policy hanya aktif kalau ada game yang sedang terdeteksi.
+  Saat idle keduanya dinonaktifkan dan ada catatan `Select a game first to change its
+  preset or apply a boost.`, karena `apply_preset` tidak menyimpan apa pun saat tidak
+  ada game dan `apply_game` hanya menulis ulang nilai BAL yang sudah aktif.
 - GOS bypass dengan deteksi paket: ROM tanpa GOS dianggap sudah bypass.
 - Bypass charging dan toggle heads-up notifikasi lewat daemon.
 
@@ -666,10 +667,12 @@ Gunakan checklist ini setiap kali ada perubahan.
   - `apply_preset` di daemon hanya mengembalikan pesan `Profile saved; applies on next launch`
     tanpa benar-benar menyimpan kalau tidak ada game di foreground. UI dulu tetap
     mengubah tombol aktif beberapa detik lalu kembali, tanpa penjelasan.
-  - Sekarang keempat tombol preset dinonaktifkan kalau `game_pkg` kosong, dan muncul
-    catatan `Select a game first to change its preset.` Tombol tetap 44 px saat aktif.
-  - Perubahan hanya WebUI, daemon tidak disentuh. Verifikasi device: idle → 4/4 tombol
-    disabled dan catatan tampil; `game_profiles.json` tidak berubah setelah tombol diklik.
+  - Sekarang keempat tombol preset dan tombol Apply boost dinonaktifkan kalau
+    `game_pkg` kosong, dan muncul catatan `Select a game first to change its preset
+    or apply a boost.` Tombol tetap 44 px saat aktif.
+  - Perubahan hanya WebUI, daemon tidak disentuh. Verifikasi device: idle → 4/4 preset
+    dan Apply boost disabled; tap sungguhan lewat CDP tidak mengubah `game_profiles.json`
+    dan tidak mengubah label tombol.
 
 ### `v2.4.0` - 2026-11-25
 
