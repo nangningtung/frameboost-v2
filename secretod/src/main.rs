@@ -369,7 +369,13 @@ fn take_snapshot(
             *last_fps_time = Instant::now();
             rep
         } else {
-            last_fps.clone().unwrap_or_default()
+            // Reuse the last reading between measurements, but report its real
+            // age instead of pretending it was sampled this instant.
+            let mut rep = last_fps.clone().unwrap_or_default();
+            if rep.fps.is_some() {
+                rep.age_ms = last_fps_time.elapsed().as_millis() as u64;
+            }
+            rep
         }
     } else {
         *last_fps = None;
@@ -801,8 +807,6 @@ fn handle_client(
 }
 
 fn main() {
-    let _ = fs::remove_file(SOCK_PATH);
-
     // Secreto Space is built for one device. `customize.sh` and `service.sh`
     // already refuse other phones; this is the last line of defence in case the
     // binary is started by hand.
@@ -814,6 +818,30 @@ fn main() {
         ));
         return;
     }
+
+    // Single instance, checked before anything else touches the device. A
+    // duplicate used to run recovery first, which woke every slept app and
+    // reset the display in the middle of a live session. Never unlink a socket
+    // that still answers: that let a second daemon take over the path while the
+    // first one kept running the tick loop with no client attached.
+    let listener = match UnixListener::bind(SOCK_PATH) {
+        Ok(l) => l,
+        Err(_) => {
+            if UnixStream::connect(SOCK_PATH).is_ok() {
+                log_line("another daemon is already listening, exiting");
+                return;
+            }
+            // Stale socket from a crash: nobody answers, so replace it.
+            let _ = fs::remove_file(SOCK_PATH);
+            match UnixListener::bind(SOCK_PATH) {
+                Ok(l) => l,
+                Err(e) => {
+                    log_line(&format!("Failed to bind socket: {}", e));
+                    std::process::exit(1);
+                }
+            }
+        }
+    };
 
     GOS_DISABLED.store(check_gos_disabled(), Ordering::Relaxed);
 
@@ -827,14 +855,6 @@ fn main() {
     if let Some(msg) = crate::render::recover() {
         log_line(&msg);
     }
-
-    let listener = match UnixListener::bind(SOCK_PATH) {
-        Ok(l) => l,
-        Err(e) => {
-            log_line(&format!("Failed to bind socket: {}", e));
-            std::process::exit(1);
-        }
-    };
 
     let _ = fs::set_permissions(SOCK_PATH, fs::Permissions::from_mode(0o666));
 

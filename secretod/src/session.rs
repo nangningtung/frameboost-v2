@@ -290,7 +290,10 @@ pub fn sample(rep: &FpsReport, temp_mc: u32, battery: i32) {
     let Some(a) = guard.as_mut() else {
         return;
     };
-    if rep.window_frames > 0 {
+    // A reused reading (`age_ms > 0`) describes a window that was already
+    // counted. Only a freshly measured window may enter the session stats,
+    // otherwise the same frames are added twice.
+    if rep.window_frames > 0 && rep.age_ms == 0 {
         a.frames += rep.window_frames as u64;
         a.jank += rep.jank_count as u64;
         for (ms, cnt) in &rep.hist {
@@ -394,10 +397,9 @@ pub fn history(pkg: &str) -> Vec<SessionReport> {
         .collect()
 }
 
-fn append_history(report: &SessionReport) {
-    let mut all = history_all();
-    all.insert(0, report.clone());
-
+/// Keep the newest `HISTORY_PER_GAME` reports per package and the global cap.
+/// Pure so the retention rule can be tested without touching the journal.
+fn trim_history(mut all: Vec<SessionReport>) -> Vec<SessionReport> {
     let mut per_game: HashMap<String, usize> = HashMap::new();
     all.retain(|r| {
         let seen = per_game.entry(r.pkg.clone()).or_insert(0);
@@ -405,6 +407,13 @@ fn append_history(report: &SessionReport) {
         *seen <= HISTORY_PER_GAME
     });
     all.truncate(HISTORY_MAX);
+    all
+}
+
+fn append_history(report: &SessionReport) {
+    let mut all = history_all();
+    all.insert(0, report.clone());
+    all = trim_history(all);
 
     if let Ok(json) = serde_json::to_string_pretty(&all) {
         let _ = fs::write(HISTORY_PATH, json);
@@ -422,16 +431,16 @@ fn lower_preset(preset: &str) -> &'static str {
 /// Honest advice, only when the data supports it: at least three sessions of
 /// five minutes or more, and the newest average at least 8% below the best run
 /// of the same game. Anything looser is just noise.
-pub fn suggestion(pkg: &str) -> Option<String> {
-    let reports: Vec<SessionReport> = history(pkg)
-        .into_iter()
+fn suggestion_from(reports: &[SessionReport]) -> Option<String> {
+    let eligible: Vec<&SessionReport> = reports
+        .iter()
         .filter(|r| r.duration_s >= ADVICE_MIN_SECONDS)
         .collect();
-    if reports.len() < 3 {
+    if eligible.len() < 3 {
         return None;
     }
-    let latest = reports.first()?.avg_fps?;
-    let best = reports
+    let latest = eligible.first()?.avg_fps?;
+    let best = eligible
         .iter()
         .filter_map(|r| r.avg_fps)
         .fold(0.0_f64, f64::max);
@@ -442,8 +451,12 @@ pub fn suggestion(pkg: &str) -> Option<String> {
     Some(format!(
         "Average FPS is {}% below the best run for this game. Try {} for the next session.",
         drop,
-        lower_preset(&reports[0].preset)
+        lower_preset(&eligible[0].preset)
     ))
+}
+
+pub fn suggestion(pkg: &str) -> Option<String> {
+    suggestion_from(&history(pkg))
 }
 
 pub fn finish(reason: &str) -> Option<SessionReport> {
@@ -510,4 +523,114 @@ pub fn recover() -> Option<String> {
 /// Used by the console to show how many apps would be slept, without doing it.
 pub fn preview_candidates(game: &str) -> Vec<String> {
     apps::candidates(game)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn hist(pairs: &[(u32, u32)]) -> HashMap<u32, u32> {
+        pairs.iter().copied().collect()
+    }
+
+    fn report(pkg: &str, duration: u64, avg: f64, preset: &str) -> SessionReport {
+        SessionReport {
+            pkg: pkg.to_string(),
+            preset: preset.to_string(),
+            duration_s: duration,
+            avg_fps: Some(avg),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn p1_low_uses_the_whole_distribution() {
+        // One slow frame in a hundred is not the 99th percentile.
+        let h = hist(&[(16, 99), (100, 1)]);
+        assert_eq!(p1_low_from(None, &h), Some(62.5));
+        // Two slow frames are.
+        let h = hist(&[(16, 98), (100, 2)]);
+        assert_eq!(p1_low_from(None, &h), Some(10.0));
+    }
+
+    #[test]
+    fn p1_low_never_exceeds_the_average() {
+        let h = hist(&[(16, 100)]);
+        assert_eq!(p1_low_from(Some(60.0), &h), Some(60.0));
+    }
+
+    #[test]
+    fn p1_low_needs_real_frames() {
+        assert_eq!(p1_low_from(Some(60.0), &HashMap::new()), None);
+        assert_eq!(p1_low_from(None, &hist(&[(0, 5)])), None);
+    }
+
+    #[test]
+    fn history_keeps_ten_per_game() {
+        let mut all = Vec::new();
+        for i in 0..15 {
+            all.push(report("a", i, 60.0, "BALANCED"));
+        }
+        for i in 0..15 {
+            all.push(report("b", i, 60.0, "BALANCED"));
+        }
+        let kept = trim_history(all);
+        assert_eq!(kept.len(), 20);
+        assert_eq!(kept.iter().filter(|r| r.pkg == "a").count(), 10);
+        assert_eq!(kept.iter().filter(|r| r.pkg == "b").count(), 10);
+        // Newest first: the first report of each package survives.
+        assert_eq!(kept[0].duration_s, 0);
+    }
+
+    #[test]
+    fn history_honours_the_global_cap() {
+        let mut all = Vec::new();
+        for p in 0..20 {
+            for i in 0..7 {
+                all.push(report(&format!("game{}", p), i, 60.0, "BALANCED"));
+            }
+        }
+        assert_eq!(trim_history(all).len(), HISTORY_MAX);
+    }
+
+    #[test]
+    fn advice_needs_three_long_sessions() {
+        let two = vec![
+            report("g", 600, 60.0, "ESPORTS"),
+            report("g", 600, 40.0, "BATTERY"),
+        ];
+        assert_eq!(suggestion_from(&two), None);
+
+        let short = vec![
+            report("g", 600, 60.0, "ESPORTS"),
+            report("g", 600, 60.0, "ESPORTS"),
+            report("g", 299, 30.0, "BATTERY"),
+        ];
+        assert_eq!(suggestion_from(&short), None, "short stints carry no signal");
+    }
+
+    #[test]
+    fn advice_fires_only_on_a_real_drop() {
+        let dropped = vec![
+            report("g", 600, 45.0, "BATTERY"),
+            report("g", 600, 58.0, "BALANCED"),
+            report("g", 600, 60.0, "ESPORTS"),
+        ];
+        let msg = suggestion_from(&dropped).expect("a 25% drop must be reported");
+        assert!(msg.contains("25%"), "{}", msg);
+        assert!(msg.contains("Battery"), "{}", msg);
+
+        let close = vec![
+            report("g", 600, 56.0, "BATTERY"),
+            report("g", 600, 58.0, "BALANCED"),
+            report("g", 600, 60.0, "ESPORTS"),
+        ];
+        assert_eq!(suggestion_from(&close), None, "7% is inside the noise floor");
+    }
+
+    #[test]
+    fn rounding_is_one_decimal() {
+        assert_eq!(round1(62.44), 62.4);
+        assert_eq!(round1(62.45), 62.5);
+    }
 }

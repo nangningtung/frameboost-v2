@@ -25,7 +25,10 @@ This module is device locked on purpose. `customize.sh` aborts the install and
 - **Auto BBR**: TCP congestion control switched during online sessions.
 - **In-game bubble and side panel**: snaps to the nearest edge, opens a cockpit with
   real FPS, GPU/CPU clocks, BBR, battery, quick actions and the preset switcher.
-- **Honest telemetry**: FPS comes from SurfaceFlinger `--timestats` per layer.
+- **Honest telemetry**: FPS comes from SurfaceFlinger `--timestats` per layer, with
+  `gfxinfo framestats` as the fallback only when the package has no layer at all. A reused
+  reading carries its real age, and a window with no new frames reports nothing instead of
+  a cumulative average.
 - **Game sessions**: a session starts when a game comes forward, sleeps the user apps you
   do not need, and reports duration, average FPS, session-wide 1% low, jank against the
   game's own frame cadence, peak temperature and battery. Every slept app is journaled

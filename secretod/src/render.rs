@@ -77,10 +77,10 @@ pub fn supported() -> bool {
     native_size().is_some()
 }
 
-/// Target size for a mode, keeping the panel aspect ratio. Returns None when
-/// the mode is unknown or would not actually reduce the pixel count.
-pub fn target_size(mode: &str) -> Option<(u32, u32)> {
-    let (w, h) = native_size()?;
+/// Target size for a mode on a given panel, keeping the aspect ratio. Returns
+/// None when the mode is unknown or would not actually reduce the pixel count.
+/// Pure so the mapping can be tested without a device.
+pub fn scaled_size((w, h): (u32, u32), mode: &str) -> Option<(u32, u32)> {
     let short = match mode {
         "720p" => 720,
         "900p" => 900,
@@ -91,6 +91,11 @@ pub fn target_size(mode: &str) -> Option<(u32, u32)> {
     }
     let long = (h as f64 * short as f64 / w as f64).round() as u32;
     Some((short, long))
+}
+
+pub fn target_size(mode: &str) -> Option<(u32, u32)> {
+    let native = native_size()?;
+    scaled_size(native, mode)
 }
 
 /// Scale configured for this package, if any. `native` and an empty value both
@@ -201,4 +206,30 @@ pub fn set(pkg: &str, mode: &str) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a50_scales_keep_the_panel_aspect() {
+        let panel = (1080, 2340);
+        assert_eq!(scaled_size(panel, "720p"), Some((720, 1560)));
+        assert_eq!(scaled_size(panel, "900p"), Some((900, 1950)));
+    }
+
+    #[test]
+    fn native_and_unknown_modes_do_nothing() {
+        let panel = (1080, 2340);
+        assert_eq!(scaled_size(panel, "native"), None);
+        assert_eq!(scaled_size(panel, "1080p"), None);
+        assert_eq!(scaled_size(panel, ""), None);
+    }
+
+    #[test]
+    fn a_scale_that_would_not_shrink_is_rejected() {
+        assert_eq!(scaled_size((720, 1280), "720p"), None);
+        assert_eq!(scaled_size((700, 1200), "900p"), None);
+    }
 }

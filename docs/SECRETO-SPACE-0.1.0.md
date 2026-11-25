@@ -192,3 +192,15 @@ dan itu justru jujur.
 Catatan M3: skala render terbukti bekerja dan aman, tetapi belum terbukti menaikkan FPS
 di dalam match. Jangan memasarkannya sebagai peningkatan FPS sampai ada pengukuran
 in-match di Auto Chess atau MLBB.
+
+## 9. Verifikasi 2026-11-25
+
+- Recovery `kill -9` saat sesi aktif: display kembali 1080x2340, journal hilang, appops
+  dan governor kembali stock, log menulis `recovered 33 apps`.
+- Daemon kedua ditolak sebelum menyentuh device; sesi dan journal tetap utuh.
+- FPS: 24 panggilan beruntun tanpa `null`; 598 frame / 10 detik = 59,8 FPS, cocok dengan
+  snapshot daemon 59,8-60,4 FPS.
+- 20 unit test Rust lulus di A50; smoke test 17/17 PASS.
+- Sesi MLBB 168 detik: rata-rata 50,6 FPS, 1% low 30,3, jank 3,1%, puncak 87 °C.
+
+Detail perintah dan hasil per cek ada di `docs/VERIFY-0.1.0.md`.

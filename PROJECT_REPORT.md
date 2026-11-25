@@ -1,6 +1,6 @@
 # Secreto Space 0.1.0 - Project Report
 
-Status: **M0 sampai M3 selesai di kode dan terverifikasi di device; spike FPS render scale belum konklusif**  
+Status: **M0 sampai M3 selesai di kode dan terverifikasi di device; pipeline FPS, recovery, dan single-instance sudah diuji dengan data; gain render scale in-match belum terukur**  
 Commit terakhir sebelum rebrand: `0221973`  
 Device uji: `RR8M50C0W8T` (Samsung Galaxy A50, GSI API 36)
 
@@ -115,7 +115,26 @@ Tidak ada angka palsu.
 Kosong = -- / N/A.
 ```
 
-FPS self-healing: TimeStats di-enable otomatis, layer basi di-clear + enable ulang, dan tidak ada fallback ke rata-rata lama.
+FPS self-healing: TimeStats di-enable otomatis dan layer basi di-clear + enable ulang.
+Kalau SurfaceFlinger tidak punya layer untuk paket itu, daemon memakai `dumpsys gfxinfo
+framestats` sebagai delta per window. Tidak ada fallback ke rata-rata kumulatif dan tidak
+ada Choreographer, karena keduanya menghasilkan angka yang terlihat hidup padahal bukan
+laju frame saat itu. Kalau tidak ada frame baru, hasilnya kosong, bukan angka lama.
+
+Integritas pengukuran FPS (diuji 2026-11-25):
+
+- Window minimal 0,2 detik dan maksimal 3 detik. Di bawah 0,2 detik frame delta belum
+  membentuk laju; di atas 3 detik layer dianggap hilang lalu di-rebaseline, supaya satu
+  frame setelah jeda panjang tidak dilaporkan sebagai `0,0 FPS`.
+- Poll yang datang terlalu cepat **tidak** menimpa baseline. Sebelumnya setiap panggilan
+  mereset jam, sehingga aliran panggilan `fps` tidak pernah mengumpulkan window dan angka
+  sempat jatuh ke `null` walau game masih menggambar.
+- Bacaan yang dipakai ulang membawa `age_ms`; hanya laporan dengan `age_ms = 0` yang masuk
+  statistik sesi, jadi frame yang sama tidak dihitung dua kali.
+- Verifikasi device: 24 panggilan `fps` beruntun saat MLBB merender = 24/24 berisi angka,
+  12 segar + 12 cache, umur cache maksimum 149 ms, `total_frames` naik monoton 208 → 325.
+  Pengukuran 10 detik di luar daemon: 598 frame = 59,8 FPS; snapshot daemon saat itu 59,8
+  sampai 60,4 FPS.
 
 Jank dihitung terhadap irama frame game itu sendiri: frame yang lebih dari 1,5x frame
 time median dianggap jank, dengan periode vsync panel sebagai batas bawah. Definisi lama
@@ -166,8 +185,30 @@ Sesi adalah unit yang dilaporkan console, bukan sekadar kumpulan tweak.
   `wm_size.journal` ditulis sebelum perintah, lalu dihapus setelah reset berhasil.
 - Reset terjadi di akhir sesi, saat daemon start, di `service.sh`, dan di `uninstall.sh`,
   jadi reboot atau crash tidak bisa meninggalkan layar dalam mode scaled.
-- Spike 2026-11-25 di Auto Chess: native dan 720p sama-sama 59-60 FPS di menu karena
-  vsync cap, suhu 71 °C vs 67 °C. Mekanisme terbukti; gain FPS in-match belum terukur.
+- Spike 2026-11-25 di Auto Chess: native 60,1 FPS / jank 2,0% / 71 °C; 720p 59,4 FPS /
+  jank 1,7% / 67 °C. Menu kena vsync cap, jadi selisih FPS belum membuktikan gain in-match.
+  `gpu_busy` tidak bisa dipakai sebagai pembanding beban karena node ini mengembalikan 0
+  saat menu, sehingga A/B beban GPU in-match masih terbuka.
+
+### 2.9 Hasil uji device (2026-11-25)
+
+Semua angka di bawah diambil dari device, bukan estimasi.
+
+- **Recovery crash**: sesi MLBB aktif dengan 720p, app tidur, dan knob preset. Daemon
+  di-`kill -9`; watchdog menyalakan ulang dalam hitungan detik. Hasil: display kembali
+  1080x2340, `wm_size.journal` dan `sleeping.list` hilang, appops kembali ke mode semula,
+  governor GPU/CPU kembali stock, log menulis `session: recovered 33 apps, all knobs
+  restored to stock`.
+- **Single-instance**: daemon kedua dijalankan di tengah sesi aktif. Ia keluar dengan
+  `another daemon is already listening` sebelum menyentuh device; PID daemon pertama tidak
+  berubah, journal tetap 33 baris, 720p tetap aktif, dan tidak ada baris recovery baru.
+- **FPS beruntun**: 24 panggilan `fps` beruntun = 24/24 berisi angka, tanpa `null`, tanpa
+  `0,0`; umur cache maksimum 149 ms.
+- **Sesi MLBB 168 detik** (binary final): rata-rata 50,6 FPS, 1% low 30,3, jank 3,1%,
+  suhu puncak 87 °C, 1 throttle event, 33 app tidur.
+- **Smoke test**: 17/17 PASS, termasuk `fps live`, `p1 low <= fps`, journal tidur, dan
+  game aktif tidak ikut ditidurkan.
+- **Unit test Rust**: 20 test dijalankan di A50 (`aarch64-linux-android`), 20 lulus.
 
 ### 2.8 Capability probe
 
@@ -286,7 +327,7 @@ WebUI: tidak ada error JS
 Belum termasuk fase ini:
 
 - [ ] Per-app layout side panel
-- [ ] Fallback FPS Choreographer saat SurfaceFlinger tidak tersedia
+- [x] Fallback FPS `gfxinfo framestats` saat SurfaceFlinger tidak punya layer (Choreographer sengaja tidak dipakai karena menghasilkan angka palsu)
 - [x] Capability probe terpisah (System tab)
 - [ ] State machine overlay murni
 - [x] Quick action tambahan (Boost RAM, Notifs, Bypass CHG, No GOS)
@@ -379,6 +420,23 @@ Gunakan checklist ini setiap kali ada perubahan.
   bisa disentuh. Border cyan penuh diganti gradient gelap, hairline 1 dp, dan rail status
   2 dp di sisi dalam yang mengikuti warna FPS. COMPACT kini memberi label kecil `FPS`, dan
   suhu/GPU memakai ukuran relatif supaya hierarki teks lebih rapi.
+
+- **Integritas FPS dan recovery (2026-11-25)**:
+  - Parser histogram hanya menerima bucket `NNms` dengan `ms > 0` dan `cnt > 0`, jadi baris
+    seperti `averageFPS=...` tidak lagi masuk bucket 0 ms dan merusak 1% low.
+  - Jalur `gfxinfo` memakai tracker delta per window, bukan angka kumulatif yang dijumlahkan
+    berulang.
+  - Poll yang terlalu cepat (<0,2 detik) tidak menimpa baseline; bacaan terakhir dipakai
+    ulang dengan `age_ms` dan kedaluwarsa setelah 2 detik. Window >3 detik di-rebaseline.
+  - Fallback `gfxinfo` hanya dipakai kalau paket benar-benar tidak punya layer
+    SurfaceFlinger; game SurfaceView tidak lagi jatuh ke `null` saat window belum siap.
+  - Guard single-instance dijalankan sebelum recovery dan tidak menghapus socket yang
+    masih menjawab, sehingga daemon kedua tidak bisa membangunkan app atau mereset display
+    di tengah sesi.
+  - `session::sample` mengabaikan laporan dengan `age_ms > 0` supaya frame yang sama tidak
+    dihitung dua kali.
+  - 20 unit test Rust, dijalankan di A50. Drill device: recovery `kill -9`, single-instance,
+    24 panggilan `fps` beruntun, dan smoke test 17/17 PASS.
 
 ### `v2.4.0` - 2026-11-25
 

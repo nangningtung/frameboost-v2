@@ -91,8 +91,9 @@ batas bawah. Jadi game 30 FPS yang stabil tidak lagi dilaporkan 97% jank.
 | Reboot di tengah sesi | reboot | `service.sh` menjalankan `wm size reset`, journal hilang |
 | Tombol UI | detail game > Render scale | Native / 900p / 720p, pilihan tersimpan, note menyebut ukuran aktif |
 
-Spike 2026-11-25 di Auto Chess: native dan 720p sama-sama 59-60 FPS di menu karena
-vsync cap, suhu 71 °C vs 67 °C. Mekanisme terbukti; gain FPS in-match belum terukur.
+Spike 2026-11-25 di Auto Chess: native 60,1 FPS / jank 2,0% / 71 °C; 720p 59,4 FPS /
+jank 1,7% / 67 °C. Menu kena vsync cap, jadi selisih FPS belum membuktikan gain in-match.
+`gpu_busy` mengembalikan 0 saat menu, jadi A/B beban GPU in-match masih terbuka.
 
 ## 5e. Overlay sesi
 
@@ -116,6 +117,16 @@ vsync cap, suhu 71 °C vs 67 °C. Mekanisme terbukti; gain FPS in-match belum te
 3. `su -c "ls /data/adb/secreto_space/sleeping.list"` harus gagal (sudah dibersihkan).
 4. `su -c "tail -20 /data/local/tmp/secretod.log"` berisi `session: recovered N apps`.
 5. `cmd appops get com.discord RUN_IN_BACKGROUND` kembali ke mode semula.
+
+## 5g. Crash recovery dan single-instance
+
+| Cek | Perintah | Harapan |
+|---|---|---|
+| Recovery setelah SIGKILL | sesi aktif dengan 720p + app tidur, `su -c "kill -9 $(pidof secretod)"` | watchdog menyalakan ulang, `wm size` kembali 1080x2340, kedua journal hilang, appops dan governor stock |
+| Log recovery | `su -c "grep recovered /data/local/tmp/secretod.log \| tail -1"` | `session: recovered N apps, all knobs restored to stock` |
+| Daemon kedua | sesi aktif, `su -c "timeout 5 /data/adb/modules/secreto_space/system/bin/secretod"` | `another daemon is already listening, exiting` |
+| Sesi tidak tersentuh | setelah daemon kedua | PID lama tetap, journal tetap, 720p tetap aktif, tidak ada baris recovery baru |
+| FPS beruntun | 24 panggilan `fps` beruntun saat game render | semua berisi angka; `age_ms` < 2000; `total_frames` naik monoton |
 
 ## 6. Rollback
 
@@ -148,4 +159,9 @@ tidak dibaca oleh versi lama, jadi profil perlu disalin kembali ke
 | 5f Probe | PASS, `a50`, GSI, GOS absent, `appops + force-stop`, `wm size` didukung, cpuset `memory` |
 | Jank | PASS, Auto Chess 30 FPS stabil berubah dari 97,3% menjadi 2,0% setelah definisi memakai median frame time |
 | IPC | PASS, tidak ada lagi `__secretoIpc[N] is not a function` setelah nomor slot callback ditangkap |
+| 5g Crash recovery | PASS, `kill -9` saat sesi aktif: display 1080x2340, journal hilang, appops/governor stock, log `recovered 33 apps` |
+| 5g Single-instance | PASS, daemon kedua keluar sebelum menyentuh device; PID lama, journal 33 baris, dan 720p tetap utuh |
+| 5g FPS beruntun | PASS, 24/24 panggilan berisi angka (12 segar + 12 cache), umur cache maks 149 ms, `total_frames` 208 → 325 |
+| FPS vs SurfaceFlinger | PASS, 598 frame / 10 detik = 59,8 FPS di luar daemon; snapshot daemon 59,8-60,4 FPS |
+| Unit test Rust | PASS, 20 test dijalankan di A50, 20 lulus |
 | Smoke test | PASS penuh 17 cek, termasuk sesi aktif dan journal |
