@@ -23,14 +23,21 @@ Prinsip utama: **ringan, cepat, rapi, dan jujur terhadap data**.
 ### 2.1 Game Library
 
 - Hanya game terpasang yang ditampilkan.
-- Grid 2 kolom.
+- Dua mode tampilan: carousel cover-flow (default) dan grid 2 kolom, bisa diganti
+  lewat tombol di toolbar. Mode carousel punya dots dan swipe tanpa loop di ujung.
 - Tap card → halaman detail terpisah.
 - Card berisi:
-  - inisial/icon
+  - **artwork asli**: banner 1024x500 dari Play Store sebagai latar, ikon 512x512
+    di tengah, plus warna dominan artwork sebagai tint gradient
   - nama game
   - package
   - badge preset berwarna
   - tombol PLAY
+- Tanpa jaringan, card tetap memakai ikon launcher asli dari `PackageManager`
+  di atas gradient (bukan huruf inisial), jadi tidak pernah ada kotak kosong.
+- Artwork di-cache di `cache/art/` per package dan dipakai ulang saat offline.
+- Tombol toolbar: search, refresh, dan tambah game (ikon saja).
+- Game bisa dihapus dari library lewat halaman detail.
 
 ### 2.2 Halaman Detail Game
 
@@ -614,6 +621,29 @@ Gunakan checklist ini setiap kali ada perubahan.
   - Render scale in-match: `gpu_busy` 79,6% → 68,5%, FPS 49,1 → 58,9, tetapi scene berubah
     selama sampel. Dicatat sebagai indikasi, bukan A/B terkontrol. Bubble HUD tetap utuh
     di 720p (`frame=[1444,188][1560,304]`).
+
+- **Artwork asli di game card (2026-11-25)**:
+  - Sumber mengikuti cara game launcher: halaman Play Store `details?id=<pkg>` memuat
+    ikon 512x512, banner 1024x500, dan warna dominan banner di payload awal.
+    Diverifikasi di host dan device: MLBB butuh `gl=ID` (US 404), Free Fire/Discord
+    jalan di `ID` maupun `US`.
+  - `GameArt.java` mengambil halaman dengan User-Agent browser, memilih entri
+    persegi >= 256 px untuk ikon dan entri rasio 1,85-2,25 dengan lebar >= 800 px
+    untuk banner, lalu mengunduh `=s160` / `=w512` supaya ringan di A50.
+  - Hasil disimpan di `cache/art/<pkg>.cover.jpg`, `.icon.png`, `.json`, `.poke`
+    (banner 36-38 KB, ikon 45-55 KB pada uji MLBB dan Auto Chess). Cache berlaku
+    7 hari; hasil ikon-only dicoba ulang setelah 6 jam supaya fetch yang gagal sembuh sendiri.
+  - Bridge `getGameArt(pkg, callback)` berjalan di thread background dan memanggil
+    balik JS lewat `evaluateJavascript`, sama seperti `sendSocketAsync`.
+  - UI memasang `.card-art` (banner, gradient scrim) dan `.game-tile-icon` (ikon
+    membulat) di grid maupun carousel, memakai warna dominan untuk `--tile-hue`.
+    Huruf inisial hanya dipakai sebelum artwork tersedia.
+  - Fallback tanpa jaringan memakai `PackageManager.getApplicationIcon`, jadi card
+    tetap menampilkan ikon aplikasi asli. Diuji dengan iptables per-uid: 4/4 card
+    ikon-only, tanpa gambar rusak, lalu banner kembali setelah aturan dihapus.
+  - Verifikasi device lewat CDP: carousel dan grid menampilkan banner dan ikon asli
+    MLBB + Auto Chess, halaman detail memakai ikon asli, dan cache bertahan setelah
+    app di-force-stop lalu dibuka lagi.
 
 ### `v2.4.0` - 2026-11-25
 

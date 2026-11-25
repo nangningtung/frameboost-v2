@@ -904,6 +904,136 @@
     return Math.round((hash * 137.508) % 360);
   }
 
+  // ---- Game art (real icon / banner pulled by the native bridge) ----
+  // Store artwork is fetched once per package and cached in memory, so
+  // re-rendering the grid or swiping the carousel never re-decodes it.
+  const gameArtCache = Object.create(null);
+  const gameArtQueued = Object.create(null);
+  const gameArtFailedAt = Object.create(null);
+
+  function hexToHue(hex) {
+    if (!hex || hex.charAt(0) !== "#" || hex.length < 7) return null;
+    const r = parseInt(hex.slice(1, 3), 16) / 255;
+    const g = parseInt(hex.slice(3, 5), 16) / 255;
+    const b = parseInt(hex.slice(5, 7), 16) / 255;
+    if ([r, g, b].some((v) => Number.isNaN(v))) return null;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    if (max === min) return 210;
+    const d = max - min;
+    let h;
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60;
+    return Math.round((h + 360) % 360);
+  }
+
+  function requestGameArt(pkg) {
+    if (!pkg || gameArtCache[pkg] || gameArtQueued[pkg]) return;
+    const failedAt = gameArtFailedAt[pkg];
+    if (failedAt && Date.now() - failedAt < 10 * 60 * 1000) return;
+    if (!window._nativeBridge || typeof window._nativeBridge.getGameArt !== "function") return;
+    gameArtQueued[pkg] = true;
+    try {
+      window._nativeBridge.getGameArt(pkg, "__secretoApplyGameArt");
+    } catch (err) {
+      gameArtQueued[pkg] = false;
+    }
+  }
+
+  window.__secretoApplyGameArt = function (raw) {
+    let art = null;
+    try {
+      art = typeof raw === "string" ? JSON.parse(raw) : raw;
+    } catch (err) {
+      return;
+    }
+    if (!art || !art.pkg) return;
+    gameArtQueued[art.pkg] = false;
+    if (!art.cover && !art.icon) {
+      gameArtFailedAt[art.pkg] = Date.now();
+      return;
+    }
+    gameArtCache[art.pkg] = art;
+    paintGameArt(art.pkg);
+  };
+
+  function clearGameArt(card) {
+    card.classList.remove("card-has-art", "card-has-icon");
+    const layer = card.querySelector(".card-art");
+    if (layer) layer.remove();
+    const icon = card.querySelector(".game-tile-icon");
+    if (icon) icon.remove();
+  }
+
+  function paintGameArt(pkg) {
+    const art = gameArtCache[pkg];
+    if (!art) return;
+    const hue = hexToHue(art.color);
+
+    document
+      .querySelectorAll(`.game-item[data-pkg="${pkg}"], .cover-card[data-pkg="${pkg}"]`)
+      .forEach((card) => {
+        if (hue !== null) card.style.setProperty("--tile-hue", hue);
+
+        if (art.cover) {
+          let layer = card.querySelector(".card-art");
+          if (!layer) {
+            layer = document.createElement("div");
+            layer.className = "card-art";
+            layer.setAttribute("aria-hidden", "true");
+            card.insertBefore(layer, card.firstChild);
+          }
+          if (layer.dataset.artPkg !== pkg) {
+            layer.style.backgroundImage = `url("${art.cover}")`;
+            layer.dataset.artPkg = pkg;
+          }
+          card.classList.add("card-has-art");
+          requestAnimationFrame(() => layer.classList.add("is-loaded"));
+        }
+
+        if (art.icon) {
+          let holder = card.querySelector(".game-tile-icon");
+          if (!holder) {
+            holder = document.createElement("div");
+            holder.className = "game-tile-icon";
+            holder.setAttribute("aria-hidden", "true");
+            const anchor = card.querySelector(".game-tile-initial");
+            if (anchor) card.insertBefore(holder, anchor.nextSibling);
+            else card.appendChild(holder);
+          }
+          if (holder.dataset.artPkg !== pkg) {
+            const img = document.createElement("img");
+            img.alt = "";
+            img.src = art.icon;
+            holder.replaceChildren(img);
+            holder.dataset.artPkg = pkg;
+          }
+          card.classList.add("card-has-icon");
+          requestAnimationFrame(() => holder.classList.add("is-loaded"));
+        }
+      });
+
+    const detailIcon = document.getElementById("detail-game-icon");
+    if (detailIcon && selectedGamePkg === pkg && art.icon) {
+      const img = document.createElement("img");
+      img.alt = "";
+      img.src = art.icon;
+      detailIcon.replaceChildren(img);
+      detailIcon.classList.add("has-art");
+    }
+  }
+
+  function hydrateGameArt(card, pkg) {
+    if (gameArtCache[pkg]) {
+      paintGameArt(pkg);
+      return;
+    }
+    clearGameArt(card);
+    requestGameArt(pkg);
+  }
+
   function buildGameCardData(game) {
     const sourceClass =
       game.source === "manual"
@@ -1011,6 +1141,7 @@
       item.style.setProperty("--tile-hue", d.hue);
       item.innerHTML = gameCardInnerHTML(game, d);
       gamesContainer.appendChild(item);
+      hydrateGameArt(item, game.pkg);
     });
     bindGameCardEvents(gamesContainer);
 
@@ -1268,6 +1399,9 @@
         });
       });
       bindGameCardEvents(carouselStage);
+      carouselStage.querySelectorAll(".cover-card").forEach((card) => {
+        hydrateGameArt(card, card.dataset.pkg);
+      });
     } else {
       // Update card content/data in-place (game list same length but
       // might have different packages after rescan).
@@ -1285,6 +1419,7 @@
         card.querySelector(".game-tile-initial").textContent = d.initial;
         card.querySelector(".game-tile-title").textContent = game.name;
         card.querySelector(".game-tile-sub").textContent = game.pkg;
+        hydrateGameArt(card, game.pkg);
       });
     }
 
@@ -1385,6 +1520,7 @@
     const name = document.getElementById("detail-game-name");
     const p = document.getElementById("detail-game-pkg");
     if (icon) icon.textContent = (game.name || "?").trim().charAt(0).toUpperCase();
+    if (icon) icon.classList.remove("has-art");
     if (name) name.textContent = game.name || pkg;
     if (p) p.textContent = pkg;
     const bbrBtn = document.getElementById("btn-detail-bbr");
@@ -1405,6 +1541,8 @@
     if (gameDetailView) gameDetailView.classList.remove("hidden");
     loadGameReports(pkg);
     loadRenderScale(pkg);
+    requestGameArt(pkg);
+    paintGameArt(pkg);
   }
 
   function closeGameDetail() {

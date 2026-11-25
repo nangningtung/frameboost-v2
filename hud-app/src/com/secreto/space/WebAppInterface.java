@@ -150,6 +150,21 @@ public class WebAppInterface {
         }
     }
 
+    @JavascriptInterface
+    public void getGameArt(String pkg, String callbackName) {
+        if (pkg == null || pkg.isEmpty() || callbackName == null || callbackName.isEmpty()) return;
+        new Thread(() -> {
+            String json = GameArt.load(context, pkg);
+            String quoted = org.json.JSONObject.quote(json);
+            mainHandler.post(() -> {
+                if (context instanceof android.app.Activity) {
+                    android.webkit.WebView webView = ((android.app.Activity) context).findViewById(R.id.webview);
+                    if (webView != null) webView.evaluateJavascript(callbackName + "(" + quoted + ");", null);
+                }
+            });
+        }, "secreto-art").start();
+    }
+
     private static String escapeJson(String s) {
         if (s == null) return "";
         StringBuilder sb = new StringBuilder();

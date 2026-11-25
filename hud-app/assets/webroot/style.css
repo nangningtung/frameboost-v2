@@ -1533,6 +1533,77 @@ button:disabled,
   z-index: 1;
 }
 
+/* Real store artwork sits under the card chrome */
+.card-art {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-position: center;
+  background-size: cover;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+
+.card-art.is-loaded {
+  opacity: 1;
+}
+
+.card-art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.92) 0%,
+    rgba(0, 0, 0, 0.6) 26%,
+    rgba(0, 0, 0, 0.12) 58%,
+    rgba(0, 0, 0, 0.42) 100%
+  );
+}
+
+.card-has-art .game-tile-initial,
+.card-has-icon .game-tile-initial {
+  opacity: 0;
+}
+
+.game-tile-icon {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  width: 64px;
+  height: 64px;
+  margin: -32px 0 0 -32px;
+  border-radius: 18px;
+  overflow: hidden;
+  z-index: 1;
+  opacity: 0;
+  transform: translateY(6px) scale(0.94);
+  transition: opacity 0.4s ease, transform 0.4s var(--ease-emph);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.16);
+  pointer-events: none;
+}
+
+.game-tile-icon.is-loaded {
+  opacity: 1;
+  transform: none;
+}
+
+.game-tile-icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.game-item .game-tile-icon {
+  top: 36%;
+  width: 52px;
+  height: 52px;
+  margin: -26px 0 0 -26px;
+  border-radius: 15px;
+}
+
 .game-tile-bottom {
   position: relative;
   z-index: 2;
@@ -1655,6 +1726,19 @@ button:disabled,
   font-weight: 700;
   color: var(--accent);
   flex: none;
+}
+
+.game-detail-icon.has-art {
+  padding: 0;
+  overflow: hidden;
+  background: var(--bg-raised);
+}
+
+.game-detail-icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .game-detail-identity {
