@@ -112,41 +112,44 @@
 
         <!-- Session: what Secreto is doing right now -->
         <section class="panel session-card" aria-labelledby="session-title">
-          <div class="panel-head">
-            <h2 class="panel-title" id="session-title">Session</h2>
-            <span class="badge" id="session-badge">IDLE</span>
-          </div>
-          <div class="session-grid">
-            <div class="session-metric">
-              <span class="meta-label">Duration</span>
-              <strong id="session-duration">--</strong>
-            </div>
-            <div class="session-metric">
-              <span class="meta-label">Apps asleep</span>
-              <strong id="session-slept">0</strong>
-            </div>
-            <div class="session-metric">
-              <span class="meta-label">Avg FPS</span>
-              <strong id="session-avg-fps">--</strong>
-            </div>
-            <div class="session-metric">
-              <span class="meta-label">1% low</span>
-              <strong id="session-p1">--</strong>
-            </div>
-            <div class="session-metric">
-              <span class="meta-label">Jank</span>
-              <strong id="session-jank">--</strong>
-            </div>
-            <div class="session-metric">
-              <span class="meta-label">Peak temp</span>
-              <strong id="session-peak">--</strong>
+          <div class="session-header">
+            <div class="session-mini-cover" id="session-mini-cover"></div>
+            <div class="session-header-text">
+              <div class="session-header-top">
+                <span class="session-status-dot" id="session-status-dot"></span>
+                <span class="session-status-badge" id="session-badge">IDLE</span>
+              </div>
+              <h2 class="session-game-title" id="session-title">No active session</h2>
+              <p class="session-timer" id="session-duration">Elapsed: 00:00:00</p>
             </div>
           </div>
-          <p class="panel-note block" id="session-last">No session recorded yet.</p>
-          <div class="btn-group">
+
+          <div class="session-telemetry">
+            <div class="session-tel-cell">
+              <span class="session-tel-label">AVG FPS</span>
+              <span class="session-tel-value" id="session-avg-fps">--</span>
+            </div>
+            <div class="session-tel-cell">
+              <span class="session-tel-label">1% LOW</span>
+              <span class="session-tel-value" id="session-p1">--</span>
+            </div>
+            <div class="session-tel-cell">
+              <span class="session-tel-label">JANK</span>
+              <span class="session-tel-value" id="session-jank">--</span>
+            </div>
+            <div class="session-tel-cell">
+              <span class="session-tel-label">PEAK</span>
+              <span class="session-tel-value" id="session-peak">--</span>
+            </div>
+          </div>
+
+          <p class="session-note" id="session-last">No session recorded yet.</p>
+
+          <div class="session-actions">
             <button class="hud-btn secondary" id="btn-session-wake">Wake apps</button>
             <button class="hud-btn danger" id="btn-session-end">End session &amp; restore</button>
           </div>
+          <input type="hidden" id="session-slept" value="0">
         </section>
 
         <!-- Compact game library -->
@@ -156,6 +159,7 @@
             <button class="panel-link" id="btn-home-see-games">See all</button>
           </div>
           <div id="home-games" class="home-games-list"></div>
+          <p class="home-games-count" id="home-games-count"></p>
         </section>
 
         <!-- Quick tools: 2x2 tactical tiles -->
@@ -306,6 +310,26 @@
           <div id="games-carousel-view" class="games-carousel-view hidden">
             <div class="carousel-stage" id="carousel-stage"></div>
             <div class="carousel-dots" id="carousel-dots"></div>
+            <div class="carousel-hero" id="carousel-hero">
+              <div class="carousel-hero-meta">
+                <span class="carousel-hero-dot"></span>
+                <span id="carousel-hero-preset" class="carousel-hero-preset">BALANCED</span>
+              </div>
+              <h2 class="carousel-hero-title" id="carousel-hero-title">Game</h2>
+              <p class="carousel-hero-sub" id="carousel-hero-sub">pkg</p>
+              <div class="carousel-hero-actions">
+                <button class="game-play-btn carousel-hero-play" id="carousel-hero-play">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+                  <span>Play</span>
+                </button>
+                <button class="carousel-hero-tune" id="carousel-hero-tune">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" aria-hidden="true">
+                    <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>
+                  </svg>
+                  <span>Tune</span>
+                </button>
+              </div>
+            </div>
           </div>
           <!-- Grid mode -->
           <div class="games-list" id="games-container">

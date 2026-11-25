@@ -77,6 +77,12 @@
   const gamesCarouselView = document.getElementById("games-carousel-view");
   const carouselStage = document.getElementById("carousel-stage");
   const carouselDots = document.getElementById("carousel-dots");
+  const carouselHero = document.getElementById("carousel-hero");
+  const carouselHeroTitle = document.getElementById("carousel-hero-title");
+  const carouselHeroSub = document.getElementById("carousel-hero-sub");
+  const carouselHeroPreset = document.getElementById("carousel-hero-preset");
+  const carouselHeroPlay = document.getElementById("carousel-hero-play");
+  const carouselHeroTune = document.getElementById("carousel-hero-tune");
   const btnViewToggle = document.getElementById("btn-view-toggle");
   const gameSearchInput = document.getElementById("game-search-input");
   const btnScanGames = document.getElementById("btn-scan-games");
@@ -287,27 +293,45 @@
 
   function renderSession(sess, sleeping) {
     const active = !!sess.active;
+    const sessionStatusDot = document.getElementById("session-status-dot");
+    const sessionMiniCover = document.getElementById("session-mini-cover");
+    const sessionGameTitle = document.getElementById("session-title");
+
     if (sessionBadge) {
-      sessionBadge.textContent = active ? "LIVE" : "IDLE";
-      sessionBadge.className = active ? "badge active" : "badge";
+      sessionBadge.textContent = active ? "ACTIVE SESSION" : "STANDBY READY";
+      sessionBadge.className = active ? "session-status-badge active" : "session-status-badge";
+    }
+    if (sessionStatusDot) {
+      sessionStatusDot.className = active ? "session-status-dot active" : "session-status-dot";
     }
     if (sessionDuration) {
-      sessionDuration.textContent = active ? formatDuration(sess.elapsed_s) : "--";
+      sessionDuration.textContent = active ? "Elapsed: " + formatDuration(sess.elapsed_s) : "Elapsed: 00:00:00";
+    }
+    if (sessionGameTitle) {
+      sessionGameTitle.textContent = active ? displayGameName(sess.pkg) : "No active session";
+    }
+    if (sessionMiniCover) {
+      if (active && sess.pkg) {
+        sessionMiniCover.style.setProperty("--tile-hue", charSumHue(sess.pkg));
+        sessionMiniCover.classList.remove("idle");
+      } else {
+        sessionMiniCover.classList.add("idle");
+      }
     }
     const sleptCount = active ? (sess.slept_apps || 0) : (sleeping ? sleeping.length : 0);
-    if (sessionSlept) sessionSlept.textContent = String(sleptCount);
+    if (sessionSlept) sessionSlept.value = String(sleptCount);
     if (sessionAvgFps) {
-      sessionAvgFps.textContent = sess.avg_fps != null ? `${sess.avg_fps} FPS` : "--";
+      sessionAvgFps.textContent = sess.avg_fps != null ? String(sess.avg_fps) : "--";
     }
     if (sessionP1) {
-      sessionP1.textContent = sess.p1_low != null ? `${sess.p1_low} FPS` : "--";
+      sessionP1.textContent = sess.p1_low != null ? String(sess.p1_low) : "--";
     }
     if (sessionJank) {
-      sessionJank.textContent = sess.jank_pct != null ? `${sess.jank_pct}%` : "--";
+      sessionJank.textContent = sess.jank_pct != null ? (sess.jank_pct + "%") : "--";
     }
     if (sessionPeak) {
       const peak = active ? sess.max_temp_c : (lastSessionReport?.max_temp_c ?? null);
-      sessionPeak.textContent = peak != null ? `${Math.round(peak)}°C` : "--";
+      sessionPeak.textContent = peak != null ? (Math.round(peak) + "°C") : "--";
     }
     if (sessionLast) {
       if (active) {
@@ -858,6 +882,12 @@
   // GAME LIBRARY CONTROLLER (Auto + Manual)
   // ==========================================
 
+  // Golden-angle hue spread: adjacent games never collide on the color wheel.
+  function charSumHue(str) {
+    const hash = String(str || "?").split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+    return Math.round((hash * 137.508) % 360);
+  }
+
   function buildGameCardData(game) {
     const sourceClass =
       game.source === "manual"
@@ -885,8 +915,7 @@
       : rawProfile;
 
     const initial = (game.name || "?").trim().charAt(0).toUpperCase();
-    const pkgHash = game.pkg.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-    const hue = Math.round((pkgHash * 137.508) % 360);
+    const hue = charSumHue(game.pkg);
 
     return { sourceClass, sourceLabel, currentPreset, profileText, initial, hue };
   }
@@ -1091,14 +1120,24 @@
           <div class="game-tile-bottom">
             <div class="game-tile-title">${game.name}</div>
             <div class="game-tile-sub">${game.pkg}</div>
-            <button class="game-play-btn inline-launch" data-pkg="${game.pkg}" aria-label="Play ${game.name}" title="Play ${game.name}">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
-              <span>Play</span>
-            </button>
           </div>
         </div>
       `;
     }).join("");
+
+    // Update hero showcase
+    const activeGame = games[carouselIndex];
+    if (activeGame) {
+      const d = buildGameCardData(activeGame);
+      if (carouselHero) carouselHero.style.setProperty("--tile-hue", d.hue);
+      if (carouselHeroTitle) carouselHeroTitle.textContent = activeGame.name || activeGame.pkg;
+      if (carouselHeroSub) carouselHeroSub.textContent = activeGame.pkg;
+      if (carouselHeroPreset) {
+        carouselHeroPreset.textContent = d.currentPreset;
+        carouselHeroPreset.className = "carousel-hero-preset preset-badge preset-badge-" + d.currentPreset.toLowerCase();
+      }
+      if (carouselHeroPlay) carouselHeroPlay.dataset.pkg = activeGame.pkg;
+    }
 
     carouselDots.innerHTML = games.map((_, idx) => `
       <button class="carousel-dot ${idx === carouselIndex ? "active" : ""}" data-idx="${idx}" aria-label="Go to game ${idx + 1}"></button>
@@ -1127,6 +1166,27 @@
         renderCarousel(games);
       });
     });
+
+    // Hero Play button
+    if (carouselHeroPlay) {
+      carouselHeroPlay.addEventListener("click", () => {
+        const pkg = carouselHeroPlay.dataset.pkg;
+        if (!pkg) return;
+        if (window._nativeBridge && typeof window._nativeBridge.launchGame === "function") {
+          window._nativeBridge.launchGame(pkg);
+        } else {
+          alert("Could not launch game. Make sure the package is installed.");
+        }
+      });
+    }
+
+    // Hero Tune button opens detail
+    if (carouselHeroTune) {
+      carouselHeroTune.addEventListener("click", () => {
+        const activeCard = carouselStage.querySelector(".cover-card-active");
+        if (activeCard) openGameDetail(activeCard.dataset.pkg);
+      });
+    }
   }
 
   function setGamesViewMode(mode) {
@@ -2119,10 +2179,12 @@
 
   // Compact game list on Home. Full management lives in the Games tab.
   const homeGames = document.getElementById("home-games");
+  const homeGamesCount = document.getElementById("home-games-count");
   function renderHomeGames() {
     if (!homeGames) return;
     if (!allGames || !allGames.length) {
       homeGames.innerHTML = '<div class="home-game-row"><span class="home-game-sub">No games detected yet</span></div>';
+      if (homeGamesCount) homeGamesCount.textContent = "";
       return;
     }
     const esc = (s) => String(s == null ? "" : s).replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]));
@@ -2131,13 +2193,19 @@
       const preset = esc((g.preset || "BALANCED").toUpperCase());
       const pkg = esc(g.pkg || "");
       const initial = esc((g.name || g.pkg || "?").charAt(0).toUpperCase());
-      return '<div class="home-game-row">' +
+      const hue = charSumHue(g.pkg || g.name || "?");
+      return '<div class="home-game-row" style="--tile-hue:' + hue + '">' +
         '<span class="home-game-icon">' + initial + '</span>' +
         '<span class="home-game-meta"><span class="home-game-name">' + name + '</span>' +
         '<span class="home-game-sub">' + preset + ' | ' + pkg + '</span></span>' +
         '<button class="home-game-play" data-home-launch="' + pkg + '">PLAY</button>' +
         '</div>';
     }).join("");
+    if (homeGamesCount) {
+      const total = allGames.length;
+      const shown = Math.min(4, total);
+      homeGamesCount.textContent = shown + " of " + total + " games";
+    }
   }
 
   document.getElementById("btn-home-see-games")?.addEventListener("click", () => {

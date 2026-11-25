@@ -504,6 +504,16 @@ Gunakan checklist ini setiap kali ada perubahan.
     suppress click setelah swipe supaya tidak membuka detail secara tak
     sengaja. Verifikasi device: swipe left -> Auto Chess, swipe right -> MLBB,
     state CDP mengonfirmasi detail view tetap hidden setelah swipe.
+  - Polish UI Pixel OS: carousel hero showcase (title, preset badge, Play pill,
+    Tune button) di bawah stage menggantikan tombol Play di dalam card.
+    Card carousel jadi pure visual cover. Session card di-redesign dengan
+    mini cover ber-hue per game, status dot animasi pulse, badge status
+    (STANDBY READY / ACTIVE SESSION), telemetry grid 4-kolom (AVG FPS, 1% LOW,
+    JANK, PEAK). "Your games" di Home pakai cover icon ber-gradient per game
+    dan tombol Play solid accent. Watermark initial digeser ke atas supaya
+    tidak overlap title. Ambient glow backdrop di belakang app container
+    sync dengan hue game aktif. Diverifikasi: hero Play launch MLBB, hero Tune
+    buka detail view, semua tap target >= 44dp (CDP), tidak ada error logcat.
 - **State machine overlay murni (2026-11-25)**:
   - State overlay disatukan ke enum `OverlayState { HIDDEN, DOCKED, DRAGGING,
     PANEL_OPEN }` dengan transisi terpusat lewat `enterState()`. Sebelumnya
