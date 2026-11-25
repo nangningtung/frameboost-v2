@@ -492,6 +492,13 @@ Gunakan checklist ini setiap kali ada perubahan.
     Tombol Play berukuran 44dp (min tap target), tap card body membuka detail,
     tap Play langsung menjalankan game (diverifikasi: MLBB ter-launch via CDP
     bounding rect + adb input tap).
+  - View mode toggle (grid <-> carousel): tombol icon di toolbar Games tab
+    mengaktifkan carousel cover flow (kartu tengah besar, kartu samping
+    menyinggung dengan scale dan opacity berkurang, dot indicator pill accent).
+    Tap card samping untuk slide, tap dot untuk pindah, tap card tengah untuk
+    buka detail, tap Play untuk launch. Diverifikasi: Play button di carousel
+    menjalankan Auto Chess; toggle grid/carousel bolak-balik normal; tidak ada
+    error logcat.
 - **State machine overlay murni (2026-11-25)**:
   - State overlay disatukan ke enum `OverlayState { HIDDEN, DOCKED, DRAGGING,
     PANEL_OPEN }` dengan transisi terpusat lewat `enterState()`. Sebelumnya

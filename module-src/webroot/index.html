@@ -283,6 +283,7 @@
         <div id="games-toolbar" class="games-toolbar">
           <input type="text" id="game-search-input" class="hud-search-input" placeholder="Search games or packages" aria-label="Search games">
           <div class="games-actions-row">
+            <button id="btn-view-toggle" class="btn btn-icon-only" title="Switch view" aria-label="Switch view mode" type="button"></button>
             <button id="btn-scan-games" class="btn btn-secondary" title="Rescan installed games">Refresh installed</button>
             <button id="btn-toggle-add-drawer" class="btn btn-primary">Add custom</button>
           </div>
@@ -301,6 +302,12 @@
         </div>
 
         <div id="games-list-view">
+          <!-- Carousel mode -->
+          <div id="games-carousel-view" class="games-carousel-view hidden">
+            <div class="carousel-stage" id="carousel-stage"></div>
+            <div class="carousel-dots" id="carousel-dots"></div>
+          </div>
+          <!-- Grid mode -->
           <div class="games-list" id="games-container">
             <div class="empty-state">Loading game list...</div>
           </div>

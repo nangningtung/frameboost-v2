@@ -74,6 +74,10 @@
 
   // Elements: Game Library
   const gamesContainer = document.getElementById("games-container");
+  const gamesCarouselView = document.getElementById("games-carousel-view");
+  const carouselStage = document.getElementById("carousel-stage");
+  const carouselDots = document.getElementById("carousel-dots");
+  const btnViewToggle = document.getElementById("btn-view-toggle");
   const gameSearchInput = document.getElementById("game-search-input");
   const btnScanGames = document.getElementById("btn-scan-games");
   const btnToggleAddDrawer = document.getElementById("btn-toggle-add-drawer");
@@ -93,6 +97,9 @@
   let allGames = [];
   let installedApps = [];
   let currentForegroundPkg = "";
+  let gamesViewMode = "grid";        // "grid" | "carousel"
+  let carouselIndex = 0;
+  let carouselFiltered = [];
   const frametimeHistory = [];
   const MAX_FRAMETIME_POINTS = 45;
 
@@ -851,9 +858,86 @@
   // GAME LIBRARY CONTROLLER (Auto + Manual)
   // ==========================================
 
+  function buildGameCardData(game) {
+    const sourceClass =
+      game.source === "manual"
+        ? "chip-source-manual"
+        : game.source === "config"
+        ? "chip-source-config"
+        : game.source === "auto"
+        ? "chip-source-auto"
+        : "chip-source-builtin";
+
+    const sourceLabel =
+      game.source === "manual"
+        ? "MANUAL"
+        : game.source === "config"
+        ? "CONFIG"
+        : game.source === "auto"
+        ? "AUTO"
+        : "BUILTIN";
+
+    const currentPreset = (game.preset || "BALANCED").toUpperCase();
+    const rawProfile = game.profile || "";
+    const presetPrefix = `${currentPreset} \u2022 `;
+    const profileText = rawProfile.toUpperCase().startsWith(presetPrefix)
+      ? rawProfile.slice(presetPrefix.length)
+      : rawProfile;
+
+    const initial = (game.name || "?").trim().charAt(0).toUpperCase();
+    const pkgHash = game.pkg.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+    const hue = Math.round((pkgHash * 137.508) % 360);
+
+    return { sourceClass, sourceLabel, currentPreset, profileText, initial, hue };
+  }
+
+  function gameCardInnerHTML(game, d) {
+    return `
+      <div class="game-tile-top">
+        <span class="game-tile-source ${d.sourceClass}">${d.sourceLabel}</span>
+        <span class="game-tile-preset preset-badge preset-badge-${d.currentPreset.toLowerCase()}">${d.currentPreset}</span>
+      </div>
+      <div class="game-tile-initial">${d.initial}</div>
+      <div class="game-tile-bottom">
+        <div class="game-tile-title">${game.name}</div>
+        <div class="game-tile-sub">${game.pkg}</div>
+        <button class="game-play-btn inline-launch" data-pkg="${game.pkg}" aria-label="Play ${game.name}" title="Play ${game.name}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+          <span>Play</span>
+        </button>
+      </div>
+    `;
+  }
+
+  function bindGameCardEvents(scope) {
+    scope.querySelectorAll(".game-item").forEach((item) => {
+      item.addEventListener("click", (e) => {
+        if (e.target.closest("button,input,select")) return;
+        openGameDetail(item.dataset.pkg);
+      });
+    });
+    scope.querySelectorAll(".inline-launch").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (window._nativeBridge && typeof window._nativeBridge.launchGame === "function") {
+          window._nativeBridge.launchGame(btn.dataset.pkg);
+        } else {
+          alert("Could not launch game. Make sure the package is installed.");
+        }
+      });
+    });
+  }
+
   function renderGamesList(games) {
     if (!gamesContainer) return;
+
+    // Empty state handling (shared by both modes)
     if (!games || games.length === 0) {
+      if (gamesViewMode === "carousel" && gamesCarouselView) {
+        gamesCarouselView.classList.add("hidden");
+      }
+      gamesContainer.classList.remove("hidden");
+      gamesContainer.className = "games-grid";
       gamesContainer.innerHTML = `
         <div class="empty-state">
           <span class="empty-state-glyph" aria-hidden="true">
@@ -868,6 +952,7 @@
       return;
     }
 
+    // Always build the grid DOM so data stays fresh when toggling modes
     gamesContainer.innerHTML = "";
     gamesContainer.className = "games-grid";
     games.forEach((game) => {
@@ -877,77 +962,114 @@
       if (currentForegroundPkg && game.pkg === currentForegroundPkg) {
         item.classList.add("active-profile");
       }
-
-      const sourceClass =
-        game.source === "manual"
-          ? "chip-source-manual"
-          : game.source === "config"
-          ? "chip-source-config"
-          : game.source === "auto"
-          ? "chip-source-auto"
-          : "chip-source-builtin";
-
-      const sourceLabel =
-        game.source === "manual"
-          ? "MANUAL"
-          : game.source === "config"
-          ? "CONFIG"
-          : game.source === "auto"
-          ? "AUTO"
-          : "BUILTIN";
-
-      const isBbr = !!game.auto_bbr;
-      const currentPreset = (game.preset || "BALANCED").toUpperCase();
-      const rawProfile = game.profile || "";
-      const presetPrefix = `${currentPreset} \u2022 `;
-      const profileText = rawProfile.toUpperCase().startsWith(presetPrefix)
-        ? rawProfile.slice(presetPrefix.length)
-        : rawProfile;
-
-      const initial = (game.name || "?").trim().charAt(0).toUpperCase();
-      // Golden-angle spread so neighbouring packages never land on the same hue.
-      const pkgHash = game.pkg.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-      const hue = Math.round((pkgHash * 137.508) % 360);
-      item.style.setProperty("--tile-hue", hue);
-      item.innerHTML = `
-        <div class="game-tile-top">
-          <span class="game-tile-source ${sourceClass}">${sourceLabel}</span>
-          <span class="game-tile-preset preset-badge preset-badge-${currentPreset.toLowerCase()}">${currentPreset}</span>
-        </div>
-        <div class="game-tile-initial">${initial}</div>
-        <div class="game-tile-bottom">
-          <div class="game-tile-title">${game.name}</div>
-          <div class="game-tile-sub">${game.pkg}</div>
-          <button class="game-play-btn inline-launch" data-pkg="${game.pkg}" aria-label="Play ${game.name}" title="Play ${game.name}">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
-            <span>Play</span>
-          </button>
-        </div>
-      `;
-
+      const d = buildGameCardData(game);
+      item.style.setProperty("--tile-hue", d.hue);
+      item.innerHTML = gameCardInnerHTML(game, d);
       gamesContainer.appendChild(item);
     });
+    bindGameCardEvents(gamesContainer);
 
-    // Tap card (outside buttons) opens the separate detail page.
-  gamesContainer.querySelectorAll(".game-item").forEach((item) => {
-    item.addEventListener("click", (e) => {
-      if (e.target.closest("button,input,select")) return;
-      openGameDetail(item.dataset.pkg);
-    });
-  });
-
-  gamesContainer.querySelectorAll(".inline-launch").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (window._nativeBridge && typeof window._nativeBridge.launchGame === "function") {
-        window._nativeBridge.launchGame(btn.dataset.pkg);
-      } else {
-        alert("Could not launch game. Make sure the package is installed.");
-      }
-    });
-  });
-
+    // Also (re)render the carousel data model for instant toggle
+    carouselFiltered = games;
+    if (carouselIndex >= games.length) carouselIndex = 0;
+    if (gamesViewMode === "carousel") {
+      renderCarousel(games);
+    }
   }
+
+  function renderCarousel(games) {
+    if (!carouselStage || !carouselDots) return;
+    if (!games || games.length === 0) {
+      carouselStage.innerHTML = "";
+      carouselDots.innerHTML = "";
+      return;
+    }
+
+    if (carouselIndex >= games.length) carouselIndex = 0;
+
+    carouselStage.innerHTML = games.map((game, idx) => {
+      const offset = idx - carouselIndex;
+      const absOffset = Math.abs(offset);
+      // Side cards peek ~40px each side on a 411px viewport.
+      const translateX = offset * 100;
+      const scale = offset === 0 ? 1 : Math.max(0.78, 0.9 - (absOffset - 1) * 0.07);
+      const opacity = absOffset > 2 ? 0 : (offset === 0 ? 1 : 0.55);
+      const zIndex = 20 - absOffset;
+      const d = buildGameCardData(game);
+      const isActive = offset === 0;
+      return `
+        <div class="cover-card ${isActive ? "cover-card-active" : ""}"
+             data-pkg="${game.pkg}"
+             data-idx="${idx}"
+             style="--tile-hue: ${d.hue}; transform: translateX(${translateX}px) scale(${scale}); opacity: ${opacity}; z-index: ${zIndex};">
+          <div class="game-tile-top">
+            <span class="game-tile-source ${d.sourceClass}">${d.sourceLabel}</span>
+            <span class="game-tile-preset preset-badge preset-badge-${d.currentPreset.toLowerCase()}">${d.currentPreset}</span>
+          </div>
+          <div class="game-tile-initial">${d.initial}</div>
+          <div class="game-tile-bottom">
+            <div class="game-tile-title">${game.name}</div>
+            <div class="game-tile-sub">${game.pkg}</div>
+            <button class="game-play-btn inline-launch" data-pkg="${game.pkg}" aria-label="Play ${game.name}" title="Play ${game.name}">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+              <span>Play</span>
+            </button>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    carouselDots.innerHTML = games.map((_, idx) => `
+      <button class="carousel-dot ${idx === carouselIndex ? "active" : ""}" data-idx="${idx}" aria-label="Go to game ${idx + 1}"></button>
+    `).join("");
+
+    // Bind click on cover cards: tap center card opens detail, tap side card slides
+    carouselStage.querySelectorAll(".cover-card").forEach((card) => {
+      card.addEventListener("click", (e) => {
+        if (e.target.closest("button,input,select")) return;
+        const idx = parseInt(card.dataset.idx, 10);
+        if (idx === carouselIndex) {
+          openGameDetail(card.dataset.pkg);
+        } else {
+          carouselIndex = idx;
+          renderCarousel(games);
+        }
+      });
+    });
+    bindGameCardEvents(carouselStage);
+
+    carouselDots.querySelectorAll(".carousel-dot").forEach((dot) => {
+      dot.addEventListener("click", () => {
+        carouselIndex = parseInt(dot.dataset.idx, 10);
+        renderCarousel(games);
+      });
+    });
+  }
+
+  function setGamesViewMode(mode) {
+    gamesViewMode = mode;
+    if (mode === "carousel") {
+      if (gamesCarouselView) gamesCarouselView.classList.remove("hidden");
+      gamesContainer.classList.add("hidden");
+      if (btnViewToggle) {
+        btnViewToggle.innerHTML = viewToggleIcons.grid;
+        btnViewToggle.dataset.mode = "carousel";
+      }
+      renderCarousel(carouselFiltered.length ? carouselFiltered : allGames);
+    } else {
+      if (gamesCarouselView) gamesCarouselView.classList.add("hidden");
+      gamesContainer.classList.remove("hidden");
+      if (btnViewToggle) {
+        btnViewToggle.innerHTML = viewToggleIcons.carousel;
+        btnViewToggle.dataset.mode = "grid";
+      }
+    }
+  }
+
+  const viewToggleIcons = {
+    grid: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z"/></svg>',
+    carousel: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 2l-3 3M17 2l3 3M7 22l-3-3M17 22l3-3"/></svg>'
+  };
 
   function applyFilter() {
     renderHomeGames();
@@ -1215,6 +1337,15 @@
   });
 
   gameSearchInput?.addEventListener("input", applyFilter);
+
+  // View mode toggle (grid <-> carousel)
+  if (btnViewToggle) {
+    btnViewToggle.innerHTML = viewToggleIcons.carousel;
+    btnViewToggle.dataset.mode = "grid";
+    btnViewToggle.addEventListener("click", () => {
+      setGamesViewMode(btnViewToggle.dataset.mode === "grid" ? "carousel" : "grid");
+    });
+  }
 
   // Initial load of games
   loadGames();
