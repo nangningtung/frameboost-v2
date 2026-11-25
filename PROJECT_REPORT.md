@@ -485,6 +485,13 @@ Gunakan checklist ini setiap kali ada perubahan.
   - Verifikasi device: 4 tab (Session, Games, Policy, System) terender benar,
     game detail dengan segmented control dan badge EXPERIMENTAL utuh, tidak
     ada error di logcat. Webroot parity 3/3 MATCH.
+  - Game library (tab Games) diubah dari list row horizontal ke grid 2-kolom
+    kartu vertikal bergaya cover poster: gradient per-package (golden-angle
+    hue spread), inisial game besar di tengah, label source dan preset badge
+    di atas, judul + package + tombol Play pill di overlay gradient bawah.
+    Tombol Play berukuran 44dp (min tap target), tap card body membuka detail,
+    tap Play langsung menjalankan game (diverifikasi: MLBB ter-launch via CDP
+    bounding rect + adb input tap).
 - **State machine overlay murni (2026-11-25)**:
   - State overlay disatukan ke enum `OverlayState { HIDDEN, DOCKED, DRAGGING,
     PANEL_OPEN }` dengan transisi terpusat lewat `enterState()`. Sebelumnya

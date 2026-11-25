@@ -869,6 +869,7 @@
     }
 
     gamesContainer.innerHTML = "";
+    gamesContainer.className = "games-grid";
     games.forEach((game) => {
       const item = document.createElement("div");
       item.className = "game-item";
@@ -904,23 +905,24 @@
         : rawProfile;
 
       const initial = (game.name || "?").trim().charAt(0).toUpperCase();
-      const hue = (game.pkg.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 360);
+      // Golden-angle spread so neighbouring packages never land on the same hue.
+      const pkgHash = game.pkg.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+      const hue = Math.round((pkgHash * 137.508) % 360);
+      item.style.setProperty("--tile-hue", hue);
       item.innerHTML = `
-        <div class="game-tile-cover" style="--tile-hue: ${hue};">
-          <div class="game-tile-initial">${initial}</div>
-          <div class="game-tile-source ${sourceClass}">${sourceLabel}</div>
+        <div class="game-tile-top">
+          <span class="game-tile-source ${sourceClass}">${sourceLabel}</span>
+          <span class="game-tile-preset preset-badge preset-badge-${currentPreset.toLowerCase()}">${currentPreset}</span>
         </div>
-        <div class="game-tile-body">
-          <div class="game-row-top">
-            <div class="game-title">${game.name}</div>
-            <span class="preset-badge preset-badge-${currentPreset.toLowerCase()}">${currentPreset}</span>
-          </div>
-          <div class="game-pkg">${game.pkg}</div>
-          <div class="game-profile">${profileText || "No profile"}</div>
+        <div class="game-tile-initial">${initial}</div>
+        <div class="game-tile-bottom">
+          <div class="game-tile-title">${game.name}</div>
+          <div class="game-tile-sub">${game.pkg}</div>
+          <button class="game-play-btn inline-launch" data-pkg="${game.pkg}" aria-label="Play ${game.name}" title="Play ${game.name}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+            <span>Play</span>
+          </button>
         </div>
-        <button class="game-play-btn inline-launch" data-pkg="${game.pkg}" aria-label="Play ${game.name}" title="Play ${game.name}">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.4v13.2L19 12z"/></svg>
-        </button>
       `;
 
       gamesContainer.appendChild(item);
