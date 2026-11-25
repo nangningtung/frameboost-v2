@@ -977,6 +977,87 @@
     }
   }
 
+  // Touch swipe state for carousel
+  let swipeStartX = 0;
+  let swipeStartY = 0;
+  let swipeDeltaX = 0;
+  let isSwiping = false;
+  let swipeMoved = false;
+
+  function bindCarouselSwipe() {
+    if (!carouselStage) return;
+
+    carouselStage.addEventListener("touchstart", (e) => {
+      if (e.touches.length !== 1) return;
+      swipeStartX = e.touches[0].clientX;
+      swipeStartY = e.touches[0].clientY;
+      swipeDeltaX = 0;
+      isSwiping = false;
+      swipeMoved = false;
+    }, { passive: true });
+
+    carouselStage.addEventListener("touchmove", (e) => {
+      if (e.touches.length !== 1) return;
+      const dx = e.touches[0].clientX - swipeStartX;
+      const dy = e.touches[0].clientY - swipeStartY;
+      // Determine direction on first significant move
+      if (!swipeMoved && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+        isSwiping = Math.abs(dx) > Math.abs(dy);
+        swipeMoved = true;
+      }
+      if (isSwiping) {
+        swipeDeltaX = dx;
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    carouselStage.addEventListener("touchend", () => {
+      if (!swipeMoved) return;
+      const threshold = 40;
+      if (swipeDeltaX < -threshold) {
+        // Swipe left -> next
+        if (carouselFiltered.length > 0) {
+          carouselIndex = Math.min(carouselIndex + 1, carouselFiltered.length - 1);
+          renderCarousel(carouselFiltered);
+        }
+      } else if (swipeDeltaX > threshold) {
+        // Swipe right -> prev
+        if (carouselFiltered.length > 0) {
+          carouselIndex = Math.max(carouselIndex - 1, 0);
+          renderCarousel(carouselFiltered);
+        }
+      }
+      isSwiping = false;
+      swipeMoved = false;
+      swipeDeltaX = 0;
+    }, { passive: true });
+
+    // Also support mouse drag for desktop preview
+    let mouseDown = false;
+    let mouseStartX = 0;
+    carouselStage.addEventListener("mousedown", (e) => {
+      if (e.target.closest("button,input,select")) return;
+      mouseDown = true;
+      mouseStartX = e.clientX;
+    });
+    carouselStage.addEventListener("mouseup", (e) => {
+      if (!mouseDown) return;
+      mouseDown = false;
+      const dx = e.clientX - mouseStartX;
+      if (Math.abs(dx) > 40) {
+        if (carouselFiltered.length > 0) {
+          if (dx < 0) {
+            carouselIndex = Math.min(carouselIndex + 1, carouselFiltered.length - 1);
+          } else {
+            carouselIndex = Math.max(carouselIndex - 1, 0);
+          }
+          renderCarousel(carouselFiltered);
+        }
+      }
+    });
+    carouselStage.addEventListener("mouseleave", () => { mouseDown = false; });
+  }
+
   function renderCarousel(games) {
     if (!carouselStage || !carouselDots) return;
     if (!games || games.length === 0) {
@@ -990,10 +1071,10 @@
     carouselStage.innerHTML = games.map((game, idx) => {
       const offset = idx - carouselIndex;
       const absOffset = Math.abs(offset);
-      // Side cards peek ~40px each side on a 411px viewport.
-      const translateX = offset * 100;
-      const scale = offset === 0 ? 1 : Math.max(0.78, 0.9 - (absOffset - 1) * 0.07);
-      const opacity = absOffset > 2 ? 0 : (offset === 0 ? 1 : 0.55);
+      // Large cards: 80% width, side cards peek ~50px each side.
+      const translateX = offset * 135;
+      const scale = offset === 0 ? 1 : Math.max(0.8, 0.92 - (absOffset - 1) * 0.06);
+      const opacity = absOffset > 2 ? 0 : (offset === 0 ? 1 : 0.5);
       const zIndex = 20 - absOffset;
       const d = buildGameCardData(game);
       const isActive = offset === 0;
@@ -1023,10 +1104,12 @@
       <button class="carousel-dot ${idx === carouselIndex ? "active" : ""}" data-idx="${idx}" aria-label="Go to game ${idx + 1}"></button>
     `).join("");
 
-    // Bind click on cover cards: tap center card opens detail, tap side card slides
+    // Bind click on cover cards: tap center card opens detail, tap side card slides.
+    // Suppress click if a swipe just happened.
     carouselStage.querySelectorAll(".cover-card").forEach((card) => {
       card.addEventListener("click", (e) => {
         if (e.target.closest("button,input,select")) return;
+        if (swipeMoved) return; // suppress tap after swipe
         const idx = parseInt(card.dataset.idx, 10);
         if (idx === carouselIndex) {
           openGameDetail(card.dataset.pkg);
@@ -1346,6 +1429,10 @@
       setGamesViewMode(btnViewToggle.dataset.mode === "grid" ? "carousel" : "grid");
     });
   }
+
+  // Bind carousel swipe gestures (safe to call once; stage re-renders but
+  // the touch listeners live on the parent element).
+  bindCarouselSwipe();
 
   // Initial load of games
   loadGames();

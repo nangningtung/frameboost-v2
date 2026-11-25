@@ -499,6 +499,11 @@ Gunakan checklist ini setiap kali ada perubahan.
     buka detail, tap Play untuk launch. Diverifikasi: Play button di carousel
     menjalankan Auto Chess; toggle grid/carousel bolak-balik normal; tidak ada
     error logcat.
+  - Carousel diperbesar (80% width, 312px height) dan mendukung swipe gesture:
+    geser kiri/kanan pada stage untuk pindah card, dengan threshold 40px dan
+    suppress click setelah swipe supaya tidak membuka detail secara tak
+    sengaja. Verifikasi device: swipe left -> Auto Chess, swipe right -> MLBB,
+    state CDP mengonfirmasi detail view tetap hidden setelah swipe.
 - **State machine overlay murni (2026-11-25)**:
   - State overlay disatukan ke enum `OverlayState { HIDDEN, DOCKED, DRAGGING,
     PANEL_OPEN }` dengan transisi terpusat lewat `enterState()`. Sebelumnya
