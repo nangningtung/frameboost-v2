@@ -1118,35 +1118,38 @@ button:disabled,
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .carousel-stage {
   position: relative;
   width: 100%;
-  height: 268px;
+  height: 300px;
   flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   touch-action: pan-y;
+  perspective: 1000px;
+  perspective-origin: 50% 50%;
 }
 
 .cover-card {
   position: absolute;
-  width: 80%;
-  max-width: 300px;
-  height: 240px;
-  padding: 10px;
+  width: 200px;
+  height: 268px;
+  padding: 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-lg);
+  border-radius: 26px;
   overflow: hidden;
   cursor: pointer;
   color: #fff;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
   background:
     radial-gradient(circle at 50% 38%, hsl(var(--tile-hue, 210), 70%, 42%) 0%, transparent 62%),
     linear-gradient(
@@ -1155,19 +1158,21 @@ button:disabled,
       hsl(calc(var(--tile-hue, 210) + 40), 55%, 16%) 58%,
       hsl(calc(var(--tile-hue, 210) + 70), 50%, 9%) 100%
     );
-  transition: transform 0.38s var(--ease-emph), opacity 0.35s var(--ease-emph),
-              box-shadow 0.38s var(--ease-emph), border-color 0.3s var(--ease-emph);
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+              opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 0.3s ease;
   will-change: transform, opacity;
 }
 
 .cover-card-active {
-  border-color: rgba(255, 255, 255, 0.25);
-  box-shadow: 0 12px 36px -8px rgba(0, 0, 0, 0.65);
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 20px 48px -12px rgba(0, 0, 0, 0.75), 0 0 0 2px rgba(255, 255, 255, 0.12);
 }
 
-/* Scale text for larger carousel cards */
+/* Scale text for carousel cards */
 .cover-card .game-tile-initial {
-  font-size: 64px;
+  font-size: 60px;
 }
 
 .cover-card .game-tile-title {
@@ -1179,7 +1184,7 @@ button:disabled,
 }
 
 .cover-card .game-tile-bottom {
-  padding: 24px 10px 10px;
+  padding: 28px 12px 12px;
 }
 
 .carousel-dots {

@@ -525,6 +525,15 @@ Gunakan checklist ini setiap kali ada perubahan.
     stroke-based SVG. Cache buser bump ke v0.1.0-ui2. Search bar dihapus dari
     Games tab karena game list biasanya sedikit (2-5 game) sehingga filter
     tidak diperlukan.
+  - Carousel 3D cover flow upgrade: kartu lebih besar (200x268px) dengan
+    perspective 1000px, telescoping position (unit pertama full spacing,
+    sisanya 55% spacing), rotateY clamped ke ±52deg, translateZ depth
+    (max 3 unit x 60px), dan scale 8% per unit. Drag mengikuti jari 1:1
+    (transition disabled saat drag), snap-back dengan spring easing
+    cubic-bezier(0.22, 1, 0.36, 1) 0.5s. Velocity-based flick: swipe cepat
+    (>0.6 px/ms) melompat 2 kartu. DOM card di-build sekali, hanya
+    transform yang diupdate supaya CSS transition beranimasi. Hero dan dots
+    sync dengan card center. Cache buser bump ke v0.1.0-ui3.
 - **State machine overlay murni (2026-11-25)**:
   - State overlay disatukan ke enum `OverlayState { HIDDEN, DOCKED, DRAGGING,
     PANEL_OPEN }` dengan transisi terpusat lewat `enterState()`. Sebelumnya

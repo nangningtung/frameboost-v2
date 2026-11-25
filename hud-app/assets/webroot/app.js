@@ -1018,6 +1018,9 @@
   let swipeDeltaX = 0;
   let isSwiping = false;
   let swipeMoved = false;
+  let swipeLastX = 0;
+  let swipeLastT = 0;
+  let swipeVelocity = 0;
 
   function bindCarouselSwipe() {
     if (!carouselStage) return;
@@ -1026,14 +1029,18 @@
       if (e.touches.length !== 1) return;
       swipeStartX = e.touches[0].clientX;
       swipeStartY = e.touches[0].clientY;
+      swipeLastX = swipeStartX;
+      swipeLastT = Date.now();
       swipeDeltaX = 0;
+      swipeVelocity = 0;
       isSwiping = false;
       swipeMoved = false;
     }, { passive: true });
 
     carouselStage.addEventListener("touchmove", (e) => {
       if (e.touches.length !== 1) return;
-      const dx = e.touches[0].clientX - swipeStartX;
+      const cx = e.touches[0].clientX;
+      const dx = cx - swipeStartX;
       const dy = e.touches[0].clientY - swipeStartY;
       // Determine direction on first significant move
       if (!swipeMoved && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
@@ -1042,29 +1049,53 @@
       }
       if (isSwiping) {
         swipeDeltaX = dx;
+        // Track velocity for flick detection
+        const now = Date.now();
+        const dt = now - swipeLastT;
+        if (dt > 0) {
+          swipeVelocity = (cx - swipeLastX) / dt; // px/ms
+        }
+        swipeLastX = cx;
+        swipeLastT = now;
         e.preventDefault();
+        // Live drag: update card positions in real-time
+        applyDragOffset(carouselFiltered, dx);
       }
     }, { passive: false });
 
     carouselStage.addEventListener("touchend", () => {
       if (!swipeMoved) return;
       const threshold = 40;
+      // Velocity-based flick: fast swipe (>0.6 px/ms) nudges 1 extra slide
+      const fastFlick = Math.abs(swipeVelocity) > 0.6;
+      // Re-enable transition for spring snap-back
+      carouselStage.querySelectorAll(".cover-card").forEach((c) => {
+        c.style.transition = "";
+      });
       if (swipeDeltaX < -threshold) {
-        // Swipe left -> next
+        // Swipe left -> next (velocity boost = +1 extra)
         if (carouselFiltered.length > 0) {
-          carouselIndex = Math.min(carouselIndex + 1, carouselFiltered.length - 1);
-          renderCarousel(carouselFiltered);
+          let step = fastFlick ? 2 : 1;
+          carouselIndex = Math.min(carouselIndex + step, carouselFiltered.length - 1);
+          layoutCarousel(0, false);
+          updateHeroAndDots(carouselFiltered);
         }
       } else if (swipeDeltaX > threshold) {
-        // Swipe right -> prev
+        // Swipe right -> prev (velocity boost = +1 extra)
         if (carouselFiltered.length > 0) {
-          carouselIndex = Math.max(carouselIndex - 1, 0);
-          renderCarousel(carouselFiltered);
+          let step = fastFlick ? 2 : 1;
+          carouselIndex = Math.max(carouselIndex - step, 0);
+          layoutCarousel(0, false);
+          updateHeroAndDots(carouselFiltered);
         }
+      } else {
+        // Not enough drag: snap back to current
+        layoutCarousel(0, false);
       }
       isSwiping = false;
       swipeMoved = false;
       swipeDeltaX = 0;
+      swipeVelocity = 0;
     }, { passive: true });
 
     // Also support mouse drag for desktop preview
@@ -1075,10 +1106,19 @@
       mouseDown = true;
       mouseStartX = e.clientX;
     });
+    carouselStage.addEventListener("mousemove", (e) => {
+      if (!mouseDown) return;
+      const dx = e.clientX - mouseStartX;
+      applyDragOffset(carouselFiltered, dx);
+    });
     carouselStage.addEventListener("mouseup", (e) => {
       if (!mouseDown) return;
       mouseDown = false;
       const dx = e.clientX - mouseStartX;
+      // Re-enable transition for snap-back
+      carouselStage.querySelectorAll(".cover-card").forEach((c) => {
+        c.style.transition = "";
+      });
       if (Math.abs(dx) > 40) {
         if (carouselFiltered.length > 0) {
           if (dx < 0) {
@@ -1086,11 +1126,71 @@
           } else {
             carouselIndex = Math.max(carouselIndex - 1, 0);
           }
-          renderCarousel(carouselFiltered);
+          layoutCarousel(0, false);
+          updateHeroAndDots(carouselFiltered);
         }
+      } else {
+        // Snap back
+        renderCarousel(carouselFiltered);
       }
     });
-    carouselStage.addEventListener("mouseleave", () => { mouseDown = false; });
+    carouselStage.addEventListener("mouseleave", () => {
+      if (mouseDown) {
+        mouseDown = false;
+        carouselStage.querySelectorAll(".cover-card").forEach((c) => {
+          c.style.transition = "";
+        });
+        renderCarousel(carouselFiltered);
+      }
+    });
+  }
+
+  // Live drag: moves cards in real-time following the finger.
+  // dragPx > 0 = dragging right (prev), dragPx < 0 = dragging left (next).
+  function applyDragOffset(games, dragPx) {
+    if (!games || games.length === 0) return;
+    layoutCarousel(dragPx, true); // true = no transition during drag
+  }
+
+  // Compute and apply transform/opacity/zIndex for every card.
+  // Based on "Anatomy of Cover Flow" (godui.design):
+  // - Telescoping position: first unit full spacing, rest 55% spacing
+  // - rotateY clamped to ±52deg max
+  // - translateZ pushes far cards back for depth
+  // - Only compositor-friendly props change (x, rotateY, z, scale, opacity)
+  function layoutCarousel(dragPx, noTransition) {
+    const cards = carouselStage.querySelectorAll(".cover-card");
+    if (!cards.length) return;
+    const SPACING = 130;
+    const dragInSlots = dragPx / SPACING;
+    cards.forEach((card) => {
+      card.style.transition = noTransition ? "none" : "";
+      const idx = parseInt(card.dataset.idx, 10);
+      const offset = idx - carouselIndex - dragInSlots;
+      const abs = Math.abs(offset);
+      const sign = offset > 0 ? 1 : (offset < 0 ? -1 : 0);
+      // Telescoping X: first unit full spacing, rest compressed to 55%
+      const near = Math.min(abs, 1);
+      const far = Math.max(abs - 1, 0);
+      const x = sign * (near * SPACING + far * SPACING * 0.55);
+      // Clamped rotateY: center=0, sides capped at ±52deg
+      const rotateY = -Math.max(-1, Math.min(1, offset)) * 52;
+      // translateZ: push far cards back (max 3 units)
+      const z = -Math.min(abs, 3) * 60;
+      // Scale: center=1, sides shrink by 8% per unit (max 3)
+      const scale = 1 - Math.min(abs, 3) * 0.08;
+      // Opacity: center=1, sides fade
+      const opacity = abs > 2.5 ? 0 : (1 - Math.min(abs, 2.5) * 0.25);
+      const zIndex = 20 - Math.round(abs);
+      card.style.transform = `translate3d(${x}px, 0, ${z}px) rotateY(${rotateY}deg) scale(${scale})`;
+      card.style.opacity = String(opacity);
+      card.style.zIndex = String(zIndex);
+      if (abs < 0.5) {
+        card.classList.add("cover-card-active");
+      } else {
+        card.classList.remove("cover-card-active");
+      }
+    });
   }
 
   function renderCarousel(games) {
@@ -1103,34 +1203,72 @@
 
     if (carouselIndex >= games.length) carouselIndex = 0;
 
-    carouselStage.innerHTML = games.map((game, idx) => {
-      const offset = idx - carouselIndex;
-      const absOffset = Math.abs(offset);
-      // Large cards: 80% width, side cards peek ~50px each side.
-      const translateX = offset * 135;
-      const scale = offset === 0 ? 1 : Math.max(0.8, 0.92 - (absOffset - 1) * 0.06);
-      const opacity = absOffset > 2 ? 0 : (offset === 0 ? 1 : 0.5);
-      const zIndex = 20 - absOffset;
-      const d = buildGameCardData(game);
-      const isActive = offset === 0;
-      return `
-        <div class="cover-card ${isActive ? "cover-card-active" : ""}"
-             data-pkg="${game.pkg}"
-             data-idx="${idx}"
-             style="--tile-hue: ${d.hue}; transform: translateX(${translateX}px) scale(${scale}); opacity: ${opacity}; z-index: ${zIndex};">
-          <div class="game-tile-top">
-            <span class="game-tile-source ${d.sourceClass}">${d.sourceLabel}</span>
-            <span class="game-tile-preset preset-badge preset-badge-${d.currentPreset.toLowerCase()}">${d.currentPreset}</span>
+    // Build DOM only if card count changed (avoids re-creating elements
+    // so CSS transitions can animate between states).
+    const existing = carouselStage.querySelectorAll(".cover-card");
+    if (existing.length !== games.length) {
+      carouselStage.innerHTML = games.map((game, idx) => {
+        const d = buildGameCardData(game);
+        return `
+          <div class="cover-card"
+               data-pkg="${game.pkg}"
+               data-idx="${idx}"
+               style="--tile-hue: ${d.hue};">
+            <div class="game-tile-top">
+              <span class="game-tile-source ${d.sourceClass}">${d.sourceLabel}</span>
+              <span class="game-tile-preset preset-badge preset-badge-${d.currentPreset.toLowerCase()}">${d.currentPreset}</span>
+            </div>
+            <div class="game-tile-initial">${d.initial}</div>
+            <div class="game-tile-bottom">
+              <div class="game-tile-title">${game.name}</div>
+              <div class="game-tile-sub">${game.pkg}</div>
+            </div>
           </div>
-          <div class="game-tile-initial">${d.initial}</div>
-          <div class="game-tile-bottom">
-            <div class="game-tile-title">${game.name}</div>
-            <div class="game-tile-sub">${game.pkg}</div>
-          </div>
-        </div>
-      `;
-    }).join("");
+        `;
+      }).join("");
 
+      // Bind click on cover cards once.
+      carouselStage.querySelectorAll(".cover-card").forEach((card) => {
+        card.addEventListener("click", (e) => {
+          if (e.target.closest("button,input,select")) return;
+          if (swipeMoved) return;
+          const idx = parseInt(card.dataset.idx, 10);
+          if (idx === carouselIndex) {
+            openGameDetail(card.dataset.pkg);
+          } else {
+            carouselIndex = idx;
+            layoutCarousel(0, false);
+            updateHeroAndDots(games);
+          }
+        });
+      });
+      bindGameCardEvents(carouselStage);
+    } else {
+      // Update card content/data in-place (game list same length but
+      // might have different packages after rescan).
+      games.forEach((game, idx) => {
+        const card = carouselStage.querySelector(`.cover-card[data-idx="${idx}"]`);
+        if (!card) return;
+        const d = buildGameCardData(game);
+        card.dataset.pkg = game.pkg;
+        card.style.setProperty("--tile-hue", d.hue);
+        card.querySelector(".game-tile-source").className = "game-tile-source " + d.sourceClass;
+        card.querySelector(".game-tile-source").textContent = d.sourceLabel;
+        const preset = card.querySelector(".game-tile-preset");
+        preset.textContent = d.currentPreset;
+        preset.className = "game-tile-preset preset-badge preset-badge-" + d.currentPreset.toLowerCase();
+        card.querySelector(".game-tile-initial").textContent = d.initial;
+        card.querySelector(".game-tile-title").textContent = game.name;
+        card.querySelector(".game-tile-sub").textContent = game.pkg;
+      });
+    }
+
+    // Apply transforms with transition (animated snap)
+    layoutCarousel(0, false);
+    updateHeroAndDots(games);
+  }
+
+  function updateHeroAndDots(games) {
     // Update hero showcase
     const activeGame = games[carouselIndex];
     if (activeGame) {
@@ -1149,31 +1287,15 @@
       <button class="carousel-dot ${idx === carouselIndex ? "active" : ""}" data-idx="${idx}" aria-label="Go to game ${idx + 1}"></button>
     `).join("");
 
-    // Bind click on cover cards: tap center card opens detail, tap side card slides.
-    // Suppress click if a swipe just happened.
-    carouselStage.querySelectorAll(".cover-card").forEach((card) => {
-      card.addEventListener("click", (e) => {
-        if (e.target.closest("button,input,select")) return;
-        if (swipeMoved) return; // suppress tap after swipe
-        const idx = parseInt(card.dataset.idx, 10);
-        if (idx === carouselIndex) {
-          openGameDetail(card.dataset.pkg);
-        } else {
-          carouselIndex = idx;
-          renderCarousel(games);
-        }
-      });
-    });
-    bindGameCardEvents(carouselStage);
-
     carouselDots.querySelectorAll(".carousel-dot").forEach((dot) => {
       dot.addEventListener("click", () => {
         carouselIndex = parseInt(dot.dataset.idx, 10);
-        renderCarousel(games);
+        layoutCarousel(0, false);
+        updateHeroAndDots(games);
       });
     });
 
-    // Hero Play button
+    // Hero Play button (rebind each time since games array may change)
     if (carouselHeroPlay) {
       carouselHeroPlay.addEventListener("click", () => {
         const pkg = carouselHeroPlay.dataset.pkg;
