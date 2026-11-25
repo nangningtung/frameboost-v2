@@ -28,9 +28,16 @@ This module is device locked on purpose. `customize.sh` aborts the install and
 - **Honest telemetry**: FPS comes from SurfaceFlinger `--timestats` per layer.
 - **Game sessions**: a session starts when a game comes forward, sleeps the user apps you
   do not need, and reports duration, average FPS, session-wide 1% low, jank against the
-  panel vsync, peak temperature and battery. Every slept app is journaled first, so a
-  crash, reboot or uninstall restores its original app-op mode.
+  game's own frame cadence, peak temperature and battery. Every slept app is journaled
+  first, so a crash, reboot or uninstall restores its original app-op mode.
   Missing data shows `--`, never a fabricated number.
+- **Session history**: the last 10 sessions per game, with a preset suggestion once three
+  runs of five minutes or more show a drop of more than 8% from the best run.
+- **Render scale (experimental)**: 720p or 900p while a game runs, applied through
+  `wm size`, journaled, and always reset on exit, reboot or uninstall. Native by default.
+- **Capability probe**: the System tab shows what the ROM really supports (GSI or One UI,
+  GOS, sleep primitive, `wm size`, cpuset, root, SELinux) instead of pretending.
+- **Four tabs**: Games, Session, Policy, System.
 - **Wide thermal hysteresis**: warn 87C, recover 82C, critical 92C.
 
 ## Requirements

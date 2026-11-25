@@ -34,6 +34,14 @@ if [ -f "$SLEEP_LIST" ]; then
     log -t SecretoSpace "woke apps from an interrupted session"
 fi
 
+# Undo an experimental render scale if the session was interrupted.
+WM_JOURNAL=/data/adb/secreto_space/wm_size.journal
+if [ -f "$WM_JOURNAL" ]; then
+    wm size reset
+    rm -f "$WM_JOURNAL"
+    log -t SecretoSpace "display size reset to native after an interrupted session"
+fi
+
 # Ensure daemon binary is executable
 DAEMON="$MODDIR/system/bin/secretod"
 LOG=/data/local/tmp/secretod.log

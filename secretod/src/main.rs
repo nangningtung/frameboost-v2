@@ -15,6 +15,7 @@ mod detect;
 mod fps;
 mod net;
 mod profile;
+mod render;
 mod rollback;
 mod session;
 mod snapshot;
@@ -119,6 +120,80 @@ fn has_samsung_gos() -> bool {
         .output()
         .map(|o| o.status.success() && !o.stdout.is_empty())
         .unwrap_or(false)
+}
+
+fn getprop(key: &str) -> String {
+    run_cmd("getprop", &[key])
+}
+
+#[derive(Serialize)]
+struct CapabilityProbe {
+    device: String,
+    model: String,
+    android: String,
+    rom: String,
+    gsi: bool,
+    gos: bool,
+    freeze: String,
+    wm_size: bool,
+    cpuset: bool,
+    cpuset_controllers: String,
+    root: bool,
+    selinux: String,
+}
+
+/// What this ROM actually supports, so the console can hide or label features
+/// instead of pretending they work everywhere.
+fn probe_capabilities() -> CapabilityProbe {
+    let flavor = getprop("ro.build.flavor");
+    let gsi = flavor.to_ascii_lowercase().contains("gsi");
+    let oneui = !getprop("ro.build.version.oneui").is_empty()
+        || flavor.to_ascii_lowercase().contains("oneui");
+    let rom = if gsi {
+        "GSI".to_string()
+    } else if oneui {
+        "One UI".to_string()
+    } else {
+        "AOSP".to_string()
+    };
+
+    // `cmd appops get` answers "No operations. Default mode: ..." for packages
+    // without an explicit op, so the op name is not always in the output. A
+    // non-empty answer still proves the command and the op exist.
+    let appops_out = run_cmd("cmd", &["appops", "get", "com.android.shell", "RUN_IN_BACKGROUND"]);
+    let appops_ok = appops_out.contains("RUN_IN_BACKGROUND")
+        || appops_out.contains("Default mode")
+        || appops_out.contains("No operations");
+    let freeze = if appops_ok {
+        "appops + force-stop"
+    } else {
+        "force-stop only"
+    }
+    .to_string();
+
+    let cpuset = std::path::Path::new("/dev/cpuset").exists();
+    let controllers = read_file("/sys/fs/cgroup/cgroup.controllers");
+    let root = run_cmd("id", &["-u"]) == "0";
+    let selinux = read_file("/sys/fs/selinux/enforce");
+
+    CapabilityProbe {
+        device: getprop("ro.product.device"),
+        model: getprop("ro.product.model"),
+        android: getprop("ro.build.version.release"),
+        rom,
+        gsi,
+        gos: has_samsung_gos(),
+        freeze,
+        wm_size: crate::render::supported(),
+        cpuset,
+        cpuset_controllers: controllers,
+        root,
+        selinux: match selinux.as_str() {
+            "1" => "enforcing".to_string(),
+            "0" => "permissive".to_string(),
+            _ => "unknown".to_string(),
+        },
+    }
 }
 
 fn check_gos_disabled() -> bool {
@@ -283,13 +358,13 @@ fn take_snapshot(
         // ponytail: throttle fps measurement to 1s to prevent RenderThread binder stalls
         if last_fps_time.elapsed() >= Duration::from_millis(1000) {
             let rep = measure_fps(active_pkg);
-            if rep.available {
-                crate::session::sample(
-                    &rep,
-                    read_u32("/sys/class/thermal/thermal_zone0/temp"),
-                    read_u32("/sys/class/power_supply/battery/capacity") as i32,
-                );
-            }
+            // Record temperature and battery even when the game is not drawing
+            // frames, so a short or paused session still reports a real peak.
+            crate::session::sample(
+                &rep,
+                read_u32("/sys/class/thermal/thermal_zone0/temp"),
+                read_u32("/sys/class/power_supply/battery/capacity") as i32,
+            );
             *last_fps = Some(rep.clone());
             *last_fps_time = Instant::now();
             rep
@@ -532,6 +607,45 @@ fn handle_client(
             serde_json::to_string(&last).unwrap_or_default(),
             serde_json::to_string(&crate::session::sleeping_apps()).unwrap_or_default()
         )
+    } else if req == "session_history" || req.starts_with("session_history ") {
+        let arg = req.strip_prefix("session_history").unwrap_or("").trim();
+        let reports = if arg.is_empty() {
+            crate::session::history_all()
+        } else {
+            crate::session::history(arg)
+        };
+        let suggestion = if arg.is_empty() {
+            None
+        } else {
+            crate::session::suggestion(arg)
+        };
+        format!(
+            r#"{{"status":"ok","pkg":"{}","reports":{},"suggestion":{}}}"#,
+            arg,
+            serde_json::to_string(&reports).unwrap_or_default(),
+            serde_json::to_string(&suggestion).unwrap_or_default()
+        )
+    } else if req == "get_render_scale" {
+        format!(
+            r#"{{"status":"ok","render":{}}}"#,
+            serde_json::to_string(&crate::render::status()).unwrap_or_default()
+        )
+    } else if let Some(rest) = req.strip_prefix("set_render_scale ") {
+        let mut parts = rest.split_whitespace();
+        let pkg = parts.next().unwrap_or("");
+        let mode = parts.next().unwrap_or("native");
+        match crate::render::set(pkg, mode) {
+            Ok(_) => format!(
+                r#"{{"status":"ok","render":{}}}"#,
+                serde_json::to_string(&crate::render::status()).unwrap_or_default()
+            ),
+            Err(e) => format!(r#"{{"status":"error","message":"{}"}}"#, e),
+        }
+    } else if req == "probe" {
+        format!(
+            r#"{{"status":"ok","probe":{}}}"#,
+            serde_json::to_string(&probe_capabilities()).unwrap_or_default()
+        )
     } else if let Some(rest) = req.strip_prefix("session_start") {
         let arg = rest.trim();
         let pkg = if arg.is_empty() {
@@ -689,6 +803,18 @@ fn handle_client(
 fn main() {
     let _ = fs::remove_file(SOCK_PATH);
 
+    // Secreto Space is built for one device. `customize.sh` and `service.sh`
+    // already refuse other phones; this is the last line of defence in case the
+    // binary is started by hand.
+    let device = getprop("ro.product.device");
+    if device != "a50" {
+        log_line(&format!(
+            "device {} is not a50, refusing to start",
+            if device.is_empty() { "unknown" } else { device.as_str() }
+        ));
+        return;
+    }
+
     GOS_DISABLED.store(check_gos_disabled(), Ordering::Relaxed);
 
     // Initial stock capture so baseline is preserved
@@ -698,6 +824,9 @@ fn main() {
     // Finish anything a crash or a reboot interrupted before serving clients.
     // `recover()` logs its own summary, so it is not logged twice here.
     let _ = crate::session::recover();
+    if let Some(msg) = crate::render::recover() {
+        log_line(&msg);
+    }
 
     let listener = match UnixListener::bind(SOCK_PATH) {
         Ok(l) => l,

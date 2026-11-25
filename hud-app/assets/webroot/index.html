@@ -35,8 +35,8 @@
     </div>
 
     <main class="hud-main">
-      <!-- ===================== 1. HOME ===================== -->
-      <section class="tab-panel active" id="tab-home">
+      <!-- ===================== 1. SESSION ===================== -->
+      <section class="tab-panel active" id="tab-session">
 
         <!-- Instrument cluster: identity + readouts + governor rail -->
         <div class="panel cluster">
@@ -133,6 +133,14 @@
               <span class="meta-label">1% low</span>
               <strong id="session-p1">--</strong>
             </div>
+            <div class="session-metric">
+              <span class="meta-label">Jank</span>
+              <strong id="session-jank">--</strong>
+            </div>
+            <div class="session-metric">
+              <span class="meta-label">Peak temp</span>
+              <strong id="session-peak">--</strong>
+            </div>
           </div>
           <p class="panel-note block" id="session-last">No session recorded yet.</p>
           <div class="btn-group">
@@ -193,19 +201,7 @@
           </div>
         </section>
 
-        <!-- Performance profile -->
-        <section class="panel" aria-labelledby="preset-title">
-          <div class="panel-head">
-            <h2 class="panel-title" id="preset-title">Performance profile</h2>
-            <span class="panel-note">Governor &amp; clock tuning</span>
-          </div>
-          <div class="preset-segmented-control" role="group" aria-label="Pilih profil performa">
-            <button class="preset-segment-btn" data-preset="BATTERY">ECO</button>
-            <button class="preset-segment-btn" data-preset="BALANCED">BAL</button>
-            <button class="preset-segment-btn" data-preset="PERFORMANCE">PERF</button>
-            <button class="preset-segment-btn active" data-preset="ESPORTS">ESPORTS</button>
-          </div>
-        </section>
+        <!-- Performance profile lives in the Policy tab -->
 
         <!-- Diagnostics stays collapsed so games stay in focus -->
         <details class="diagnostics">
@@ -271,16 +267,10 @@
               <span class="battery-meta-val highlight" id="batt-power">-- W</span>
             </div>
           </div>
-        </details>
-
-        <!-- Manual override -->
-        <section class="panel action-card">
-          <div class="action-info">
-            <div class="action-title">Manual boost override</div>
-            <div class="action-desc">Force a gaming profile without waiting for auto-detect</div>
-          </div>
-          <button class="hud-btn primary" id="btn-toggle-boost">Apply boost</button>
         </section>
+      </div>
+    </details>
+
       </section>
 
       <!-- ===================== 2. GAMES ===================== -->
@@ -345,16 +335,76 @@
             <button id="btn-detail-bbr" class="btn btn-secondary">Toggle</button>
           </div>
 
+          <div class="surface-card game-detail-card">
+            <div class="game-detail-label">Session reports</div>
+            <div id="detail-reports" class="report-list">
+              <div class="report-empty">No sessions recorded yet.</div>
+            </div>
+            <div id="detail-advice" class="report-advice hidden"></div>
+          </div>
+
+          <div class="surface-card game-detail-card">
+            <div class="game-detail-label">Render scale <span class="badge">EXPERIMENTAL</span></div>
+            <div class="scale-segmented" id="detail-scale-group">
+              <button class="btn btn-secondary detail-scale active" data-scale="native">Native</button>
+              <button class="btn btn-secondary detail-scale" data-scale="900p">900p</button>
+              <button class="btn btn-secondary detail-scale" data-scale="720p">720p</button>
+            </div>
+            <div class="scale-note" id="detail-scale-note">Applies only while this game is running, and is always reset on exit or reboot.</div>
+          </div>
+
           <button id="btn-detail-launch" class="btn btn-primary game-detail-launch">Apply profile</button>
         </div>
       </section>
 
-      <!-- ===================== 3. NETWORK ===================== -->
-      <section class="tab-panel" id="tab-network">
+      <!-- ===================== 3. POLICY ===================== -->
+      <section class="tab-panel" id="tab-policy">
         <div class="section-header">
-          <h2>Network</h2>
-          <span class="sub-hint">Ping • jitter • bufferbloat • BBR</span>
+          <h2>Policy</h2>
+          <span class="sub-hint">Presets, background apps, network and BBR</span>
         </div>
+
+        <!-- Performance profile -->
+        <section class="panel" aria-labelledby="preset-title">
+          <div class="panel-head">
+            <h2 class="panel-title" id="preset-title">Performance profile</h2>
+            <span class="panel-note">Governor &amp; clock tuning</span>
+          </div>
+          <div class="preset-segmented-control" role="group" aria-label="Choose a performance profile">
+            <button class="preset-segment-btn" data-preset="BATTERY">ECO</button>
+            <button class="preset-segment-btn" data-preset="BALANCED">BAL</button>
+            <button class="preset-segment-btn" data-preset="PERFORMANCE">PERF</button>
+            <button class="preset-segment-btn active" data-preset="ESPORTS">ESPORTS</button>
+          </div>
+          <div class="action-card policy-boost">
+            <div class="action-info">
+              <div class="action-title">Manual boost override</div>
+              <div class="action-desc">Force a gaming profile without waiting for auto-detect</div>
+            </div>
+            <button class="hud-btn primary" id="btn-toggle-boost">Apply boost</button>
+          </div>
+        </section>
+
+        <!-- Background apps -->
+        <section class="panel" aria-labelledby="sleep-title">
+          <div class="panel-head">
+            <h2 class="panel-title" id="sleep-title">Background apps</h2>
+            <span class="badge" id="sleep-badge">ON</span>
+          </div>
+          <p class="panel-note block">Sleeps user apps while a game session runs. Games, launchers, keyboards, the phone app and your whitelist stay awake. Every app is restored when the session ends.</p>
+          <div class="setting-row">
+            <div>
+              <div class="setting-title">Sleep during sessions</div>
+              <div class="setting-desc" id="sleep-desc">Checking installed apps</div>
+            </div>
+            <button class="hud-btn secondary" id="btn-sleep-toggle">ON</button>
+          </div>
+          <label class="setting-title" for="sleep-whitelist-input">Whitelist (comma separated)</label>
+          <textarea id="sleep-whitelist-input" class="hud-input sleep-whitelist" rows="2" placeholder="com.whatsapp,com.discord"></textarea>
+          <button class="hud-btn secondary full-w" id="btn-sleep-save">Save whitelist</button>
+        </section>
+
+        <div class="policy-subhead">Network</div>
 
         <div class="target-chips-row">
           <button class="target-chip active" id="chip-gw" data-target="gw">
@@ -493,12 +543,31 @@
         </section>
       </section>
 
-      <!-- ===================== 4. SAFETY ===================== -->
-      <section class="tab-panel" id="tab-settings">
+      <!-- ===================== 4. SYSTEM ===================== -->
+      <section class="tab-panel" id="tab-system">
         <div class="section-header">
-          <h2>Safety &amp; system</h2>
-          <span class="sub-hint">Thermal guard &amp; rollback</span>
+          <h2>System</h2>
+          <span class="sub-hint">Capabilities, thermal guard and rollback</span>
         </div>
+
+        <section class="panel" aria-labelledby="probe-title">
+          <div class="panel-head">
+            <h2 class="panel-title" id="probe-title">Capability probe</h2>
+            <span class="badge" id="probe-badge">CHECKING</span>
+          </div>
+          <p class="panel-note block">What this ROM actually supports. Features that are missing are hidden, not faked.</p>
+          <div class="probe-grid">
+            <div class="probe-row"><span>Device</span><strong id="probe-device">--</strong></div>
+            <div class="probe-row"><span>Android</span><strong id="probe-android">--</strong></div>
+            <div class="probe-row"><span>ROM</span><strong id="probe-rom">--</strong></div>
+            <div class="probe-row"><span>Samsung GOS</span><strong id="probe-gos">--</strong></div>
+            <div class="probe-row"><span>Sleep primitive</span><strong id="probe-freeze">--</strong></div>
+            <div class="probe-row"><span>Render scale</span><strong id="probe-render">--</strong></div>
+            <div class="probe-row"><span>cpuset</span><strong id="probe-cpuset">--</strong></div>
+            <div class="probe-row"><span>Root</span><strong id="probe-root">--</strong></div>
+            <div class="probe-row"><span>SELinux</span><strong id="probe-selinux">--</strong></div>
+          </div>
+        </section>
 
         <section class="panel" aria-labelledby="thermal-title">
           <div class="panel-head">
@@ -507,21 +576,21 @@
           <div class="setting-row">
             <div>
               <div class="setting-title">Warning stage</div>
-              <div class="setting-desc">Drops GPU clock to 385 MHz when the SoC hits 85°C</div>
+              <div class="setting-desc">Drops GPU clock to 385 MHz when the SoC hits 87°C</div>
             </div>
-            <span class="badge active">85°C</span>
+            <span class="badge active">87°C</span>
           </div>
           <div class="setting-row">
             <div>
               <div class="setting-title">Critical stage</div>
-              <div class="setting-desc">Full stock rollback when the SoC hits 90°C</div>
+              <div class="setting-desc">Full stock rollback when the SoC hits 92°C</div>
             </div>
-            <span class="badge danger">90°C</span>
+            <span class="badge danger">92°C</span>
           </div>
           <div class="setting-row">
             <div>
               <div class="setting-title">Hysteresis</div>
-              <div class="setting-desc">Boost re-engages when temps fall to 82°C</div>
+              <div class="setting-desc">Boost re-engages at 82°C, full restore exits at 80°C</div>
             </div>
             <span class="badge">ACTIVE</span>
           </div>
@@ -538,24 +607,6 @@
             <button class="hud-btn secondary" id="btn-gos-restore">Restore GOS</button>
           </div>
           <div id="gos-status" class="status-line">Status: checking for GOS package</div>
-        </section>
-
-        <section class="panel" aria-labelledby="sleep-title">
-          <div class="panel-head">
-            <h2 class="panel-title" id="sleep-title">Background apps</h2>
-            <span class="badge" id="sleep-badge">ON</span>
-          </div>
-          <p class="panel-note block">Sleeps user apps while a game session runs. Games, launchers, keyboards, the phone app and your whitelist stay awake. Every app is restored when the session ends.</p>
-          <div class="setting-row">
-            <div>
-              <div class="setting-title">Sleep during sessions</div>
-              <div class="setting-desc" id="sleep-desc">Checking installed apps</div>
-            </div>
-            <button class="hud-btn secondary" id="btn-sleep-toggle">ON</button>
-          </div>
-          <label class="setting-title" for="sleep-whitelist-input">Whitelist (comma separated)</label>
-          <textarea id="sleep-whitelist-input" class="hud-input sleep-whitelist" rows="2" placeholder="com.whatsapp,com.discord"></textarea>
-          <button class="hud-btn secondary full-w" id="btn-sleep-save">Save whitelist</button>
         </section>
 
         <section class="panel">
@@ -629,7 +680,7 @@
             <div class="credit-item">
               <strong>imacte/yumi</strong>
               <span class="credit-badge">GPL-3.0</span>
-              <div class="credit-desc">Dual-thread monitor+scheduler, probe eBPF sched_switch (referensi).</div>
+              <div class="credit-desc">Dual-thread monitor+scheduler, probe eBPF sched_switch (reference).</div>
             </div>
             <div class="credit-item">
               <strong>Dreamucxe/GameCore</strong>
@@ -654,22 +705,14 @@
             <div class="credit-item">
               <strong>NetizenNemo/Aether_OptExt &amp; cinitdev/AppOpt</strong>
               <span class="credit-badge">GPL-3.0</span>
-              <div class="credit-desc">Rust thread affinity, eBPF tracepoint, CPU core binding (referensi).</div>
+              <div class="credit-desc">Rust thread affinity, eBPF tracepoint, CPU core binding (reference).</div>
             </div>
           </div>
         </details>
       </section>
     </main>
 
-    <nav class="hud-nav" aria-label="Navigasi utama">
-      <button class="nav-tab active" data-tab="tab-home">
-        <span class="nav-indicator">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M4 11.2 12 4l8 7.2V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z"/>
-          </svg>
-        </span>
-        <span class="nav-label">HOME</span>
-      </button>
+    <nav class="hud-nav" aria-label="Main navigation">
       <button class="nav-tab" data-tab="tab-games">
         <span class="nav-indicator">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -679,25 +722,32 @@
         </span>
         <span class="nav-label">GAMES</span>
       </button>
-      <button class="nav-tab" data-tab="tab-network">
+      <button class="nav-tab active" data-tab="tab-session">
         <span class="nav-indicator">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M8.1 16.4a5.5 5.5 0 0 1 7.8 0"/>
-            <path d="M12 20h.01"/>
-            <path d="M4.9 12.9a10 10 0 0 1 14.2 0"/>
-            <path d="M1.4 9.4a15.2 15.2 0 0 1 21.2 0"/>
+            <path d="M3 12h3.5l2.5-7 4.5 14 2.5-7H21"/>
           </svg>
         </span>
-        <span class="nav-label">PING</span>
+        <span class="nav-label">SESSION</span>
       </button>
-      <button class="nav-tab" data-tab="tab-settings">
+      <button class="nav-tab" data-tab="tab-policy">
+        <span class="nav-indicator">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 7h9M17 7h3M4 17h3M11 17h9"/>
+            <circle cx="15" cy="7" r="2"/>
+            <circle cx="9" cy="17" r="2"/>
+          </svg>
+        </span>
+        <span class="nav-label">POLICY</span>
+      </button>
+      <button class="nav-tab" data-tab="tab-system">
         <span class="nav-indicator">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M12 3l7 3v6c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z"/>
             <path d="M9 12l2 2 4-4"/>
           </svg>
         </span>
-        <span class="nav-label">SAFETY</span>
+        <span class="nav-label">SYSTEM</span>
       </button>
     </nav>
   </div>

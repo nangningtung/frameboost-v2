@@ -133,7 +133,9 @@ Rename menyentuh 30 file. Daftar lengkap: `module.prop`, `customize.sh`,
 - Ini lever FPS terbesar di Mali G72 MP3, tapi juga yang paling mungkin bikin
   layout GSI aneh. Default mati, label `Experimental`.
 - Spike wajib dulu: ukur FPS dan cek layout di Auto Chess dan MLBB sebelum
-  dijadikan fitur.
+  dijadikan fitur. Hasil 2026-11-25: mekanisme `wm size` dan reset terbukti,
+  tetapi menu Auto Chess kena vsync cap 60 FPS di native maupun 720p, jadi gain
+  in-match belum terukur. Fitur tetap default Native dan berlabel `EXPERIMENTAL`.
 
 ### Phase 4 - Overlay jadi kokpit (S)
 
@@ -177,3 +179,16 @@ milestone internal di dalam 0.1.0.
 Selama M0 sampai M3 belum selesai, `module.prop` tetap `v0.1.0`.
 Nomor kecil menyatakan bahwa ini produk baru dengan janji yang lebih sempit,
 dan itu justru jujur.
+
+## 8. Status implementasi
+
+| Milestone | Status | Bukti |
+|---|---|---|
+| M0 | Selesai | Modul `secreto_space`, guard A50, migrasi data, APK baru |
+| M1 | Selesai | 33 app tidur, journal, restore setelah reboot, smoke test |
+| M2 | Selesai | Riwayat 10 sesi per game, kartu detail, saran preset, strip overlay |
+| M3 | Selesai, satu catatan | Empat tab, probe, skala render dengan reset berjurnal; gain FPS in-match belum diukur |
+
+Catatan M3: skala render terbukti bekerja dan aman, tetapi belum terbukti menaikkan FPS
+di dalam match. Jangan memasarkannya sebagai peningkatan FPS sampai ada pengukuran
+in-match di Auto Chess atau MLBB.

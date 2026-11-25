@@ -30,6 +30,10 @@ public class SnapshotReader {
         public boolean battBypass = false;
         public boolean gosDisabled = false;
         public boolean hasGos = false;
+        public boolean sessionActive = false;
+        public long sessionElapsed = 0;
+        public int sessionSlept = 0;
+        public double sessionJank = -1.0;
     }
 
     public static SnapshotData read() {
@@ -98,6 +102,16 @@ public class SnapshotReader {
                 data.battChargeType = batt.optString("charge_type", "");
                 data.battPowerW = batt.optDouble("power_w", 0.0);
                 data.battBypass = batt.optBoolean("bypass_charging", false);
+            }
+
+            JSONObject sess = obj.optJSONObject("session");
+            if (sess != null) {
+                data.sessionActive = sess.optBoolean("active", false);
+                data.sessionElapsed = sess.optLong("elapsed_s", 0);
+                data.sessionSlept = sess.optInt("slept_apps", 0);
+                data.sessionJank = sess.has("jank_pct") && !sess.isNull("jank_pct")
+                        ? sess.optDouble("jank_pct", -1.0)
+                        : -1.0;
             }
 
             return data;

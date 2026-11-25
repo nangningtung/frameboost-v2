@@ -58,7 +58,7 @@ impl StockSnapshot {
     /// Save to persistent file. Overwrites only if none exists (first capture wins).
     pub fn save_if_new(&self) -> Result<(), String> {
         if fs::metadata(STOCK_PATH).is_ok() {
-            // Already have a snapshot — don't overwrite.
+            // Already have a snapshot, so do not overwrite it.
             return Ok(());
         }
         // Ensure parent dir exists

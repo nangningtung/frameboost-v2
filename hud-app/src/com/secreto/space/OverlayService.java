@@ -67,6 +67,10 @@ public class OverlayService extends Service {
     private TextView txtMNet;
     private TextView txtMBat;
     private TextView txtTelemetryState;
+    private TextView txtSessTime;
+    private TextView txtSessJank;
+    private TextView txtSessApps;
+    private TextView txtSessThermal;
 
     private Button btnTypeOff;
     private Button btnTypeCompact;
@@ -116,6 +120,10 @@ public class OverlayService extends Service {
     private String lastMNet = "";
     private String lastMBat = "";
     private String lastGame = "";
+    private String lastSessTime = "";
+    private String lastSessJank = "";
+    private String lastSessApps = "";
+    private String lastSessThermal = "";
 
     private int lastScreenW = 0;
     private int lastScreenH = 0;
@@ -168,6 +176,10 @@ public class OverlayService extends Service {
         txtMNet = overlayRoot.findViewById(R.id.txt_m_net);
         txtMBat = overlayRoot.findViewById(R.id.txt_m_bat);
         txtTelemetryState = overlayRoot.findViewById(R.id.txt_telemetry_state);
+        txtSessTime = overlayRoot.findViewById(R.id.txt_sess_time);
+        txtSessJank = overlayRoot.findViewById(R.id.txt_sess_jank);
+        txtSessApps = overlayRoot.findViewById(R.id.txt_sess_apps);
+        txtSessThermal = overlayRoot.findViewById(R.id.txt_sess_thermal);
 
         btnTypeOff = overlayRoot.findViewById(R.id.btn_type_off);
         btnTypeCompact = overlayRoot.findViewById(R.id.btn_type_compact);
@@ -1107,6 +1119,42 @@ public class OverlayService extends Service {
                 : "Battery";
         if (!bat.equals(lastMBat)) { txtMBat.setText(bat); lastMBat = bat; }
 
+        if (txtSessTime != null) {
+            String time = data.sessionActive ? formatSessionTime(data.sessionElapsed) : "--:--";
+            if (!time.equals(lastSessTime)) { txtSessTime.setText(time); lastSessTime = time; }
+
+            String jank = data.sessionJank >= 0
+                    ? String.format(java.util.Locale.US, "%.0f%%", data.sessionJank)
+                    : "--";
+            if (!jank.equals(lastSessJank)) {
+                txtSessJank.setText(jank);
+                txtSessJank.setTextColor(data.sessionJank >= 30 ? COLOR_RED
+                        : data.sessionJank >= 15 ? COLOR_AMBER : COLOR_GREEN);
+                lastSessJank = jank;
+            }
+
+            String apps = data.sessionActive ? String.valueOf(data.sessionSlept) : "0";
+            if (!apps.equals(lastSessApps)) { txtSessApps.setText(apps); lastSessApps = apps; }
+
+            String thermal;
+            int thermalColor;
+            if ("CRIT".equals(data.daemonState)) {
+                thermal = "LIMIT";
+                thermalColor = COLOR_RED;
+            } else if ("WARN".equals(data.daemonState)) {
+                thermal = "HOT";
+                thermalColor = COLOR_AMBER;
+            } else {
+                thermal = "OK";
+                thermalColor = COLOR_GREEN;
+            }
+            if (!thermal.equals(lastSessThermal)) {
+                txtSessThermal.setText(thermal);
+                txtSessThermal.setTextColor(thermalColor);
+                lastSessThermal = thermal;
+            }
+        }
+
         if (data.battBypass != bypassEnabled) {
             bypassEnabled = data.battBypass;
             updateBypassButton();
@@ -1117,6 +1165,14 @@ public class OverlayService extends Service {
             hasGos = data.hasGos;
             updateGosButton();
         }
+    }
+
+    private String formatSessionTime(long seconds) {
+        if (seconds < 3600) {
+            return String.format(java.util.Locale.US, "%d:%02d", seconds / 60, seconds % 60);
+        }
+        return String.format(java.util.Locale.US, "%d:%02d:%02d",
+                seconds / 3600, (seconds % 3600) / 60, seconds % 60);
     }
 
     private void triggerHaptic() {

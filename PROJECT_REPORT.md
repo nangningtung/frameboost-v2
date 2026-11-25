@@ -1,6 +1,6 @@
 # Secreto Space 0.1.0 - Project Report
 
-Status: **M0 dan M1 selesai di kode; M1 terverifikasi di device kecuali uji reboot**  
+Status: **M0 sampai M3 selesai di kode dan terverifikasi di device; spike FPS render scale belum konklusif**  
 Commit terakhir sebelum rebrand: `0221973`  
 Device uji: `RR8M50C0W8T` (Samsung Galaxy A50, GSI API 36)
 
@@ -40,6 +40,11 @@ Prinsip utama: **ringan, cepat, rapi, dan jujur terhadap data**.
   - Performance — kuning
   - Esports — pink
 - BBR ON/OFF.
+- Riwayat 10 sesi terakhir untuk game itu: waktu, durasi, rata-rata FPS, 1% low, jank,
+  suhu puncak, jumlah app tidur, preset, dan event throttle.
+- Saran preset muncul hanya kalau ada minimal 3 sesi berdurasi 5 menit atau lebih dan
+  rata-rata terbaru turun lebih dari 8% dari sesi terbaik.
+- Render scale (eksperimental): Native / 900p / 720p, default Native.
 - Apply Profile dengan notifikasi:
   - `✓ PROFILE APPLIED`
   - `✕ APPLY FAILED`
@@ -68,6 +73,7 @@ Detail perilaku:
 **Side panel** (cockpit GameSpace, lebar 306 dp):
 
 - Header fixed: hero FPS + frametime, GPU, CPU big, network, battery.
+- Strip sesi: SESSION (timer), JANK (%), ASLEEP (jumlah app), THERMAL (OK / HOT / LIMIT).
 - Aksi scrollable: Boost RAM, Notifs (heads-up), Bypass CHG, No GOS.
 - Preset switcher 4 tombol (ECO / BAL / PERF / ESPORTS).
 - Segmen Floating Monitor: OFF / FPS / + TEMP / + GPU.
@@ -107,6 +113,11 @@ Kosong = -- / N/A.
 
 FPS self-healing: TimeStats di-enable otomatis, layer basi di-clear + enable ulang, dan tidak ada fallback ke rata-rata lama.
 
+Jank dihitung terhadap irama frame game itu sendiri: frame yang lebih dari 1,5x frame
+time median dianggap jank, dengan periode vsync panel sebagai batas bawah. Definisi lama
+(vsync panel x 1,5) melaporkan game 30 FPS yang stabil sebagai 97% jank; definisi baru
+melaporkan game yang sama sekitar 2%.
+
 ### 2.5 Safety
 
 - Snapshot & restore stock config (termasuk `charging_enabled=1` saat rollback).
@@ -134,10 +145,33 @@ Sesi adalah unit yang dilaporkan console, bukan sekadar kumpulan tweak.
   reboot, atau uninstall selalu bisa mengembalikan mode appops semula.
 - Batch tidur berjalan di worker thread dengan `APPLY_LOCK`, jadi tick loop termal tidak
   berhenti beberapa detik saat app ditidurkan.
-- Laporan sesi: durasi, rata-rata FPS, 1% low dari p99 seluruh sesi, jank terhadap interval
-  vsync panel, suhu puncak, baterai awal/akhir, jumlah app yang tidur, dan alasan berakhir.
+- Laporan sesi: durasi, rata-rata FPS, 1% low dari p99 seluruh sesi, jank terhadap irama
+  frame game, suhu puncak, baterai awal/akhir, jumlah app yang tidur, event throttle, dan
+  alasan berakhir.
+- Riwayat `session_history.json`: maksimal 10 sesi per game dan 120 total. Perintah
+  `session_history <pkg>` mengembalikan daftar plus saran preset.
 - `End session & restore` dan `RESTORE NOW` mengakhiri sesi, membangunkan app, memulihkan
   clock stock, lalu mem-pause Secreto untuk game itu sampai game ditutup.
+
+### 2.7 Render scale (eksperimental)
+
+- Mode per game: `native` (default), `900p`, `720p`; disimpan di
+  `/data/adb/secreto_space/render_scale.json`.
+- Ukuran mengikuti rasio panel: 720p = 720x1560, 900p = 900x1950 pada panel 1080x2340.
+- Diterapkan lewat `wm size` hanya saat sesi game itu dimulai. Journal
+  `wm_size.journal` ditulis sebelum perintah, lalu dihapus setelah reset berhasil.
+- Reset terjadi di akhir sesi, saat daemon start, di `service.sh`, dan di `uninstall.sh`,
+  jadi reboot atau crash tidak bisa meninggalkan layar dalam mode scaled.
+- Spike 2026-11-25 di Auto Chess: native dan 720p sama-sama 59-60 FPS di menu karena
+  vsync cap, suhu 71 °C vs 67 °C. Mekanisme terbukti; gain FPS in-match belum terukur.
+
+### 2.8 Capability probe
+
+Perintah `probe` dan kartu System menampilkan device, model, Android, ROM (GSI / One UI /
+AOSP), ada tidaknya GOS, primitif freeze yang benar-benar bekerja, dukungan `wm size`,
+cpuset dan controller-nya, root, serta status SELinux. Di A50 GSI hasilnya: `a50`,
+Android 16, GSI, GOS absent, `appops + force-stop`, `wm size` didukung, cpuset hanya
+`memory`.
 
 ---
 
@@ -160,7 +194,10 @@ File penting:
 
 | File | Fungsi |
 |---|---|
-| `secretod/src/main.rs` | IPC, snapshot, command router |
+| `secretod/src/main.rs` | IPC, snapshot, command router, probe |
+| `secretod/src/session.rs` | Sesi, journal, laporan, riwayat, saran preset |
+| `secretod/src/render.rs` | Skala render per game, journal `wm size` |
+| `secretod/src/apps.rs` | Sleep/wake appops, whitelist, proteksi library |
 | `secretod/src/profile.rs` | Preset & per-game config |
 | `secretod/src/net.rs` | Ping, BBR, network |
 | `hud-app/src/.../OverlayService.java` | Overlay, drag, panel, preset IPC |
@@ -246,9 +283,11 @@ Belum termasuk fase ini:
 
 - [ ] Per-app layout side panel
 - [ ] Fallback FPS Choreographer saat SurfaceFlinger tidak tersedia
-- [ ] Capability probe terpisah
+- [x] Capability probe terpisah (System tab)
 - [ ] State machine overlay murni
 - [x] Quick action tambahan (Boost RAM, Notifs, Bypass CHG, No GOS)
+- [ ] Gain FPS render scale di dalam match (spike baru mengukur menu yang kena vsync cap)
+- [ ] Uji layout GSI pada 720p/900p untuk semua layar game, bukan hanya Auto Chess
 
 ---
 
@@ -305,10 +344,32 @@ Gunakan checklist ini setiap kali ada perubahan.
   - Journal `sleeping.list` ditulis sebelum aksi, dipulihkan oleh daemon, `service.sh`,
     dan `uninstall.sh`.
   - Game di library, launcher, IME, app telepon, GMS, dan whitelist tidak pernah ditidurkan.
-  - Laporan sesi: durasi, rata-rata FPS, 1% low (p99 seluruh sesi), jank terhadap vsync
-    panel, suhu puncak, baterai awal/akhir, jumlah app yang tidur.
+  - Laporan sesi: durasi, rata-rata FPS, 1% low (p99 seluruh sesi), jank terhadap irama
+    frame game, suhu puncak, baterai awal/akhir, jumlah app yang tidur.
   - `End session & restore` dan `RESTORE NOW` mengakhiri sesi, membangunkan app, dan
     mem-pause Secreto untuk game itu sampai game ditutup.
+- **Laporan sesi dan riwayat (M2)**:
+  - `session_history.json` menyimpan 10 sesi terakhir per game (maksimal 120 total).
+  - Halaman detail game menampilkan 10 sesi terakhir dan saran preset kalau data cukup:
+    minimal 3 sesi berdurasi 5 menit dan FPS turun lebih dari 8% dari sesi terbaik.
+  - Side panel punya strip SESSION / JANK / ASLEEP / THERMAL, diperbarui tiap 200 ms.
+  - Jank dihitung terhadap frame time median game, bukan vsync panel, supaya game 30 FPS
+    yang stabil tidak dilaporkan 97% jank.
+  - Peak temperature tetap tercatat walau game sedang tidak menggambar frame.
+  - Bug IPC `window.__secretoIpc[N] is not a function` diperbaiki dengan menangkap nomor
+    slot callback, sehingga respons yang datang berdekatan tidak saling menghapus.
+- **Skala render (M3, eksperimental)**:
+  - `render.rs` menyimpan mode per game dan menerapkan `wm size` 720p/900p hanya selama
+    sesi game itu. Journal `wm_size.journal` ditulis sebelum perintah.
+  - Reset di akhir sesi, start daemon, `service.sh`, dan `uninstall.sh`.
+  - Default Native; UI memberi label `EXPERIMENTAL` dan menjelaskan cakupannya.
+- **Produk (M3)**:
+  - Empat tab: Games / Session / Policy / System. Network, background apps, preset, dan
+    manual boost dilebur ke Policy; thermal guard dan rollback ke System.
+  - Capability probe menampilkan ROM, GOS, primitif freeze, `wm size`, cpuset, root, dan
+    SELinux lewat perintah `probe`.
+  - Guard `ro.product.device=a50` juga ada di binary daemon.
+  - Copy Indonesia di UI disapu ke English, termasuk `(referensi)` menjadi `(reference)`.
 
 ### `v2.4.0` - 2026-11-25
 

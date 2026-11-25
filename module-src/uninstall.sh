@@ -17,6 +17,7 @@ if [ -f /data/adb/secreto_space/sleeping.list ]; then
 fi
 
 # 2. Force restore stock knobs
+wm size reset 2>/dev/null || true
 echo "Interactive" > /sys/kernel/gpu/gpu_governor 2>/dev/null || true
 echo "260000" > /sys/kernel/gpu/gpu_min_clock 2>/dev/null || true
 echo "702000" > /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq 2>/dev/null || true

@@ -205,6 +205,9 @@ impl AutoDaemon {
                 "State transition: {:?} -> {:?} (pkg={}, temp={}mC)",
                 self.state, next_state, self.current_game, temp_big
             ));
+            if matches!(next_state, DaemonState::Warn | DaemonState::Crit) {
+                crate::session::note_throttle();
+            }
             self.apply_state(next_state);
             self.state = next_state;
         }

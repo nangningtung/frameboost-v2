@@ -57,6 +57,8 @@
   const sessionSlept = document.getElementById("session-slept");
   const sessionAvgFps = document.getElementById("session-avg-fps");
   const sessionP1 = document.getElementById("session-p1");
+  const sessionJank = document.getElementById("session-jank");
+  const sessionPeak = document.getElementById("session-peak");
   const sessionLast = document.getElementById("session-last");
   const btnSessionWake = document.getElementById("btn-session-wake");
   const btnSessionEnd = document.getElementById("btn-session-end");
@@ -197,12 +199,15 @@
         if (tab.dataset.tab === "tab-games") {
           loadGames();
         }
-        if (tab.dataset.tab === "tab-settings") {
+        if (tab.dataset.tab === "tab-policy") {
           refreshSleepSettings();
+          if (!multiPingDone) {
+            multiPingDone = true;
+            runMultiPing();
+          }
         }
-        if (tab.dataset.tab === "tab-network" && !multiPingDone) {
-          multiPingDone = true;
-          runMultiPing();
+        if (tab.dataset.tab === "tab-system") {
+          loadProbe();
         }
       }
     });
@@ -233,10 +238,14 @@
   function sendSocketCmd(cmd) {
     if (window._nativeBridge && typeof window._nativeBridge.sendSocketAsync === "function") {
       return new Promise((resolve) => {
-        const callback = `window.__secretoIpc[${++ipcSeq}]`;
+        // Capture the slot number. Using the mutable counter inside the
+        // callback deleted a newer request's slot and made its response fail
+        // with "__secretoIpc[N] is not a function".
+        const id = ++ipcSeq;
+        const callback = `window.__secretoIpc[${id}]`;
         window.__secretoIpc = window.__secretoIpc || {};
-        window.__secretoIpc[ipcSeq] = (value) => {
-          delete window.__secretoIpc[ipcSeq];
+        window.__secretoIpc[id] = (value) => {
+          delete window.__secretoIpc[id];
           resolve(value || null);
         };
         window._nativeBridge.sendSocketAsync(cmd, callback);
@@ -286,6 +295,13 @@
     if (sessionP1) {
       sessionP1.textContent = sess.p1_low != null ? `${sess.p1_low} FPS` : "--";
     }
+    if (sessionJank) {
+      sessionJank.textContent = sess.jank_pct != null ? `${sess.jank_pct}%` : "--";
+    }
+    if (sessionPeak) {
+      const peak = active ? sess.max_temp_c : (lastSessionReport?.max_temp_c ?? null);
+      sessionPeak.textContent = peak != null ? `${Math.round(peak)}°C` : "--";
+    }
     if (sessionLast) {
       if (active) {
         sessionLast.textContent = `Running ${displayGameName(sess.pkg)} on ${sess.preset || "preset"}. ${sleptCount} apps asleep.`;
@@ -293,7 +309,8 @@
         const r = lastSessionReport;
         const avg = r.avg_fps != null ? `${r.avg_fps} FPS avg` : "no FPS data";
         const jank = r.jank_pct != null ? `${r.jank_pct}% jank` : "no frame data";
-        sessionLast.textContent = `Last: ${displayGameName(r.pkg)} · ${formatDuration(r.duration_s)} · ${avg} · ${jank} · peak ${r.max_temp_c || 0}°C`;
+        const thermal = r.throttle_events ? ` · ${r.throttle_events} thermal drop${r.throttle_events > 1 ? "s" : ""}` : "";
+        sessionLast.textContent = `Last: ${displayGameName(r.pkg)} · ${formatDuration(r.duration_s)} · ${avg} · ${jank} · peak ${r.max_temp_c || 0}°C${thermal}`;
       } else {
         sessionLast.textContent = "No session recorded yet.";
       }
@@ -342,6 +359,126 @@
     }
   }
 
+  async function loadProbe() {
+    const badge = document.getElementById("probe-badge");
+    const raw = await sendSocketCmd("probe");
+    if (!raw || typeof raw !== "string") return;
+    try {
+      const p = JSON.parse(raw).probe;
+      if (!p) return;
+      const set = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+      };
+      set("probe-device", `${p.device || "--"} · ${p.model || "--"}`);
+      set("probe-android", p.android ? `Android ${p.android}` : "--");
+      set("probe-rom", p.rom || "--");
+      set("probe-gos", p.gos ? "present" : "absent");
+      set("probe-freeze", p.freeze || "--");
+      set("probe-render", p.wm_size ? "wm size supported" : "not supported");
+      set("probe-cpuset", p.cpuset ? p.cpuset_controllers || "present" : "absent");
+      set("probe-root", p.root ? "root" : "no root");
+      set("probe-selinux", p.selinux || "--");
+      if (badge) {
+        badge.textContent = "READY";
+        badge.className = "badge active";
+      }
+    } catch (e) {
+      console.error("probe parse:", e);
+    }
+  }
+
+  function reportWhen(epochSeconds) {
+    const d = new Date((epochSeconds || 0) * 1000);
+    if (isNaN(d.getTime())) return "--";
+    const date = d.toLocaleDateString([], { month: "short", day: "numeric" });
+    const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return `${date} ${time}`;
+  }
+
+  async function loadGameReports(pkg) {
+    const listEl = document.getElementById("detail-reports");
+    const adviceEl = document.getElementById("detail-advice");
+    if (!listEl) return;
+    listEl.innerHTML = '<div class="report-empty">Loading reports...</div>';
+    if (adviceEl) adviceEl.classList.add("hidden");
+    const raw = await sendSocketCmd(`session_history ${pkg}`);
+    if (!raw || typeof raw !== "string") {
+      listEl.innerHTML = '<div class="report-empty">Reports unavailable.</div>';
+      return;
+    }
+    try {
+      const j = JSON.parse(raw);
+      const reports = j.reports || [];
+      if (!reports.length) {
+        listEl.innerHTML = '<div class="report-empty">No sessions recorded yet.</div>';
+      } else {
+        listEl.innerHTML = reports
+          .map((r) => {
+            const metrics = [
+              formatDuration(r.duration_s),
+              r.avg_fps != null ? `${r.avg_fps} avg` : "no fps",
+              r.p1_low != null ? `${r.p1_low} 1%` : null,
+              r.jank_pct != null ? `${r.jank_pct}% jank` : null,
+              `${Math.round(r.max_temp_c || 0)}°C`,
+              `${r.slept_apps || 0} asleep`,
+              r.preset || "preset",
+            ]
+              .filter(Boolean)
+              .join(" · ");
+            const flag = r.throttle_events
+              ? `${r.throttle_events} thermal`
+              : r.reason === "idle"
+                ? ""
+                : r.reason || "";
+            return `<div class="report-row"><span class="report-when">${reportWhen(r.started_at)}</span><span class="report-flag">${flag}</span><span class="report-metrics">${metrics}</span></div>`;
+          })
+          .join("");
+      }
+      if (adviceEl && j.suggestion) {
+        adviceEl.textContent = j.suggestion;
+        adviceEl.classList.remove("hidden");
+      }
+    } catch (e) {
+      listEl.innerHTML = '<div class="report-empty">Reports unavailable.</div>';
+    }
+  }
+
+  let renderStatus = null;
+
+  function paintRenderScale(pkg) {
+    const group = document.getElementById("detail-scale-group");
+    const note = document.getElementById("detail-scale-note");
+    if (!group) return;
+    const supported = !!(renderStatus && renderStatus.supported);
+    const mode = supported ? (renderStatus.scales || {})[pkg] || "native" : "native";
+    group.querySelectorAll(".detail-scale").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.scale === mode);
+      btn.disabled = !supported;
+    });
+    if (note) {
+      if (!supported) {
+        note.textContent = "This ROM does not expose wm size. Render scale is unavailable.";
+      } else {
+        const active = renderStatus.override_size
+          ? `Active now: ${renderStatus.override_size}`
+          : `Native panel: ${renderStatus.native}`;
+        note.textContent = `${active}. 720p and 900p apply only while this game runs, and are reset on exit or reboot.`;
+      }
+    }
+  }
+
+  async function loadRenderScale(pkg) {
+    const raw = await sendSocketCmd("get_render_scale");
+    if (!raw || typeof raw !== "string") return;
+    try {
+      renderStatus = JSON.parse(raw).render || null;
+    } catch (e) {
+      renderStatus = null;
+    }
+    paintRenderScale(pkg);
+  }
+
   function renderSnapshot(data) {
     if (!data) return;
 
@@ -373,7 +510,7 @@
 
     // Radial Ring Gauges calculation
     if (radialCpuFill) {
-      const maxTemp = 90;
+      const maxTemp = 92;
       const tempRatio = Math.min(1, Math.max(0, tempC / maxTemp));
       const cpuOffset = 264 * (1 - tempRatio);
       radialCpuFill.style.strokeDashoffset = cpuOffset;
@@ -858,6 +995,8 @@
     if (gamesToolbar) gamesToolbar.classList.add("hidden");
     if (addGameDrawer) addGameDrawer.classList.add("hidden");
     if (gameDetailView) gameDetailView.classList.remove("hidden");
+    loadGameReports(pkg);
+    loadRenderScale(pkg);
   }
 
   function closeGameDetail() {
@@ -899,6 +1038,21 @@
     } catch (e) {}
     await loadGames();
     openGameDetail(selectedGamePkg);
+  });
+
+  document.querySelectorAll(".detail-scale").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!selectedGamePkg || !renderStatus?.supported) return;
+      const mode = btn.dataset.scale;
+      btn.disabled = true;
+      const raw = await sendSocketCmd(`set_render_scale ${selectedGamePkg} ${mode}`);
+      btn.disabled = false;
+      try {
+        const j = JSON.parse(raw);
+        if (j.status === "ok" && j.render) renderStatus = j.render;
+      } catch (e) {}
+      paintRenderScale(selectedGamePkg);
+    });
   });
 
   document.getElementById("btn-detail-launch")?.addEventListener("click", async (e) => {

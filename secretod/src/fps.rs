@@ -32,9 +32,31 @@ fn vsync_ms() -> f64 {
     })
 }
 
-/// A frame is late when it misses more than one and a half vsync periods.
-fn jank_threshold_ms() -> f64 {
-    vsync_ms() * 1.5
+/// The frame time that half the frames beat, i.e. the cadence the game is
+/// actually running at. A locked 30 FPS game takes ~33 ms per frame; judging it
+/// against a 60 Hz vsync made every single frame look like jank.
+fn typical_frame_ms(hist: &HashMap<u32, u32>) -> f64 {
+    let total: u64 = hist.values().map(|&c| c as u64).sum();
+    if total == 0 {
+        return vsync_ms();
+    }
+    let half = (total as f64 * 0.5).ceil() as u64;
+    let mut keys: Vec<u32> = hist.keys().copied().collect();
+    keys.sort_unstable();
+    let mut accum = 0u64;
+    for ms in keys {
+        accum += hist[&ms] as u64;
+        if accum >= half {
+            return ms as f64;
+        }
+    }
+    vsync_ms()
+}
+
+/// Jank is a frame that takes 50% longer than the game's own cadence, with the
+/// panel period as the floor. Works for 30, 45 and 60 FPS targets alike.
+fn jank_cut_ms(hist: &HashMap<u32, u32>) -> f64 {
+    (typical_frame_ms(hist) * 1.5).max(vsync_ms())
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -308,7 +330,7 @@ fn measure_fps_timestats(pkg: &str) -> Option<FpsReport> {
         fps_val
     };
 
-    let jank_cut = jank_threshold_ms();
+    let jank_cut = jank_cut_ms(&delta_hist);
     let janks: u32 = delta_hist
         .iter()
         .filter(|(ms, _)| **ms as f64 > jank_cut)
@@ -384,7 +406,14 @@ fn measure_fps_gfxinfo(pkg: &str) -> FpsReport {
     }
 
     let total = frame_durations_ns.len() as u32;
-    let jank_cut_ns = (jank_threshold_ms() * 1_000_000.0) as u64;
+
+    let mut hist: HashMap<u32, u32> = HashMap::new();
+    for &d in &frame_durations_ns {
+        let ms = ((d / 1_000_000).max(1)) as u32;
+        *hist.entry(ms).or_insert(0) += 1;
+    }
+
+    let jank_cut_ns = (jank_cut_ms(&hist) * 1_000_000.0) as u64;
     let janks = frame_durations_ns
         .iter()
         .filter(|&&d| d > jank_cut_ns)
@@ -404,12 +433,6 @@ fn measure_fps_gfxinfo(pkg: &str) -> FpsReport {
     } else {
         0.0
     };
-
-    let mut hist: HashMap<u32, u32> = HashMap::new();
-    for &d in &frame_durations_ns {
-        let ms = ((d / 1_000_000).max(1)) as u32;
-        *hist.entry(ms).or_insert(0) += 1;
-    }
 
     FpsReport {
         package: pkg.to_string(),

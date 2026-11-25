@@ -19,6 +19,15 @@ const DIR: &str = "/data/adb/secreto_space";
 const STATE_PATH: &str = "/data/adb/secreto_space/session.json";
 const LIST_PATH: &str = "/data/adb/secreto_space/sleeping.list";
 const LAST_PATH: &str = "/data/adb/secreto_space/session_last.json";
+const HISTORY_PATH: &str = "/data/adb/secreto_space/session_history.json";
+
+/// Sessions kept per game, and the hard cap across every game.
+const HISTORY_PER_GAME: usize = 10;
+const HISTORY_MAX: usize = 120;
+
+/// A report needs this much play time before its average FPS is trusted for
+/// advice. A 30 second launcher stint says nothing about a preset.
+const ADVICE_MIN_SECONDS: u64 = 300;
 
 /// Serialises the sleep batch against wake/recovery. Without it, a session
 /// that ends while the batch is still running could be woken and then slept
@@ -43,6 +52,7 @@ struct Active {
     battery_start: i32,
     battery_last: i32,
     slept: usize,
+    throttle_events: u32,
 }
 
 #[derive(Serialize, Clone, Debug, Default)]
@@ -56,6 +66,7 @@ pub struct SessionInfo {
     pub avg_fps: Option<f64>,
     pub p1_low: Option<f64>,
     pub jank_pct: Option<f64>,
+    pub max_temp_c: f64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -73,6 +84,9 @@ pub struct SessionReport {
     pub battery_end: i32,
     pub slept_apps: usize,
     pub reason: String,
+    /// Thermal downgrades (WARN or CRIT) that happened during the session.
+    #[serde(default)]
+    pub throttle_events: u32,
 }
 
 #[derive(Serialize)]
@@ -195,10 +209,14 @@ pub fn start(pkg: &str, preset: &str) -> bool {
         battery_start: battery_pct(),
         battery_last: battery_pct(),
         slept: 0,
+        throttle_events: 0,
     };
     write_state(&active);
     log_line(&format!("session: start pkg={} preset={}", pkg, preset));
     *ACTIVE.lock().unwrap() = Some(active);
+    // Applies only when this game has a non-native scale configured, and is a
+    // no-op otherwise. Doing it here covers both the daemon and a manual start.
+    crate::render::apply_for(pkg);
     true
 }
 
@@ -289,6 +307,14 @@ pub fn sample(rep: &FpsReport, temp_mc: u32, battery: i32) {
     a.battery_last = battery;
 }
 
+/// Called by the daemon whenever it drops a preset because of heat. Counted
+/// once per session so the report can say the game was thermally limited.
+pub fn note_throttle() {
+    if let Some(a) = ACTIVE.lock().unwrap().as_mut() {
+        a.throttle_events += 1;
+    }
+}
+
 /// Package of the running session, if any. Used so "End session" pauses the
 /// game that actually had the session rather than whatever is foreground now
 /// (the console itself, for example).
@@ -320,6 +346,7 @@ pub fn info() -> SessionInfo {
         } else {
             None
         },
+        max_temp_c: round1(a.max_temp_mc as f64 / 1000.0),
     }
 }
 
@@ -349,9 +376,80 @@ pub fn last_report() -> Option<SessionReport> {
     serde_json::from_str(&raw).ok()
 }
 
+/// Every report ever kept, newest first.
+pub fn history_all() -> Vec<SessionReport> {
+    let raw = match fs::read_to_string(HISTORY_PATH) {
+        Ok(v) => v,
+        Err(_) => return Vec::new(),
+    };
+    serde_json::from_str(&raw).unwrap_or_default()
+}
+
+/// Newest first, at most `HISTORY_PER_GAME` reports for one package.
+pub fn history(pkg: &str) -> Vec<SessionReport> {
+    history_all()
+        .into_iter()
+        .filter(|r| r.pkg == pkg)
+        .take(HISTORY_PER_GAME)
+        .collect()
+}
+
+fn append_history(report: &SessionReport) {
+    let mut all = history_all();
+    all.insert(0, report.clone());
+
+    let mut per_game: HashMap<String, usize> = HashMap::new();
+    all.retain(|r| {
+        let seen = per_game.entry(r.pkg.clone()).or_insert(0);
+        *seen += 1;
+        *seen <= HISTORY_PER_GAME
+    });
+    all.truncate(HISTORY_MAX);
+
+    if let Ok(json) = serde_json::to_string_pretty(&all) {
+        let _ = fs::write(HISTORY_PATH, json);
+    }
+}
+
+fn lower_preset(preset: &str) -> &'static str {
+    match preset.to_ascii_uppercase().as_str() {
+        "ESPORTS" => "Performance",
+        "PERFORMANCE" => "Balanced",
+        _ => "Battery",
+    }
+}
+
+/// Honest advice, only when the data supports it: at least three sessions of
+/// five minutes or more, and the newest average at least 8% below the best run
+/// of the same game. Anything looser is just noise.
+pub fn suggestion(pkg: &str) -> Option<String> {
+    let reports: Vec<SessionReport> = history(pkg)
+        .into_iter()
+        .filter(|r| r.duration_s >= ADVICE_MIN_SECONDS)
+        .collect();
+    if reports.len() < 3 {
+        return None;
+    }
+    let latest = reports.first()?.avg_fps?;
+    let best = reports
+        .iter()
+        .filter_map(|r| r.avg_fps)
+        .fold(0.0_f64, f64::max);
+    if best <= 0.0 || latest >= best * 0.92 {
+        return None;
+    }
+    let drop = ((best - latest) / best * 100.0).round() as u32;
+    Some(format!(
+        "Average FPS is {}% below the best run for this game. Try {} for the next session.",
+        drop,
+        lower_preset(&reports[0].preset)
+    ))
+}
+
 pub fn finish(reason: &str) -> Option<SessionReport> {
     let active = ACTIVE.lock().unwrap().take()?;
     let slept = wake_all();
+    crate::render::restore();
     let ended_at = epoch();
     let avg = if active.fps_n > 0 {
         Some(round1(active.fps_sum / active.fps_n as f64))
@@ -377,11 +475,13 @@ pub fn finish(reason: &str) -> Option<SessionReport> {
         battery_end: active.battery_last,
         slept_apps: slept,
         reason: reason.to_string(),
+        throttle_events: active.throttle_events,
     };
 
     if let Ok(json) = serde_json::to_string_pretty(&report) {
         let _ = fs::write(LAST_PATH, json);
     }
+    append_history(&report);
     let _ = fs::remove_file(STATE_PATH);
     log_line(&format!(
         "session: end pkg={} duration={}s slept={} reason={}",
@@ -398,6 +498,7 @@ pub fn recover() -> Option<String> {
         return None;
     }
     let woke = wake_all();
+    crate::render::restore();
     *ACTIVE.lock().unwrap() = None;
     let _ = fs::remove_file(STATE_PATH);
     let restored = crate::rollback::restore_all().unwrap_or_else(|e| format!("restore failed: {}", e));

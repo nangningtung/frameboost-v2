@@ -68,8 +68,46 @@ di foreground.
 | Tidak ada re-apply | tunggu 15 detik setelah End session | jam tetap stock |
 
 `avg_fps`, `p1_low`, dan `jank_pct` hanya terisi kalau layer game benar-benar
-menghasilkan frame. Jank dihitung terhadap vsync panel (frame > 1,5 x interval
-vsync), bukan ambang 16 ms tetap.
+menghasilkan frame. Jank dihitung terhadap irama frame game itu sendiri: frame yang
+lebih dari 1,5x frame time median dianggap jank, dengan periode vsync panel sebagai
+batas bawah. Jadi game 30 FPS yang stabil tidak lagi dilaporkan 97% jank.
+
+## 5c. Laporan sesi dan riwayat
+
+| Cek | Perintah | Harapan |
+|---|---|---|
+| Riwayat tersimpan | `su -c "cat /data/adb/secreto_space/session_history.json"` | maksimal 10 entri per game, 120 total |
+| Riwayat via socket | `printf 'session_history com.mobilechess.gp' \| nc -U /data/local/tmp/secreto.sock` | `reports` urut terbaru, `suggestion` null atau satu kalimat saran |
+| Kartu detail game | buka Games > pilih game | daftar sesi dengan durasi, FPS, 1% low, jank, suhu, jumlah app tidur |
+| Saran preset | 3 sesi >= 5 menit dan FPS turun > 8% dari terbaik | `suggestion` menyebut preset yang lebih rendah |
+
+## 5d. Skala render (eksperimental)
+
+| Cek | Perintah | Harapan |
+|---|---|---|
+| Simpan mode | `printf 'set_render_scale com.mobilechess.gp 720p' \| nc ...` | `render.scales` berisi `720p` |
+| Terapkan saat sesi | mulai sesi game itu | `wm size` menampilkan `Override size: 720x1560`, `wm_size.journal` ada |
+| Reset saat selesai | `session_end` | hanya `Physical size`, journal hilang |
+| Reboot di tengah sesi | reboot | `service.sh` menjalankan `wm size reset`, journal hilang |
+| Tombol UI | detail game > Render scale | Native / 900p / 720p, pilihan tersimpan, note menyebut ukuran aktif |
+
+Spike 2026-11-25 di Auto Chess: native dan 720p sama-sama 59-60 FPS di menu karena
+vsync cap, suhu 71 °C vs 67 °C. Mekanisme terbukti; gain FPS in-match belum terukur.
+
+## 5e. Overlay sesi
+
+| Cek | Harapan |
+|---|---|
+| Panel saat sesi aktif | SESSION berjalan, JANK %, ASLEEP = jumlah app tidur, THERMAL OK/HOT/LIMIT |
+| Panel saat idle | SESSION `--:--`, JANK `--`, ASLEEP `0`, THERMAL `OK` |
+| Warna | JANK hijau di bawah 15%, amber 15-29%, merah 30% ke atas |
+
+## 5f. Capability probe
+
+| Cek | Perintah | Harapan |
+|---|---|---|
+| Probe socket | `printf 'probe' \| nc -U /data/local/tmp/secreto.sock` | `device:a50`, `rom:GSI`, `gos:false`, `freeze:appops + force-stop`, `wm_size:true` |
+| Kartu System | buka tab System | nilai probe tampil, badge `READY` |
 
 ## 5b. Reboot di tengah sesi
 
@@ -104,4 +142,10 @@ tidak dibaca oleh versi lama, jadi profil perlu disalin kembali ke
 | 5b Reboot saat sesi | PASS, log `session: recovered 31 apps, all knobs restored to stock`, journal dibersihkan, appops kembali `allow`/`default` |
 | Whitelist | PASS, `com.whatsapp` dan `com.discord` di whitelist tidak masuk journal (31 dari 33) |
 | Toggle sleep | PASS, `set_sleep_enabled 0` dan `1` tersimpan |
+| 5c Riwayat sesi | PASS, 4 sesi Auto Chess tersimpan dan tampil di detail game; saran `null` karena belum ada 3 sesi >= 5 menit |
+| 5d Skala render | PASS mekanisme: 720p diterapkan (`720x1560`), reset saat `session_end`, journal bersih; gain FPS in-match belum terukur |
+| 5e Overlay | PASS, strip `SESSION 0:47 / JANK 8% / ASLEEP 33 / THERMAL OK` saat Auto Chess berjalan |
+| 5f Probe | PASS, `a50`, GSI, GOS absent, `appops + force-stop`, `wm size` didukung, cpuset `memory` |
+| Jank | PASS, Auto Chess 30 FPS stabil berubah dari 97,3% menjadi 2,0% setelah definisi memakai median frame time |
+| IPC | PASS, tidak ada lagi `__secretoIpc[N] is not a function` setelah nomor slot callback ditangkap |
 | Smoke test | PASS penuh 17 cek, termasuk sesi aktif dan journal |

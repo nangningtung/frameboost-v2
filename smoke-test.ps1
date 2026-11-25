@@ -99,6 +99,13 @@ if ($snap) {
         $hudPid = (& $adb -s $Serial shell "pidof com.secreto.space").Trim()
         if ($hudPid) {
             $oom = (& $adb -s $Serial shell su -c "cat /proc/$hudPid/oom_score_adj").Trim()
+            # ActivityManager can overwrite the adj while the game is coming to
+            # the foreground; the daemon repins it on the next tick. Retry once
+            # instead of failing on that one-second window.
+            if ($oom -ne "-800") {
+                Start-Sleep -Seconds 2
+                $oom = (& $adb -s $Serial shell su -c "cat /proc/$hudPid/oom_score_adj").Trim()
+            }
             Add-Result "hud oom_score_adj" ($oom -eq "-800") ("adj=" + $oom)
         } else {
             Add-Result "hud process" $false "not running"
