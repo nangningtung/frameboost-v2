@@ -534,12 +534,11 @@ Gunakan checklist ini setiap kali ada perubahan.
     (>0.6 px/ms) melompat 2 kartu. DOM card di-build sekali, hanya
     transform yang diupdate supaya CSS transition beranimasi. Hero dan dots
     sync dengan card center. Cache buser bump ke v0.1.0-ui3.
-  - Carousel symmetry fix: kartu lebih besar (230x300px, stage 340px),
-    spacing 120px. Bug arah swipe diperbaiki (tanda dragInSlots salah).
-    Infinite carousel dengan triple-copy DOM (N*3 cards) supaya selalu ada
-    card di kedua sisi center, simetris seperti Apple Cover Flow. Swipe
-    kiri/kanan ter-verifikasi: MLBB <-> Auto Chess, hero dan dots sync,
-    5 card visible di stage.
+  - Carousel: clone dihapus, kembali ke N card asli. Tidak loop di ujung:
+    kiri mentok berhenti, kanan mentok berhenti. Rubber band effect
+    (drag 30% strength) saat swipe di ujung supaya terasa responsif tapi
+    tidak melompat. Swipe kiri/kanan ter-verifikasi: MLBB <-> Auto Chess,
+    mentok di kedua ujung tidak loop.
 - **State machine overlay murni (2026-11-25)**:
   - State overlay disatukan ke enum `OverlayState { HIDDEN, DOCKED, DRAGGING,
     PANEL_OPEN }` dengan transisi terpusat lewat `enterState()`. Sebelumnya
