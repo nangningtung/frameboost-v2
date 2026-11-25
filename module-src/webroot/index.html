@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <title>Secreto Space</title>
-  <link rel="stylesheet" href="style.css?v=0.1.0-ui5">
+  <link rel="stylesheet" href="style.css?v=0.1.0-ui6">
 </head>
 <body>
   <div class="app-container">
@@ -372,11 +372,19 @@
           </div>
 
           <div class="surface-card game-detail-card">
-            <div class="game-detail-label">Session reports</div>
-            <div id="detail-reports" class="report-list">
-              <div class="report-empty">No sessions recorded yet.</div>
+            <button id="btn-toggle-reports" class="detail-collapse-head" type="button" aria-expanded="false" aria-controls="detail-reports-body">
+              <span class="game-detail-label">Session reports</span>
+              <span class="detail-collapse-meta">
+                <span id="detail-report-count" class="detail-collapse-count"></span>
+                <svg class="detail-collapse-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9.5l6 6 6-6"/></svg>
+              </span>
+            </button>
+            <div id="detail-reports-body" class="detail-collapse-body">
+              <div id="detail-reports" class="report-list">
+                <div class="report-empty">No sessions recorded yet.</div>
+              </div>
+              <div id="detail-advice" class="report-advice hidden"></div>
             </div>
-            <div id="detail-advice" class="report-advice hidden"></div>
           </div>
 
           <div class="surface-card game-detail-card">
@@ -791,6 +799,6 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script src="app.js?v=0.1.0-ui5"></script>
+  <script src="app.js?v=0.1.0-ui6"></script>
 </body>
 </html>

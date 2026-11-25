@@ -49,6 +49,9 @@ Prinsip utama: **ringan, cepat, rapi, dan jujur terhadap data**.
 - BBR ON/OFF.
 - Riwayat 10 sesi terakhir untuk game itu: waktu, durasi, rata-rata FPS, 1% low, jank,
   suhu puncak, jumlah app tidur, preset, dan event throttle.
+  Bagian ini dilipat secara default; header menampilkan jumlah sesi dan bisa ditap
+  untuk membuka (target sentuh 44 px). Setiap membuka halaman detail, bagian ini
+  kembali tertutup supaya halaman tetap pendek.
 - Saran preset muncul hanya kalau ada minimal 3 sesi berdurasi 5 menit atau lebih dan
   rata-rata terbaru turun lebih dari 8% dari sesi terbaik.
 - Render scale (eksperimental): Native / 900p / 720p, default Native.
@@ -644,6 +647,17 @@ Gunakan checklist ini setiap kali ada perubahan.
   - Verifikasi device lewat CDP: carousel dan grid menampilkan banner dan ikon asli
     MLBB + Auto Chess, halaman detail memakai ikon asli, dan cache bertahan setelah
     app di-force-stop lalu dibuka lagi.
+
+- **Session reports dapat dilipat (2026-11-25)**:
+  - Bagian riwayat di halaman detail tidak lagi memanjangkan halaman. Header selalu
+    terlihat dengan jumlah sesi dan chevron; daftar 10 sesi plus saran preset hanya
+    muncul setelah header ditap.
+  - Header memakai target sentuh 44 px, `aria-expanded`/`aria-controls`, fokus
+    terlihat, dan chevron berputar saat terbuka. State di-reset ke tertutup setiap
+    kali halaman detail dibuka.
+  - Verifikasi device: saat tertutup 10 SESSIONS ditampilkan, body `display: none`,
+    dan halaman cukup pendek; setelah ditap 10 baris muncul; setelah back dan buka
+    lagi, bagian kembali tertutup.
 
 ### `v2.4.0` - 2026-11-25
 

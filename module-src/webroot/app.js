@@ -446,17 +446,25 @@
   async function loadGameReports(pkg) {
     const listEl = document.getElementById("detail-reports");
     const adviceEl = document.getElementById("detail-advice");
+    const countEl = document.getElementById("detail-report-count");
     if (!listEl) return;
     listEl.innerHTML = '<div class="report-empty">Loading reports...</div>';
+    if (countEl) countEl.textContent = "";
     if (adviceEl) adviceEl.classList.add("hidden");
     const raw = await sendSocketCmd(`session_history ${pkg}`);
     if (!raw || typeof raw !== "string") {
       listEl.innerHTML = '<div class="report-empty">Reports unavailable.</div>';
+      if (countEl) countEl.textContent = "UNAVAILABLE";
       return;
     }
     try {
       const j = JSON.parse(raw);
       const reports = j.reports || [];
+      if (countEl) {
+        countEl.textContent = reports.length
+          ? `${reports.length} SESSION${reports.length === 1 ? "" : "S"}`
+          : "NONE";
+      }
       if (!reports.length) {
         listEl.innerHTML = '<div class="report-empty">No sessions recorded yet.</div>';
       } else {
@@ -488,7 +496,18 @@
       }
     } catch (e) {
       listEl.innerHTML = '<div class="report-empty">Reports unavailable.</div>';
+      if (countEl) countEl.textContent = "UNAVAILABLE";
     }
+  }
+
+  let reportsExpanded = false;
+
+  function setReportsExpanded(open) {
+    reportsExpanded = !!open;
+    const head = document.getElementById("btn-toggle-reports");
+    const body = document.getElementById("detail-reports-body");
+    if (head) head.setAttribute("aria-expanded", reportsExpanded ? "true" : "false");
+    if (body) body.classList.toggle("open", reportsExpanded);
   }
 
   let renderStatus = null;
@@ -1539,6 +1558,7 @@
     if (gamesToolbar) gamesToolbar.classList.add("hidden");
     if (addGameModal) addGameModal.classList.add("hidden");
     if (gameDetailView) gameDetailView.classList.remove("hidden");
+    setReportsExpanded(false);
     loadGameReports(pkg);
     loadRenderScale(pkg);
     requestGameArt(pkg);
@@ -1553,6 +1573,9 @@
   }
 
   document.getElementById("btn-close-game-detail")?.addEventListener("click", closeGameDetail);
+  document.getElementById("btn-toggle-reports")?.addEventListener("click", () => {
+    setReportsExpanded(!reportsExpanded);
+  });
 
   document.querySelectorAll(".detail-preset").forEach((btn) => {
     btn.addEventListener("click", async () => {
