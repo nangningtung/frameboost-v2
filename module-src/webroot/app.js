@@ -547,7 +547,7 @@
     // Quick toggles follow the daemon truth on every poll, so reopening the
     // app always shows the real last state (no hardcoded defaults).
     bypassActive = !!(data.battery && data.battery.bypass_charging);
-    dndActive = !data.heads_up_blocked;
+    dndActive = !!data.heads_up_blocked;
     renderBypassState();
     renderDndState();
 
