@@ -15,6 +15,7 @@ mod daemon;
 mod detect;
 mod fps;
 mod net;
+mod priority;
 mod profile;
 mod render;
 mod rollback;

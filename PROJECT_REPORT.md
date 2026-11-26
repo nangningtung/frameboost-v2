@@ -875,6 +875,19 @@ Testing:
 - device: `record_start lite` -> cmdline `--bit-rate 6000000 --size 480x1040`; `high` -> `--bit-rate 16000000` tanpa `--size`; kedua file tersimpan dan ter-scan galeri; rasio ukuran file sesuai bitrate.
 - panel E2E: tap LITE ter-highlight, REC -> STOP REC 0:04 merah dengan timer, stop -> Recording saved.
 
+### `priority-boost` - 2026-11-27
+
+`feat: renice + ionice proses game berjurnal saat sesi aktif`
+
+Perubahan:
+- `secretod/src/priority.rs`: saat sesi game mulai, proses game di-boost (`renice -n -10` + `ionice -c 2 -n 0`), dengan nilai nice dan I/O priority asli dicatat dulu ke `/data/adb/secreto_space/priority.list`.
+- `reapply(pkg)` di loop keep-alive 5 detik: menjaga prioritas tetap aktif kalau engine game mereset nice sendiri, sekaligus menangkap proses yang baru spawn setelah `session::start`.
+- `restore()` saat keluar game (`Idle`) dan di `session::recover()` (crash/reboot) dengan guard `pid_matches()` membaca `/proc/<pid>/cmdline` agar PID yang ter-recycle tidak salah dikembalikan.
+
+Testing:
+- Unit test Rust: 22/22 PASS di A50 (`parse_ioprio_be`, `parse_nice_from_stat`).
+- E2E device (MLBB): `priority.list` ditulis (`13881 -20 2 4`), `ionice` naik ke `Best-effort: prio 0`; saat keluar game `priority: restored 1 pids` dan journal hilang; smoke test PASS.
+
 ### `sidepanel-theme-sync` - 2026-11-26
 
 `feat: aksen side panel mengikuti preset game (tema senada dengan app)`

@@ -512,6 +512,7 @@ pub fn recover() -> Option<String> {
     }
     let woke = wake_all();
     crate::render::restore();
+    crate::priority::restore();
     *ACTIVE.lock().unwrap() = None;
     let _ = fs::remove_file(STATE_PATH);
     let restored = crate::rollback::restore_all().unwrap_or_else(|e| format!("restore failed: {}", e));

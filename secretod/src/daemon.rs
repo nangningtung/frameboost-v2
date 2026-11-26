@@ -222,6 +222,7 @@ impl AutoDaemon {
                 .unwrap_or_default();
             if crate::session::start(&self.current_game, &preset) {
                 crate::session::sleep_background(&self.current_game);
+                crate::priority::boost(&self.current_game);
             }
         }
 
@@ -235,6 +236,7 @@ impl AutoDaemon {
             self.last_keepalive = Instant::now();
             self.sync_active_profile();
             self.keepalive_apply();
+            crate::priority::reapply(&self.current_game);
             self.ensure_hud_running();
         }
 
@@ -329,6 +331,7 @@ impl AutoDaemon {
         match st {
             DaemonState::Idle => {
                 crate::session::finish("idle");
+                crate::priority::restore();
                 crate::capture::stop_if_recording("session_end");
                 let _ = restore_all();
                 crate::refresh_heads_up_cache();
