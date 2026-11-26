@@ -275,7 +275,7 @@ public class OverlayService extends Service {
         applyBubbleMode();
         applyFpsOverlayState();
         highlightHudType();
-        highlightPreset();
+        highlightPreset(); applyAccent();
         updateDndButton();
         updateBypassButton();
         updateRecordButton(false);
@@ -1049,20 +1049,32 @@ public class OverlayService extends Service {
         }
     }
 
+    private void setAccentActiveBg(Button btn) {
+        int a = accentColor();
+        android.graphics.drawable.GradientDrawable gd =
+                new android.graphics.drawable.GradientDrawable();
+        gd.setCornerRadius(dp(10));
+        gd.setColor((a & 0x00FFFFFF) | 0x1F000000);
+        gd.setStroke(dp(1), a);
+        btn.setBackground(gd);
+    }
+
     private void updateDndButton() {
         if (btnQuickDnd == null) return;
-        btnQuickDnd.setBackgroundResource(dndEnabled ? R.drawable.bg_segment_active : R.drawable.bg_segment_track);
+        if (dndEnabled) setAccentActiveBg(btnQuickDnd);
+        else btnQuickDnd.setBackgroundResource(R.drawable.bg_segment_track);
         btnQuickDnd.setText(dndEnabled ? "FOCUS DND" : "NOTIFS ON");
         btnQuickDnd.setTextColor(dndEnabled ? COLOR_ACTIVE_TEXT : COLOR_DIM);
-        tintQuickIcon(btnQuickDnd, dndEnabled ? COLOR_ACCENT : COLOR_DIM);
+        tintQuickIcon(btnQuickDnd, dndEnabled ? accentColor() : COLOR_DIM);
     }
 
     private void updateBypassButton() {
         if (btnQuickBypass == null) return;
-        btnQuickBypass.setBackgroundResource(bypassEnabled ? R.drawable.bg_segment_active : R.drawable.bg_segment_track);
+        if (bypassEnabled) setAccentActiveBg(btnQuickBypass);
+        else btnQuickBypass.setBackgroundResource(R.drawable.bg_segment_track);
         btnQuickBypass.setText(bypassEnabled ? "PASSTHRU" : "BYPASS CHG");
         btnQuickBypass.setTextColor(bypassEnabled ? COLOR_ACTIVE_TEXT : COLOR_DIM);
-        tintQuickIcon(btnQuickBypass, bypassEnabled ? COLOR_ACCENT : COLOR_DIM);
+        tintQuickIcon(btnQuickBypass, bypassEnabled ? accentColor() : COLOR_DIM);
     }
 
     private void updateGosButton() {
@@ -1073,7 +1085,8 @@ public class OverlayService extends Service {
             btnQuickGos.setTextColor(COLOR_DIM);
             tintQuickIcon(btnQuickGos, COLOR_DIM);
         } else {
-            btnQuickGos.setBackgroundResource(gosDisabled ? R.drawable.bg_segment_active : R.drawable.bg_segment_track);
+            if (gosDisabled) setAccentActiveBg(btnQuickGos);
+            else btnQuickGos.setBackgroundResource(R.drawable.bg_segment_track);
             btnQuickGos.setText(gosDisabled ? "GOS KILL" : "GOS ON");
             btnQuickGos.setTextColor(gosDisabled ? COLOR_GREEN : COLOR_DIM);
             tintQuickIcon(btnQuickGos, gosDisabled ? COLOR_GREEN : COLOR_DIM);
@@ -1104,7 +1117,7 @@ public class OverlayService extends Service {
         activePreset = preset;
         getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit().putString("game_preset", preset).apply();
-        highlightPreset();
+        highlightPreset(); applyAccent();
         final String pkg = currentGamePkg;
         if (actionExecutor != null) {
             actionExecutor.execute(() -> {
@@ -1190,6 +1203,31 @@ public class OverlayService extends Service {
         btnCaptureRecord.setTextColor(recording ? 0xFFFF8A9A : COLOR_DIM);
     }
 
+    /** Panel accent follows the active game preset, matching the WebUI palette. */
+    private int accentColor() {
+        if ("BATTERY".equals(activePreset)) return 0xFF81C995;
+        if ("PERFORMANCE".equals(activePreset)) return 0xFFFFB95E;
+        if ("ESPORTS".equals(activePreset)) return 0xFFC6FF00;
+        return 0xFFA8C7FA; // BALANCED
+    }
+
+    private void applyAccent() {
+        int a = accentColor();
+        if (dotState != null && dotState.getBackground() != null) {
+            android.graphics.drawable.Drawable grip = dotState.getBackground().mutate();
+            grip.setColorFilter(a, android.graphics.PorterDuff.Mode.SRC_IN);
+            dotState.setBackground(grip);
+        }
+        if (btnQuickDnd != null) tintQuickIcon(btnQuickDnd, dndEnabled ? a : COLOR_DIM);
+        if (btnQuickBypass != null) tintQuickIcon(btnQuickBypass, bypassEnabled ? a : COLOR_DIM);
+        if (txtTelemetryState != null) {
+            txtTelemetryState.setTextColor(fpsOverlayEnabled ? a : COLOR_DIM);
+        }
+        highlightRecPreset();
+        highlightHudType();
+        highlightPresetSegments();
+    }
+
     private void highlightRecPreset() {
         styleSegment(btnRecLite, "lite".equals(recordPreset));
         styleSegment(btnRecStd, "std".equals(recordPreset));
@@ -1208,6 +1246,11 @@ public class OverlayService extends Service {
     }
 
     private void highlightPreset() {
+        highlightPresetSegments();
+        applyAccent();
+    }
+
+    private void highlightPresetSegments() {
         styleSegment(btnPresetBat, "BATTERY".equals(activePreset));
         styleSegment(btnPresetBal, "BALANCED".equals(activePreset));
         styleSegment(btnPresetPerf, "PERFORMANCE".equals(activePreset));
@@ -1216,10 +1259,21 @@ public class OverlayService extends Service {
 
     private void styleSegment(Button btn, boolean active) {
         if (btn == null) return;
-        btn.setBackgroundResource(active ? R.drawable.bg_segment_active : android.R.color.transparent);
-        btn.setTextColor(active ? COLOR_ACTIVE_TEXT : COLOR_DIM);
+        if (active) {
+            int a = accentColor();
+            android.graphics.drawable.GradientDrawable gd =
+                    new android.graphics.drawable.GradientDrawable();
+            gd.setCornerRadius(dp(10));
+            gd.setColor((a & 0x00FFFFFF) | 0x1F000000);
+            gd.setStroke(dp(1), a);
+            btn.setBackground(gd);
+            btn.setTextColor(COLOR_ACTIVE_TEXT);
+        } else {
+            btn.setBackgroundResource(R.drawable.bg_segment_track);
+            btn.setTextColor(COLOR_DIM);
+        }
         btn.setTypeface(android.graphics.Typeface.create(
-                "monospace", active ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL));
+                "sans-serif-medium", active ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL));
     }
 
     private void applyBubbleMode() {
@@ -1284,7 +1338,7 @@ public class OverlayService extends Service {
         }
         if (txtTelemetryState != null) {
             txtTelemetryState.setText(fpsOverlayEnabled ? "ON" : "OFF");
-            txtTelemetryState.setTextColor(fpsOverlayEnabled ? COLOR_ACCENT : COLOR_DIM);
+            txtTelemetryState.setTextColor(fpsOverlayEnabled ? accentColor() : COLOR_DIM);
         }
     }
 
@@ -1309,7 +1363,7 @@ public class OverlayService extends Service {
         if (data.gamePreset != null && !data.gamePreset.isEmpty()
                 && !data.gamePreset.equals(activePreset)) {
             activePreset = data.gamePreset;
-            highlightPreset();
+            highlightPreset(); applyAccent();
         }
 
         // Re-anchor if the screen metrics changed (rotation, split screen).

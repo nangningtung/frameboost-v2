@@ -875,6 +875,21 @@ Testing:
 - device: `record_start lite` -> cmdline `--bit-rate 6000000 --size 480x1040`; `high` -> `--bit-rate 16000000` tanpa `--size`; kedua file tersimpan dan ter-scan galeri; rasio ukuran file sesuai bitrate.
 - panel E2E: tap LITE ter-highlight, REC -> STOP REC 0:04 merah dengan timer, stop -> Recording saved.
 
+### `sidepanel-theme-sync` - 2026-11-26
+
+`feat: aksen side panel mengikuti preset game (tema senada dengan app)`
+
+Perubahan:
+- `accentColor()` mengikuti palet WebUI: ECO hijau `81C995`, BAL biru `A8C7FA`, PERF amber `FFB95E`, ESPORTS lime `C6FF00`.
+- `styleSegment` dan tombol quick aktif (DND/BYPASS/GOS) memakai gradient aksen dinamis (soft fill + stroke 1dp, corner 10dp), bukan drawable cyan statis.
+- Grip bubble dan label FLOATING MONITOR ikut aksen; warna FPS tetap data-driven (cyan/hijau/amber/merah) karena itu sinyal, bukan tema.
+- Tipografi: 32 dari 38 elemen monospace pindah ke `sans-serif-medium`; nilai (FPS, timer strip) tetap monospace untuk stabilitas visual.
+- Aksen diterapkan ulang saat preset berubah (WebUI maupun panel) dan saat service start.
+
+Testing:
+- E2E device: preset ESPORTS -> seluruh aksen lime; tap PERF -> seluruh aksen berganti amber real-time tanpa delay (screenshot).
+- Tidak ada regresi: struktur panel, touch target 44dp+48dp, dan sinkronisasi dua arah tetap utuh.
+
 ## 11. Laporan Terbaru (2026-11-26, sesi persistensi state)
 
 ### Masalah yang dilaporkan user
