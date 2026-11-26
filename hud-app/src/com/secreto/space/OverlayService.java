@@ -87,6 +87,11 @@ public class OverlayService extends Service {
     private Button btnQuickDnd;
     private Button btnQuickBypass;
     private Button btnQuickGos;
+    private Button btnCaptureScreenshot;
+    private Button btnCaptureRecord;
+    private boolean captureHiding = false;
+    private boolean recordUiState = false;
+    private boolean recordBusy = false;
 
     private WindowManager.LayoutParams params;
     private Handler handler;
@@ -238,6 +243,8 @@ public class OverlayService extends Service {
         btnQuickDnd = overlayRoot.findViewById(R.id.btn_quick_dnd);
         btnQuickBypass = overlayRoot.findViewById(R.id.btn_quick_bypass);
         btnQuickGos = overlayRoot.findViewById(R.id.btn_quick_gos);
+        btnCaptureScreenshot = overlayRoot.findViewById(R.id.btn_capture_screenshot);
+        btnCaptureRecord = overlayRoot.findViewById(R.id.btn_capture_record);
 
         int layoutType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
         params = new WindowManager.LayoutParams(
@@ -262,6 +269,7 @@ public class OverlayService extends Service {
         highlightPreset();
         updateDndButton();
         updateBypassButton();
+        updateRecordButton(false);
 
         Handler main = new Handler(Looper.getMainLooper());
         viewBubble.post(() -> {
@@ -983,6 +991,14 @@ public class OverlayService extends Service {
                 }
             });
         }
+
+        if (btnCaptureScreenshot != null) {
+            btnCaptureScreenshot.setOnClickListener(v -> takeScreenshot());
+        }
+
+        if (btnCaptureRecord != null) {
+            btnCaptureRecord.setOnClickListener(v -> toggleRecording());
+        }
     }
 
     private void updateDndButton() {
@@ -1051,6 +1067,77 @@ public class OverlayService extends Service {
                 }
             });
         }
+    }
+
+    private void takeScreenshot() {
+        if (captureHiding || actionExecutor == null || viewBubble == null || viewSidePanel == null) {
+            return;
+        }
+        captureHiding = true;
+        triggerHaptic();
+        final int bubbleVisibility = viewBubble.getVisibility();
+        final int panelVisibility = viewSidePanel.getVisibility();
+        // The capture button lives inside the panel, so both windows have to
+        // leave the frame before screencap runs.
+        viewBubble.setVisibility(View.INVISIBLE);
+        viewSidePanel.setVisibility(View.INVISIBLE);
+        handler.postDelayed(() -> actionExecutor.execute(() -> {
+            String res = IpcClient.sendCommand("screenshot");
+            boolean ok = res != null && res.contains("\"status\":\"ok\"");
+            String message = ok ? "Screenshot saved" : "Screenshot failed";
+            try {
+                message = new org.json.JSONObject(res).optString("message", message);
+            } catch (Exception ignored) {
+            }
+            final String toast = message;
+            // Give SurfaceFlinger one more frame after the command returns so
+            // the restored overlay is not baked into the bitmap.
+            handler.postDelayed(() -> finishScreenshot(bubbleVisibility, panelVisibility, toast), 300);
+        }), 300);
+    }
+
+    private void finishScreenshot(int bubbleVisibility, int panelVisibility, String message) {
+        captureHiding = false;
+        if (viewBubble != null) viewBubble.setVisibility(bubbleVisibility);
+        if (viewSidePanel != null) viewSidePanel.setVisibility(panelVisibility);
+        android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_SHORT).show();
+    }
+
+    private void toggleRecording() {
+        if (recordBusy || actionExecutor == null) return;
+        recordBusy = true;
+        triggerHaptic();
+        final boolean stopping = recordUiState;
+        if (btnCaptureRecord != null) btnCaptureRecord.setEnabled(false);
+        actionExecutor.execute(() -> {
+            String res = IpcClient.sendCommand(stopping ? "record_stop" : "record_start");
+            boolean ok = res != null && res.contains("\"status\":\"ok\"");
+            String message = ok
+                    ? (stopping ? "Recording saved" : "Recording started")
+                    : "Recording failed";
+            try {
+                message = new org.json.JSONObject(res).optString("message", message);
+            } catch (Exception ignored) {
+            }
+            final String toast = message;
+            final boolean started = ok && !stopping;
+            handler.post(() -> {
+                recordBusy = false;
+                if (btnCaptureRecord != null) btnCaptureRecord.setEnabled(true);
+                if (ok) updateRecordButton(started);
+                android.widget.Toast.makeText(this, toast, android.widget.Toast.LENGTH_SHORT).show();
+            });
+        });
+    }
+
+    private void updateRecordButton(boolean recording) {
+        if (btnCaptureRecord == null) return;
+        if (recordUiState == recording) return;
+        recordUiState = recording;
+        btnCaptureRecord.setText(recording ? "STOP REC" : "RECORD");
+        btnCaptureRecord.setBackgroundResource(
+                recording ? R.drawable.bg_segment_record : R.drawable.bg_segment_track);
+        btnCaptureRecord.setTextColor(recording ? 0xFFFF8A9A : COLOR_DIM);
     }
 
     private void highlightHudType() {
@@ -1161,6 +1248,7 @@ public class OverlayService extends Service {
         }
         missedReads = 0;
         lastData = data;
+        updateRecordButton(data.recording);
 
         if (data.gamePreset != null && !data.gamePreset.isEmpty()
                 && !data.gamePreset.equals(activePreset)) {

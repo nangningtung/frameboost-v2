@@ -329,6 +329,7 @@ impl AutoDaemon {
         match st {
             DaemonState::Idle => {
                 crate::session::finish("idle");
+                crate::capture::stop_if_recording("session_end");
                 let _ = restore_all();
                 crate::refresh_heads_up_cache();
                 self.extras_pkg.clear();
@@ -395,6 +396,7 @@ impl AutoDaemon {
                 }
             }
             DaemonState::Crit => {
+                crate::capture::stop_if_recording("thermal_critical");
                 let _ = restore_all();
                 crate::refresh_heads_up_cache();
             }
@@ -418,6 +420,7 @@ pub fn spawn_auto_daemon(
         }
         // Restore stock when daemon shuts down
         crate::session::finish("daemon_stop");
+        crate::capture::stop_if_recording("daemon_stop");
         let _ = restore_all();
     })
 }

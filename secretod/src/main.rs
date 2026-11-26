@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 
 mod apply;
 mod apps;
+mod capture;
 mod daemon;
 mod detect;
 mod fps;
@@ -231,6 +232,8 @@ pub struct Snapshot {
     pub stock_saved: bool,
     pub session: crate::session::SessionInfo,
     pub sleeping_apps: Vec<String>,
+    pub recording: bool,
+    pub record_path: String,
 }
 
 fn read_gpu() -> GpuState {
@@ -381,6 +384,8 @@ fn take_snapshot(
         Default::default()
     };
 
+    let (recording, record_path) = crate::capture::status();
+
     Snapshot {
         daemon_state: st_str,
         game_pkg: active_pkg.to_string(),
@@ -407,6 +412,8 @@ fn take_snapshot(
         stock_saved: StockSnapshot::exists(),
         session: crate::session::info(),
         sleeping_apps: crate::session::sleeping_apps(),
+        recording,
+        record_path,
     }
 }
 
@@ -651,6 +658,20 @@ fn handle_client(
             r#"{{"status":"ok","probe":{}}}"#,
             serde_json::to_string(&probe_capabilities()).unwrap_or_default()
         )
+    } else if req == "screenshot" {
+        crate::capture::screenshot()
+    } else if req == "record_start" {
+        crate::capture::start()
+    } else if req == "record_stop" {
+        crate::capture::stop("panel")
+    } else if req == "record_status" {
+        let (active, path) = crate::capture::status();
+        serde_json::json!({
+            "status": "ok",
+            "recording": active,
+            "path": path,
+        })
+        .to_string()
     } else if let Some(rest) = req.strip_prefix("session_start") {
         let arg = rest.trim();
         let pkg = if arg.is_empty() {

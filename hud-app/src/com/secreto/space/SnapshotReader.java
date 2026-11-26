@@ -34,6 +34,8 @@ public class SnapshotReader {
         public long sessionElapsed = 0;
         public int sessionSlept = 0;
         public double sessionJank = -1.0;
+        public boolean recording = false;
+        public String recordPath = "";
     }
 
     public static SnapshotData read() {
@@ -67,6 +69,8 @@ public class SnapshotReader {
             data.p1LowFps = obj.optDouble("p1_low_fps", 0.0);
             data.gosDisabled = obj.optBoolean("gos_disabled", false);
             data.hasGos = obj.optBoolean("has_gos", false);
+            data.recording = obj.optBoolean("recording", false);
+            data.recordPath = obj.optString("record_path", "");
 
             int tempMc = obj.optInt("temp_big_mc", 0);
             data.tempBigC = tempMc > 0 ? (tempMc / 1000) : 0;
