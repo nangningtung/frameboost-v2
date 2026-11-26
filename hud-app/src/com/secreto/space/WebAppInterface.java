@@ -210,6 +210,10 @@ public class WebAppInterface {
 
     @JavascriptInterface
     public void setHudEnabled(boolean enable) {
+        // Persist the master switch: MainActivity and BootReceiver only
+        // auto-start the overlay when the user last left it enabled.
+        context.getSharedPreferences("hud_prefs", Context.MODE_PRIVATE)
+                .edit().putBoolean("hud_master_enabled", enable).apply();
         Intent intent = new Intent(context, OverlayService.class);
         if (enable) {
             if (Settings.canDrawOverlays(context)) {

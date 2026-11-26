@@ -71,7 +71,9 @@ public class MainActivity extends Activity {
         webView.loadUrl("file:///android_asset/webroot/index.html");
 
         // Auto-start HUD background service if overlay permission already granted
-        if (Settings.canDrawOverlays(this)) {
+        if (Settings.canDrawOverlays(this)
+                && getSharedPreferences("hud_prefs", MODE_PRIVATE)
+                        .getBoolean("hud_master_enabled", true)) {
             if (!OverlayService.isRunning()) {
                 Intent hudIntent = new Intent(this, OverlayService.class);
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

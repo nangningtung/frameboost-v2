@@ -10,7 +10,9 @@ public class BootReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
-            if (Settings.canDrawOverlays(context)) {
+            if (Settings.canDrawOverlays(context)
+                    && context.getSharedPreferences("hud_prefs", Context.MODE_PRIVATE)
+                            .getBoolean("hud_master_enabled", true)) {
                 Intent serviceIntent = new Intent(context, OverlayService.class);
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     context.startForegroundService(serviceIntent);

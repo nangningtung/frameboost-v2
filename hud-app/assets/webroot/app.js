@@ -544,6 +544,13 @@
   function renderSnapshot(data) {
     if (!data) return;
 
+    // Quick toggles follow the daemon truth on every poll, so reopening the
+    // app always shows the real last state (no hardcoded defaults).
+    bypassActive = !!(data.battery && data.battery.bypass_charging);
+    dndActive = !data.heads_up_blocked;
+    renderBypassState();
+    renderDndState();
+
     if (daemonStatus) {
       daemonStatus.textContent = "ONLINE";
       daemonStatus.className = "badge active";
@@ -1852,11 +1859,20 @@
 
   // Action: Quick Gaming Dock
   let bypassActive = false;
+  // Keep quick toggles in sync with the daemon snapshot, so a reopen
+  // always reflects the real last state instead of a hardcoded default.
+  function renderBypassState() {
+    if (btnQuickBypass) btnQuickBypass.classList.toggle("active", bypassActive);
+    if (lblQuickBypass) lblQuickBypass.textContent = bypassActive ? "PASSTHROUGH" : "BYPASS CHG";
+  }
+  function renderDndState() {
+    if (btnQuickDnd) btnQuickDnd.classList.toggle("active", dndActive);
+    if (lblQuickDnd) lblQuickDnd.textContent = dndActive ? "FOCUS DND" : "NOTIF ON";
+  }
   if (btnQuickBypass) {
     btnQuickBypass.addEventListener("click", async () => {
       bypassActive = !bypassActive;
-      btnQuickBypass.classList.toggle("active", bypassActive);
-      if (lblQuickBypass) lblQuickBypass.textContent = bypassActive ? "PASSTHROUGH" : "BYPASS CHG";
+      renderBypassState();
       await sendSocketCmd(`set_bypass_charge ${bypassActive ? 1 : 0}`);
     });
   }
@@ -1865,8 +1881,7 @@
   if (btnQuickDnd) {
     btnQuickDnd.addEventListener("click", async () => {
       dndActive = !dndActive;
-      btnQuickDnd.classList.toggle("active", dndActive);
-      if (lblQuickDnd) lblQuickDnd.textContent = dndActive ? "FOCUS DND" : "NOTIF ON";
+      renderDndState();
       await sendSocketCmd(`set_heads_up ${dndActive ? 0 : 1}`);
     });
   }

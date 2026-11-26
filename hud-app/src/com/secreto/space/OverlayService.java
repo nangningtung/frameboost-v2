@@ -891,8 +891,7 @@ public class OverlayService extends Service {
             btnTypeOff.setOnClickListener(v -> {
                 triggerHaptic();
                 fpsOverlayEnabled = false;
-                getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                        .edit().putBoolean("fps_overlay_enabled", false).apply();
+                setFpsOverlayEverywhere(false);
                 applyFpsOverlayState();
                 highlightHudType();
                 saveLayoutForCurrentGame();
@@ -901,8 +900,7 @@ public class OverlayService extends Service {
         if (btnTypeCompact != null) {
             btnTypeCompact.setOnClickListener(v -> {
                 fpsOverlayEnabled = true;
-                getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                        .edit().putBoolean("fps_overlay_enabled", true).apply();
+                setFpsOverlayEverywhere(true);
                 setHudType("COMPACT");
                 applyFpsOverlayState();
             });
@@ -910,8 +908,7 @@ public class OverlayService extends Service {
         if (btnTypeDetail != null) {
             btnTypeDetail.setOnClickListener(v -> {
                 fpsOverlayEnabled = true;
-                getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                        .edit().putBoolean("fps_overlay_enabled", true).apply();
+                setFpsOverlayEverywhere(true);
                 setHudType("DETAIL");
                 applyFpsOverlayState();
             });
@@ -919,8 +916,7 @@ public class OverlayService extends Service {
         if (btnTypeFull != null) {
             btnTypeFull.setOnClickListener(v -> {
                 fpsOverlayEnabled = true;
-                getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                        .edit().putBoolean("fps_overlay_enabled", true).apply();
+                setFpsOverlayEverywhere(true);
                 setHudType("FULL");
                 applyFpsOverlayState();
             });
@@ -943,8 +939,7 @@ public class OverlayService extends Service {
             fpsToggle.setOnClickListener(v -> {
                 triggerHaptic();
                 fpsOverlayEnabled = !fpsOverlayEnabled;
-                getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                        .edit().putBoolean("fps_overlay_enabled", fpsOverlayEnabled).apply();
+                setFpsOverlayEverywhere(fpsOverlayEnabled);
                 applyFpsOverlayState();
                 saveLayoutForCurrentGame();
             });
@@ -1114,6 +1109,23 @@ public class OverlayService extends Service {
                 }
             });
         }
+    }
+
+    /**
+     * HUD on/off is a master choice: write the global key AND every stored
+     * per-game fps key, otherwise a stale per-game true would turn the HUD
+     * back on when the next game applies its saved layout.
+     */
+    private void setFpsOverlayEverywhere(boolean enabled) {
+        android.content.SharedPreferences p = getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        android.content.SharedPreferences.Editor ed = p.edit();
+        ed.putBoolean("fps_overlay_enabled", enabled);
+        for (java.util.Map.Entry<String, ?> e : p.getAll().entrySet()) {
+            if (e.getKey().endsWith(".fps")) {
+                ed.putBoolean(e.getKey(), enabled);
+            }
+        }
+        ed.apply();
     }
 
     private void applyFpsOverlayState() {
