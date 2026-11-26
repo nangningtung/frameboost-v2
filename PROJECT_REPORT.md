@@ -1,6 +1,6 @@
 # Secreto Space 0.1.0 - Project Report
 
-Status: **rilis harian untuk A50; semua fitur inti terverifikasi di device; side panel keluar-masuk game instan (245-375 ms); tanpa fitur gimmick; commit terakhir `42f52ec`**  
+Status: **rilis harian untuk A50; semua fitur inti terverifikasi di device; side panel keluar-masuk game instan (245-375 ms); state terakhir tersimpan di semua lapisan (master HUD, per-game keys, tombol quick); tanpa fitur gimmick; commit terakhir `0159b46`**  
 Device uji: `RR8M50C0W8T` (Samsung Galaxy A50, GSI API 36)  
 
 ---
