@@ -420,6 +420,20 @@ Gunakan checklist ini setiap kali ada perubahan.
 
 ## 9. Changelog
 
+### `capture-sidepanel-only` - 2026-11-26
+
+`refactor: tangkap hanya di side panel, hapus panel capture dari WebUI`
+
+Perubahan:
+- Panel Capture (Screenshot + Record) yang baru ditambahkan ke WebUI tab Session dihapus dari keduanya (`module-src/webroot` dan `hud-app/assets/webroot`).
+- Tombol SCREENSHOT dan RECORD tetap utuh di side panel overlay (`overlay_layout.xml` + `OverlayService.java`), terhubung ke daemon lewat IPC (`screenshot`, `record_start`, `record_stop`, `record_status`).
+- `module-src/webroot` dan `hud-app/assets/webroot` kembali sinkron identik (v0.1.0-ui8), tanpa panel Capture duplikat.
+
+Testing:
+- build: daemon tanpa warning, APK sukses (`build-hud-apk.ps1`).
+- device: APK di-install ke `192.168.1.3:5555`; WebUI tab Session diverifikasi tidak ada panel capture; side panel tombol capture masih tersedia.
+- IPC verifikasi: `screenshot` → `{"status":"ok","path":"/sdcard/Pictures/Secreto Space/..."}`; `record_start`/`record_stop` → file `.mp4` tersimpan di `/sdcard/Movies/Secreto Space/`.
+
 ### `sidepanel-instant-hide` - 2026-11-25
 
 ### `sidepanel-fg-fix` - 2026-11-25
