@@ -847,7 +847,42 @@ Secreto Space 0.1.0 stabil dan layak dipakai harian. Fase berikutnya sebaiknya d
 
 ---
 
-## 11. Laporan Terbaru (2026-11-25, sesi pembersihan & side panel instan)
+## 11. Laporan Terbaru (2026-11-26, sesi persistensi state)
+
+### Masalah yang dilaporkan user
+
+"Aplikasi tidak pernah menyimpan perubahan terakhir; hanya pengaturan game yang menyimpan." HUD yang di-off lalu app ditutup-buka kembali menyala lagi, begitu juga toggle lain.
+
+### Akar masalah (3 bug + 2 follow-up)
+
+| Bug | Penyebab | Perbaikan |
+|---|---|---|
+| HUD nyala lagi setelah buka app | `MainActivity` & `BootReceiver` selalu start overlay; tidak ada master switch | `hud_master_enabled` tersimpan saat toggle; auto-start hanya saat master on |
+| HUD nyala lagi di game lain | `applyLayoutFor` membaca key per-game `layout_<pkg>_fps` yang stale | HUD on/off ditulis ke global + semua key per-game (`setFpsOverlayEverywhere`) |
+| Bypass/DND tidak ingat state | `bypassActive=false` / `dndActive=true` hardcoded di `app.js` | Sinkron dari snapshot tiap poll (`battery.bypass_charging`, `heads_up_blocked`) |
+| Follow-up 1 | `setFpsOverlayEverywhere` memakai filter `.fps` padahal key memakai `_fps`, jadi per-game key tidak ikut | Filter `layout_*_fps`; E2E: ON/OFF menulis global + MLBB + Auto Chess + CoC |
+| Follow-up 2 | Sinkronisasi DND terbalik: `heads_up_blocked=true` (DND aktif) ditampilkan sebagai NOTIF ON | `dndActive = heads_up_blocked`; CDP verifikasi FOCUS DND aktif |
+
+### Verifikasi
+
+- Master HUD: off -> force-stop + buka ulang -> service tidak nyala; on -> service hidup (dumpsys service count).
+- Per-game keys: toggle OFF menulis global + ketiga game false; toggle ON menulis semuanya true (prefs XML device).
+- Tombol quick: label/kelas mengikuti snapshot (CDP).
+- Logcat: nol FATAL, nol error overlay; state machine sehat.
+- Bersih-bersih device: `/data/local/tmp` hanya file runtime, log di-truncate, `modules_update` kosong.
+- Semua lewat ADB nirkabel; tidak perlu reboot (perubahan app-side).
+
+### Git
+
+Commit `97b4104`, `9fc225d`, `654d748` ter-push ke `origin/main`. Payload ZIP diperbarui (604.373 byte).
+
+### Catatan perangkat
+
+Saat pengujian, `system_server` GSI crash-restart 2x (load spike; bukan karena perubahan kita) dan sempat berhenti di FallbackHome; pulih dengan reboot dan seluruh verifikasi selesai setelahnya.
+
+---
+
+## 12. Laporan Sebelumnya (2026-11-25, pembersihan & side panel instan)
 
 ### Yang dihapus (gimmick)
 
