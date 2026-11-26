@@ -384,7 +384,7 @@ fn take_snapshot(
         Default::default()
     };
 
-    let (recording, record_path) = crate::capture::status();
+    let (recording, record_path, _record_elapsed) = crate::capture::status();
 
     Snapshot {
         daemon_state: st_str,
@@ -660,16 +660,18 @@ fn handle_client(
         )
     } else if req == "screenshot" {
         crate::capture::screenshot()
-    } else if req == "record_start" {
-        crate::capture::start()
+    } else if let Some(rest) = req.strip_prefix("record_start") {
+        let preset = rest.trim();
+        crate::capture::start(if preset.is_empty() { "std" } else { preset })
     } else if req == "record_stop" {
         crate::capture::stop("panel")
     } else if req == "record_status" {
-        let (active, path) = crate::capture::status();
+        let (active, path, elapsed) = crate::capture::status();
         serde_json::json!({
             "status": "ok",
             "recording": active,
             "path": path,
+            "elapsed": elapsed,
         })
         .to_string()
     } else if let Some(rest) = req.strip_prefix("session_start") {

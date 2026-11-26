@@ -637,6 +637,63 @@
                         android:textStyle="bold" />
                 </LinearLayout>
 
+                <!-- Record quality preset: bitrate ladder ala ROR (fps mengikuti panel) -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btn_rec_lite"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginEnd="3dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_segment_track"
+                        android:fontFamily="monospace"
+                        android:gravity="center"
+                        android:minHeight="44dp"
+                        android:minWidth="0dp"
+                        android:text="480p 6M"
+                        android:textAllCaps="false"
+                        android:textColor="#94A3B8"
+                        android:textSize="9.5sp" />
+
+                    <Button
+                        android:id="@+id/btn_rec_std"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginEnd="3dp"
+                        android:layout_marginStart="3dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_segment_track"
+                        android:fontFamily="monospace"
+                        android:gravity="center"
+                        android:minHeight="44dp"
+                        android:minWidth="0dp"
+                        android:text="720p 8M"
+                        android:textAllCaps="false"
+                        android:textColor="#94A3B8"
+                        android:textSize="9.5sp" />
+
+                    <Button
+                        android:id="@+id/btn_rec_high"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="3dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_segment_track"
+                        android:fontFamily="monospace"
+                        android:gravity="center"
+                        android:minHeight="44dp"
+                        android:minWidth="0dp"
+                        android:text="1080p 16M"
+                        android:textAllCaps="false"
+                        android:textColor="#94A3B8"
+                        android:textSize="9.5sp" />
+                </LinearLayout>
+
                 <!-- Divider -->
                 <View
                     android:layout_width="match_parent"

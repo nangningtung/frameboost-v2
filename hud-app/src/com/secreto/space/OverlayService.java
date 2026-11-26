@@ -89,6 +89,11 @@ public class OverlayService extends Service {
     private Button btnQuickGos;
     private Button btnCaptureScreenshot;
     private Button btnCaptureRecord;
+    private Button btnRecLite;
+    private Button btnRecStd;
+    private Button btnRecHigh;
+    private String recordPreset = "std";
+    private int recStatusTick = 0;
     private boolean captureHiding = false;
     private boolean recordUiState = false;
     private boolean recordBusy = false;
@@ -197,6 +202,7 @@ public class OverlayService extends Service {
         SharedPreferences prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         autoHide = prefs.getBoolean("auto_hide", true);
         fpsOverlayEnabled = prefs.getBoolean("fps_overlay_enabled", true);
+        recordPreset = prefs.getString("record_preset", "std");
         dndEnabled = prefs.getBoolean("gaming_dnd", true);
         hudType = prefs.getString("hud_type", prefs.getString("fps_overlay_type", "COMPACT"));
         activePreset = prefs.getString("game_preset", "BALANCED");
@@ -245,6 +251,9 @@ public class OverlayService extends Service {
         btnQuickGos = overlayRoot.findViewById(R.id.btn_quick_gos);
         btnCaptureScreenshot = overlayRoot.findViewById(R.id.btn_capture_screenshot);
         btnCaptureRecord = overlayRoot.findViewById(R.id.btn_capture_record);
+        btnRecLite = overlayRoot.findViewById(R.id.btn_rec_lite);
+        btnRecStd = overlayRoot.findViewById(R.id.btn_rec_std);
+        btnRecHigh = overlayRoot.findViewById(R.id.btn_rec_high);
 
         int layoutType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
         params = new WindowManager.LayoutParams(
@@ -270,6 +279,23 @@ public class OverlayService extends Service {
         updateDndButton();
         updateBypassButton();
         updateRecordButton(false);
+        highlightRecPreset();
+        android.view.View.OnClickListener recPresetListener = v -> {
+            if (recordUiState) {
+                android.widget.Toast.makeText(this, "Stop recording to change quality", android.widget.Toast.LENGTH_SHORT).show();
+                return;
+            }
+            triggerHaptic();
+            int id = v.getId();
+            recordPreset = id == R.id.btn_rec_lite ? "lite"
+                    : id == R.id.btn_rec_high ? "high" : "std";
+            getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit().putString("record_preset", recordPreset).apply();
+            highlightRecPreset();
+        };
+        if (btnRecLite != null) btnRecLite.setOnClickListener(recPresetListener);
+        if (btnRecStd != null) btnRecStd.setOnClickListener(recPresetListener);
+        if (btnRecHigh != null) btnRecHigh.setOnClickListener(recPresetListener);
 
         Handler main = new Handler(Looper.getMainLooper());
         viewBubble.post(() -> {
@@ -316,6 +342,28 @@ public class OverlayService extends Service {
                     // package. On some ROMs UsageStats events flush late, so
                     // this is the authoritative correction (same source the
                     // session engine uses; ROR does the same with dumpsys).
+                    recStatusTick++;
+                    if (isPanelOpen() && recStatusTick % 5 == 0) {
+                        String st = IpcClient.sendCommand("record_status");
+                        if (st != null) {
+                            try {
+                                org.json.JSONObject j = new org.json.JSONObject(st);
+                                final boolean rec = j.optBoolean("recording", false);
+                                final long el = j.optLong("elapsed", 0);
+                                if (rec != recordUiState) {
+                                    recordUiState = rec;
+                                    handler.post(() -> updateRecordButton(rec));
+                                }
+                                if (rec) {
+                                    final String label = String.format("STOP REC %d:%02d", el / 60, el % 60);
+                                    handler.post(() -> {
+                                        if (btnCaptureRecord != null) btnCaptureRecord.setText(label);
+                                    });
+                                }
+                            } catch (Exception ignored) {
+                            }
+                        }
+                    }
                     {
                         String res = IpcClient.sendCommand("fg");
                         if (res != null) {
@@ -1110,7 +1158,9 @@ public class OverlayService extends Service {
         final boolean stopping = recordUiState;
         if (btnCaptureRecord != null) btnCaptureRecord.setEnabled(false);
         actionExecutor.execute(() -> {
-            String res = IpcClient.sendCommand(stopping ? "record_stop" : "record_start");
+            String res = IpcClient.sendCommand(stopping
+                    ? "record_stop"
+                    : "record_start " + recordPreset);
             boolean ok = res != null && res.contains("\"status\":\"ok\"");
             String message = ok
                     ? (stopping ? "Recording saved" : "Recording started")
@@ -1134,10 +1184,16 @@ public class OverlayService extends Service {
         if (btnCaptureRecord == null) return;
         if (recordUiState == recording) return;
         recordUiState = recording;
-        btnCaptureRecord.setText(recording ? "STOP REC" : "RECORD");
+        btnCaptureRecord.setText(recording ? "STOP REC 0:00" : "RECORD");
         btnCaptureRecord.setBackgroundResource(
                 recording ? R.drawable.bg_segment_record : R.drawable.bg_segment_track);
         btnCaptureRecord.setTextColor(recording ? 0xFFFF8A9A : COLOR_DIM);
+    }
+
+    private void highlightRecPreset() {
+        styleSegment(btnRecLite, "lite".equals(recordPreset));
+        styleSegment(btnRecStd, "std".equals(recordPreset));
+        styleSegment(btnRecHigh, "high".equals(recordPreset));
     }
 
     private void highlightHudType() {

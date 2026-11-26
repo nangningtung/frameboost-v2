@@ -12,6 +12,7 @@ const STATE_DIR: &str = "/data/adb/secreto_space";
 const RECORD_PID: &str = "/data/adb/secreto_space/record.pid";
 const RECORD_PATH: &str = "/data/adb/secreto_space/record.path";
 const RECORD_LOG: &str = "/data/adb/secreto_space/record.log";
+const RECORD_START: &str = "/data/adb/secreto_space/record.start";
 
 fn stamp() -> String {
     // Toybox date gives the local wall clock, which is what a gallery expects.
@@ -108,28 +109,66 @@ fn pid_alive(pid: u32) -> bool {
     String::from_utf8_lossy(&cmdline).contains("screenrecord")
 }
 
-/// Returns (recording, path). A stale pid file is cleaned up here so the
-/// snapshot never reports a recording that already ended.
-pub fn status() -> (bool, String) {
+/// Returns (recording, path, elapsed_secs). A stale pid file is cleaned up
+/// here so the snapshot never reports a recording that already ended.
+pub fn status() -> (bool, String, u64) {
     let active = read_pid().map(pid_alive).unwrap_or(false);
     if !active {
         let _ = fs::remove_file(RECORD_PID);
         let _ = fs::remove_file(RECORD_PATH);
-        return (false, String::new());
+        let _ = fs::remove_file(RECORD_START);
+        return (false, String::new(), 0);
     }
     let path = fs::read_to_string(RECORD_PATH)
         .map(|s| s.trim().to_string())
         .unwrap_or_default();
-    (true, path)
+    let elapsed = fs::read_to_string(RECORD_START)
+        .ok()
+        .and_then(|s| s.trim().parse::<u64>().ok())
+        .and_then(|t| SystemTime::now().duration_since(UNIX_EPOCH).ok().map(|now| now.as_secs().saturating_sub(t)))
+        .unwrap_or(0);
+    (true, path, elapsed)
 }
 
-pub fn start() -> String {
-    if let (true, path) = status() {
+/// Bitrate ladder ala ROR. `screenrecord` has no fps flag (it follows the
+/// panel), so presets are quality/resolution only. 480p/720p use a
+/// downscaled --size computed from the physical display; 1080p records
+/// native without --size to avoid orientation edge cases.
+pub fn preset_params(preset: &str) -> (i64, Option<String>) {
+    match preset {
+        "lite" => (6_000_000, scaled_size(480)),
+        "std" => (8_000_000, scaled_size(720)),
+        _ => (16_000_000, None),
+    }
+}
+
+/// Scales the current physical display so its shorter side becomes
+/// `target`, keeping aspect ratio. Falls back to no size when `wm size`
+/// cannot be parsed (native recording is the safe default).
+fn scaled_size(target: u32) -> Option<String> {
+    let out = run_cmd("wm", &["size"]);
+    let line = out.lines().find(|l| l.contains("Physical size"))?;
+    let dims = line.split(": ").last()?;
+    let (w, h) = dims.trim().split_once('x')?;
+    let w: u32 = w.trim().parse().ok()?;
+    let h: u32 = h.trim().parse().ok()?;
+    if w == 0 || h == 0 || w <= target {
+        return None;
+    }
+    let factor = target as f64 / w.min(h) as f64;
+    let sw = ((w as f64) * factor) as u32;
+    let sh = ((h as f64) * factor) as u32;
+    Some(format!("{}x{}", sw, sh))
+}
+
+pub fn start(preset: &str) -> String {
+    if let (true, path, _) = status() {
         return error(&format!("Recording already active: {}", path));
     }
     if let Err(e) = ensure_dirs() {
         return error(&e);
     }
+    let (bit_rate, size) = preset_params(preset);
     let path = format!("{}/Secreto_{}.mp4", MOV_DIR, stamp());
     let log = match fs::File::create(RECORD_LOG) {
         Ok(f) => f,
@@ -139,26 +178,37 @@ pub fn start() -> String {
         Ok(f) => f,
         Err(e) => return error(&format!("record log: {}", e)),
     };
+    let mut args: Vec<String> = vec![
+        "--bit-rate".into(),
+        bit_rate.to_string(),
+        "--time-limit".into(),
+        "300".into(),
+    ];
+    if let Some(sz) = &size {
+        args.push("--size".into());
+        args.push(sz.clone());
+    }
+    args.push(path.clone());
     let child = Command::new("screenrecord")
-        .args([
-            "--bit-rate",
-            "12000000",
-            "--time-limit",
-            "300",
-            &path,
-        ])
+        .args(&args)
         .stdout(Stdio::from(log))
         .stderr(Stdio::from(log_err))
         .spawn();
     match child {
         Ok(child) => {
             let pid = child.id();
+            let now_secs = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_secs().to_string())
+                .unwrap_or_default();
             if fs::write(RECORD_PID, pid.to_string()).is_err()
                 || fs::write(RECORD_PATH, &path).is_err()
+                || fs::write(RECORD_START, &now_secs).is_err()
             {
                 let _ = run_cmd("kill", &["-2", &pid.to_string()]);
                 let _ = fs::remove_file(RECORD_PID);
                 let _ = fs::remove_file(RECORD_PATH);
+                let _ = fs::remove_file(RECORD_START);
                 return error("failed to persist recording state");
             }
             log_line(&format!("screenrecord started pid={} path={}", pid, path));
@@ -206,7 +256,7 @@ pub fn stop(reason: &str) -> String {
 }
 
 pub fn stop_if_recording(reason: &str) {
-    let (active, _) = status();
+    let (active, _, _) = status();
     if active {
         let _ = stop(reason);
     }

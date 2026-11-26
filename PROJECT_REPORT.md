@@ -861,6 +861,20 @@ Secreto Space 0.1.0 stabil dan layak dipakai harian. Fase berikutnya sebaiknya d
 
 ---
 
+### `capture-presets` - 2026-11-26
+
+`feat: preset kualitas rekaman + indikator timer di side panel`
+
+Perubahan:
+- `capture.rs`: ladder bitrate ala ROR; preset `lite` (6 Mbps + `--size` turunan 480p dari `wm size`), `std` (8 Mbps, 720p), `high` (16 Mbps native). `screenrecord` tidak punya flag fps, jadi fps mengikuti panel.
+- `record_start <preset>` via IPC; tanpa argumen = `std`.
+- `record_status` kini mengembalikan `elapsed`; daemon menulis `record.start`.
+- Side panel: segmen preset 480p/720p/1080p (tersimpan di prefs `record_preset`), tombol REC menampilkan timer berjalan (`STOP REC m:ss`), dan status resync tiap 1 detik saat panel terbuka (rekaman yang berhenti sendiri karena limit 300 s kini otomatis terdeteksi).
+
+Testing:
+- device: `record_start lite` -> cmdline `--bit-rate 6000000 --size 480x1040`; `high` -> `--bit-rate 16000000` tanpa `--size`; kedua file tersimpan dan ter-scan galeri; rasio ukuran file sesuai bitrate.
+- panel E2E: tap LITE ter-highlight, REC -> STOP REC 0:04 merah dengan timer, stop -> Recording saved.
+
 ## 11. Laporan Terbaru (2026-11-26, sesi persistensi state)
 
 ### Masalah yang dilaporkan user
