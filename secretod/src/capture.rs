@@ -182,7 +182,7 @@ pub fn start(preset: &str) -> String {
         "--bit-rate".into(),
         bit_rate.to_string(),
         "--time-limit".into(),
-        "300".into(),
+        "0".into(),
     ];
     if let Some(sz) = &size {
         args.push("--size".into());
