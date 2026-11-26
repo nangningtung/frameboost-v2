@@ -1121,7 +1121,7 @@ public class OverlayService extends Service {
         android.content.SharedPreferences.Editor ed = p.edit();
         ed.putBoolean("fps_overlay_enabled", enabled);
         for (java.util.Map.Entry<String, ?> e : p.getAll().entrySet()) {
-            if (e.getKey().endsWith(".fps")) {
+            if (e.getKey().startsWith("layout_") && e.getKey().endsWith("_fps")) {
                 ed.putBoolean(e.getKey(), enabled);
             }
         }
