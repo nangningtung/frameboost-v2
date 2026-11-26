@@ -1,6 +1,6 @@
 # Secreto Space 0.1.0 - Project Report
 
-Status: **rilis harian untuk A50; semua fitur inti terverifikasi di device; side panel keluar-masuk game instan (245-375 ms); state terakhir tersimpan di semua lapisan (master HUD, per-game keys, tombol quick); tanpa fitur gimmick; commit terakhir `0159b46`**  
+Status: **rilis harian untuk A50; semua fitur inti terverifikasi di device; side panel keluar-masuk game instan (245-375 ms); state terakhir tersimpan di semua lapisan; capture preset + timer + aksen dinamis di side panel; renice + ionice game berjurnal; commit terakhir `619d918`**  
 Device uji: `RR8M50C0W8T` (Samsung Galaxy A50, GSI API 36)  
 
 ---
@@ -903,7 +903,26 @@ Testing:
 - E2E device: preset ESPORTS -> seluruh aksen lime; tap PERF -> seluruh aksen berganti amber real-time tanpa delay (screenshot).
 - Tidak ada regresi: struktur panel, touch target 44dp+48dp, dan sinkronisasi dua arah tetap utuh.
 
-## 11. Laporan Terbaru (2026-11-26, sesi persistensi state)
+## 11. Laporan Terbaru (2026-11-27, capture preset, tema side panel & priority boost)
+
+### Fitur & perbaikan yang diselesaikan
+
+| Item | Ringkasan | Verifikasi |
+|---|---|---|
+| **Capture di side panel** | Screenshot & screenrecord dipusatkan di side panel; panel duplikat di WebUI dihapus (`capture.rs` + `OverlayService`) | IPC `screenshot`/`record_start`/`record_stop` PASS; media scan galeri |
+| **Preset kualitas rekaman + timer** | Preset `lite` (480p 6M), `std` (720p 8M), `high` (1080p 16M) ala ROR; `record_status` mengembalikan `elapsed`; timer `STOP REC m:ss` + resync tiap 1s saat panel terbuka | Cmdline `--bit-rate`/`--size` terverifikasi; timer `STOP REC 0:04` tampil di panel |
+| **Tema dinamis side panel** | Aksen panel mengikuti preset aktif (ECO hijau, BAL biru, PERF amber, ESPORTS lime); 32 label pindah ke `sans-serif-medium`, nilai telemetri tetap monospace | ESPORTS lime -> tap PERF berganti amber real-time di screenshot |
+| **Renice + ionice game** | `secretod/src/priority.rs`: boost proses game (`renice -10`, `ionice -c 2 -n 0`) berjurnal di `priority.list`, keep-alive `reapply(pkg)` tiap 5s, restore dengan guard `/proc/<pid>/cmdline` | 22/22 unit test Rust PASS; E2E MLBB boost -> restore + smoke test PASS |
+
+### Kondisi akhir
+
+- Daemon baru (`667.336` byte) terpasang persisten lewat `ksud module install` + reboot.
+- `smoke-test.ps1` PASS; device IDLE, layar native `1080x2340`, tidak ada journal tersisa.
+- Commit lokal `619d918` (belum di-push sesuai aturan kerja).
+
+---
+
+## 12. Laporan Sebelumnya (2026-11-26, sesi persistensi state)
 
 ### Masalah yang dilaporkan user
 
@@ -938,7 +957,7 @@ Saat pengujian, `system_server` GSI crash-restart 2x (load spike; bukan karena p
 
 ---
 
-## 12. Laporan Sebelumnya (2026-11-25, pembersihan & side panel instan)
+## 13. Laporan Sebelumnya (2026-11-25, pembersihan & side panel instan)
 
 ### Yang dihapus (gimmick)
 
