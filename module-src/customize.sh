@@ -18,6 +18,18 @@ set_perm_recursive "$MODPATH/webroot" 0 0 0755 0644
 set_perm "$MODPATH/service.sh" 0 0 0755
 set_perm "$MODPATH/uninstall.sh" 0 0 0755
 
+# In-process HUD (Zygisk): siapkan .so + config default.
+if [ -f "$MODPATH/zygisk/arm64-v8a.so" ]; then
+    set_perm "$MODPATH/zygisk/arm64-v8a.so" 0 0 0644
+    chcon u:object_r:system_file:s0 "$MODPATH/zygisk/arm64-v8a.so"
+    ui_print "- In-process HUD (Zygisk) siap"
+fi
+mkdir -p /data/adb/secreto_space
+if [ ! -f /data/adb/secreto_space/inproc_targets.list ]; then
+    printf "com.mobile.legends\n" > /data/adb/secreto_space/inproc_targets.list
+    chmod 644 /data/adb/secreto_space/inproc_targets.list
+fi
+
 # Migrate data from FrameBoost 2.x, then retire the old module.
 OLD_DATA=/data/adb/a50_frameboost
 NEW_DATA=/data/adb/secreto_space

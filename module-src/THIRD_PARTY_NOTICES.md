@@ -249,3 +249,24 @@ FrameBoost v2 adheres to open-source software licenses and community attribution
 - **FrameBoost Adaptations & Safety Changes**:
   - Thread-binding concept referenced for future per-game tuning.
   - Did NOT adopt eBPF (kernel limitation on A50).
+
+## 17. ocornut/imgui (In-process HUD rendering)
+
+- **Repository**: https://github.com/ocornut/imgui
+- **License**: MIT
+- **Usage**: UI rendering di dalam proses game untuk HUD in-process
+  (`inproc-hud/`, modul Zygisk). Dibangun statis ke dalam .so.
+
+## 18. jmpews/Dobby (Inline hooking)
+
+- **Repository**: https://github.com/jmpews/Dobby
+- **License**: Apache-2.0
+- **Usage**: hook `eglSwapBuffers` untuk menggambar HUD ImGui pada
+  frame buffer game (statik: `third_party/dobby/libs/arm64-v8a/libdobby.a`).
+
+## 19. topjohnwu/Magisk — zygisk.hpp (Public API header)
+
+- **Repository**: https://github.com/topjohnwu/Magisk
+- **License**: GPL-3.0 (header API publik Zygisk, dipakai tanpa modifikasi,
+  sesuai catatan "DO NOT MODIFY" di header)
+- **Usage**: antarmuka modul Zygisk untuk injeksi proses game via ReZygisk.

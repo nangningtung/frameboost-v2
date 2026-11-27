@@ -76,6 +76,10 @@ pub struct AutoDaemon {
     last_keepalive: Instant,
     extras_pkg: String,
     hud_miss: u32,
+    apply_fail_streak: u32,
+    screen_off_since: Option<Instant>,
+    standby_active: bool,
+    last_hud_poll: Instant,
 }
 
 impl AutoDaemon {
@@ -89,10 +93,21 @@ impl AutoDaemon {
             last_keepalive: Instant::now(),
             extras_pkg: String::new(),
             hud_miss: 0,
+            apply_fail_streak: 0,
+            screen_off_since: None,
+            standby_active: false,
+            last_hud_poll: Instant::now(),
         }
     }
 
     pub fn tick(&mut self) -> DaemonState {
+        // Powercfg contract: consume a pending external mode request and
+        // re-apply the profile if the global override changed mid-session.
+        if crate::powercfg::consume().is_some() && !self.current_game.is_empty() {
+            self.active_profile = Some(GameProfile::for_package(&self.current_game));
+            self.apply_state(self.state);
+        }
+
         let fg = GameDetector::get_foreground_pkg();
 
         // A manual restore pauses Secreto for this game until it leaves the
@@ -247,6 +262,39 @@ impl AutoDaemon {
             self.extras_pkg.clear();
         }
 
+        // Standby hint (uperf-style): screen off for 20 s during a game ->
+        // drop floors to stock; re-apply the profile when the screen returns.
+        if in_game && !crate::powercfg::screen_on() {
+            let since = *self.screen_off_since.get_or_insert_with(Instant::now);
+            if !self.standby_active && since.elapsed() >= Duration::from_secs(20) {
+                self.standby_active = true;
+                log_line("standby: screen off 20s in-game, restoring stock floors");
+                let _ = restore_all();
+                crate::priority::restore();
+            }
+        } else {
+            self.screen_off_since = None;
+            if self.standby_active {
+                self.standby_active = false;
+                log_line("standby: screen back on, re-applying profile");
+                self.apply_state(self.state);
+            }
+        }
+
+        // In-process HUD stats blob (throttled to 2 s, cheap file write).
+        if !self.current_game.is_empty()
+            && self.last_hud_poll.elapsed() >= Duration::from_secs(2)
+        {
+            self.last_hud_poll = Instant::now();
+            let preset = self
+                .active_profile
+                .as_ref()
+                .map(|p| p.preset.to_string())
+                .unwrap_or_default();
+            let info = crate::session::info();
+            crate::hud::write_stats(&self.current_game, &preset, info.avg_fps);
+        }
+
         self.state
     }
 
@@ -334,6 +382,7 @@ impl AutoDaemon {
     fn apply_state(&mut self, st: DaemonState) {
         match st {
             DaemonState::Idle => {
+                self.apply_fail_streak = 0;
                 crate::session::finish("idle");
                 crate::priority::restore();
                 crate::capture::stop_if_recording("session_end");
@@ -361,7 +410,23 @@ impl AutoDaemon {
                     cpu0_max: prof.cpu0_max,
                     cpu4_max: prof.cpu4_max,
                 };
-                let _ = apply_profile(&boost);
+                // Fail-safe: after 3 consecutive apply failures, stop fighting
+                // the knob and leave stock values until the session ends.
+                // Prevents an endless write/read-fail loop from burning I/O.
+                if self.apply_fail_streak >= 3 {
+                    // suspended; checked again next state transition
+                } else {
+                    let rep = apply_profile(&boost);
+                    if rep.success {
+                        self.apply_fail_streak = 0;
+                    } else {
+                        self.apply_fail_streak += 1;
+                        log_line(&format!(
+                            "apply: {:?} (failure {} of 3, then suspend)",
+                            rep.errors, self.apply_fail_streak
+                        ));
+                    }
+                }
 
                 // One-shot extras per game session. Running them again on
                 // every thermal recovery just adds binder/IO churn.
@@ -407,7 +472,20 @@ impl AutoDaemon {
                         cpu0_max: prof.cpu0_max,
                         cpu4_max: prof.cpu4_max,
                     };
-                    let _ = apply_profile(&warn);
+                    if self.apply_fail_streak >= 3 {
+                        // suspended; leave stock knobs
+                    } else {
+                        let rep = apply_profile(&warn);
+                        if rep.success {
+                            self.apply_fail_streak = 0;
+                        } else {
+                            self.apply_fail_streak += 1;
+                            log_line(&format!(
+                                "apply warn: {:?} (failure {} of 3, then suspend)",
+                                rep.errors, self.apply_fail_streak
+                            ));
+                        }
+                    }
                 }
             }
             DaemonState::Crit => {
@@ -427,11 +505,20 @@ pub fn spawn_auto_daemon(
 ) -> thread::JoinHandle<()> {
     thread::spawn(move || {
         let mut daemon = AutoDaemon::new(detector);
+        let mut idle_streak: u32 = 0;
         while running.load(Ordering::Relaxed) {
             let st = daemon.tick();
             state_sink.store(st as u8, Ordering::Relaxed);
             *game_sink.write().unwrap() = daemon.current_game.clone();
-            thread::sleep(Duration::from_millis(POLL_MS));
+            // Adaptive polling: 250 ms while a game is active (snappy state
+            // machine), a lazy 1 s when idle to cut dumpsys churn ~4x.
+            idle_streak = if matches!(st, DaemonState::Idle) {
+                idle_streak.saturating_add(1)
+            } else {
+                0
+            };
+            let sleep_ms = if idle_streak >= 20 { 1000 } else { POLL_MS };
+            thread::sleep(Duration::from_millis(sleep_ms));
         }
         // Restore stock when daemon shuts down
         crate::session::finish("daemon_stop");

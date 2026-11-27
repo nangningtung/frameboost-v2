@@ -14,7 +14,9 @@ mod capture;
 mod daemon;
 mod detect;
 mod fps;
+mod hud;
 mod net;
+mod powercfg;
 mod priority;
 mod profile;
 mod render;
@@ -679,6 +681,17 @@ fn handle_client(
             "elapsed": elapsed,
         })
         .to_string()
+    } else if req == "hud_inproc" {
+        crate::hud::status()
+    } else if let Some(rest) = req.strip_prefix("hud_inproc ") {
+        match rest.trim() {
+            "on" => crate::hud::set_enabled(true),
+            "off" => crate::hud::set_enabled(false),
+            "toggle" => crate::hud::toggle(),
+            _ => crate::hud::status(),
+        }
+    } else if let Some(rest) = req.strip_prefix("set_global_preset ") {
+        crate::powercfg::set_global(rest.trim())
     } else if let Some(rest) = req.strip_prefix("session_start") {
         let arg = rest.trim();
         let pkg = if arg.is_empty() {
@@ -882,6 +895,9 @@ fn main() {
     let detector = Arc::new(RwLock::new(GameDetector::new()));
 
     log_line(&format!("Secreto Space daemon v0.1.0 started (pid={})", std::process::id()));
+
+    // 0. Install the powercfg contract (Scene/upref-style external UI).
+    crate::powercfg::setup();
 
     // 1. Spawn auto daemon loop (handles game detection + thermal hysteresis)
     let auto_run = running.clone();

@@ -1,0 +1,14 @@
+{
+    "name": "Secreto Space",
+    "author": "nangningtung",
+    "version": "0.1.0",
+    "versionCode": 1000,
+    "features": {
+        "strict": true,
+        "pedestal": true
+    },
+    "module": "secreto_space",
+    "state": "/data/adb/modules/secreto_space/cur_powermode.txt",
+    "entry": "/data/powercfg.sh",
+    "projectUrl": "https://github.com/nongtothejo/frameboost-v2"
+}

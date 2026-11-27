@@ -5,6 +5,9 @@ use std::io::Write;
 use std::path::Path;
 
 const PROFILES_CONFIG_PATH: &str = "/data/adb/secreto_space/game_profiles.json";
+/// Global preset override written by the powercfg contract (Scene/upref modes).
+/// Per-game custom configs take precedence; empty/absent means per-game default.
+pub const GLOBAL_PRESET_PATH: &str = "/data/adb/secreto_space/global_preset";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Preset {
@@ -209,6 +212,16 @@ impl GameProfile {
         if let Some(cfg) = custom_map.get(pkg) {
             let preset = Preset::from_str(&cfg.preset);
             return Self::build(pkg, preset, cfg.auto_bbr);
+        }
+
+        // Global override from the powercfg contract (Scene/upref-style modes).
+        // Custom per-game configs still win over this.
+        if let Ok(s) = fs::read_to_string(GLOBAL_PRESET_PATH) {
+            let t = s.trim().to_uppercase();
+            if !t.is_empty() {
+                let bbr = Self::default_preset_for(pkg).1;
+                return Self::build(pkg, Preset::from_str(&t), bbr);
+            }
         }
 
         let (def_preset, def_bbr) = Self::default_preset_for(pkg);
