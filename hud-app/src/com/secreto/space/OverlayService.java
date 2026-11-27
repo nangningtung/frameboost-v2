@@ -92,9 +92,7 @@ public class OverlayService extends Service {
     private Button btnRecLite;
     private Button btnRecStd;
     private Button btnRecHigh;
-    private Button btnRecAudio;
     private String recordPreset = "std";
-    private String audioMode = "game"; // off | game | game_mic
     private int recStatusTick = 0;
     private boolean captureHiding = false;
     private boolean recordUiState = false;
@@ -205,7 +203,6 @@ public class OverlayService extends Service {
         autoHide = prefs.getBoolean("auto_hide", true);
         fpsOverlayEnabled = prefs.getBoolean("fps_overlay_enabled", true);
         recordPreset = prefs.getString("record_preset", "std");
-        audioMode = prefs.getString("record_audio_mode", "game");
         dndEnabled = prefs.getBoolean("gaming_dnd", true);
         hudType = prefs.getString("hud_type", prefs.getString("fps_overlay_type", "COMPACT"));
         activePreset = prefs.getString("game_preset", "BALANCED");
@@ -257,7 +254,6 @@ public class OverlayService extends Service {
         btnRecLite = overlayRoot.findViewById(R.id.btn_rec_lite);
         btnRecStd = overlayRoot.findViewById(R.id.btn_rec_std);
         btnRecHigh = overlayRoot.findViewById(R.id.btn_rec_high);
-        btnRecAudio = overlayRoot.findViewById(R.id.btn_rec_audio);
 
         int layoutType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
         params = new WindowManager.LayoutParams(
@@ -300,30 +296,6 @@ public class OverlayService extends Service {
         if (btnRecLite != null) btnRecLite.setOnClickListener(recPresetListener);
         if (btnRecStd != null) btnRecStd.setOnClickListener(recPresetListener);
         if (btnRecHigh != null) btnRecHigh.setOnClickListener(recPresetListener);
-        highlightAudioMode();
-        if (btnRecAudio != null) {
-            btnRecAudio.setOnClickListener(v -> {
-                if (ScreenRecorder.isRecording()) {
-                    android.widget.Toast.makeText(this, "Stop recording to change audio source",
-                            android.widget.Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                triggerHaptic();
-                audioMode = "off".equals(audioMode) ? "game"
-                        : "game".equals(audioMode) ? "game_mic" : "off";
-                getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                        .edit().putString("record_audio_mode", audioMode).apply();
-                highlightAudioMode();
-            });
-        }
-        // Recorder result callback: reset UI state and toast the outcome.
-        ScreenRecorder.setCallback((ok, path, message) -> {
-            recordBusy = false;
-            if (btnCaptureRecord != null) btnCaptureRecord.setEnabled(true);
-            recordUiState = false;
-            updateRecordButton(false);
-            android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_SHORT).show();
-        });
 
         Handler main = new Handler(Looper.getMainLooper());
         viewBubble.post(() -> {
@@ -372,20 +344,24 @@ public class OverlayService extends Service {
                     // session engine uses; ROR does the same with dumpsys).
                     recStatusTick++;
                     if (isPanelOpen() && recStatusTick % 5 == 0) {
-                        // In-app MediaProjection recorder state (replaces the
-                        // daemon record_status poll; screenrecord has no audio).
-                        boolean rec = ScreenRecorder.isRecording();
-                        if (rec != recordUiState) {
-                            recordUiState = rec;
-                            handler.post(() -> updateRecordButton(rec));
-                        }
-                        if (rec) {
-                            final long el = ScreenRecorder.elapsedSecs();
-                            handler.post(() -> {
-                                if (btnCaptureRecord != null) {
-                                    btnCaptureRecord.setText(String.format("STOP REC %d:%02d", el / 60, el % 60));
+                        String st = IpcClient.sendCommand("record_status");
+                        if (st != null) {
+                            try {
+                                org.json.JSONObject j = new org.json.JSONObject(st);
+                                final boolean rec = j.optBoolean("recording", false);
+                                final long el = j.optLong("elapsed", 0);
+                                if (rec != recordUiState) {
+                                    recordUiState = rec;
+                                    handler.post(() -> updateRecordButton(rec));
                                 }
-                            });
+                                if (rec) {
+                                    final String label = String.format("STOP REC %d:%02d", el / 60, el % 60);
+                                    handler.post(() -> {
+                                        if (btnCaptureRecord != null) btnCaptureRecord.setText(label);
+                                    });
+                                }
+                            } catch (Exception ignored) {
+                            }
                         }
                     }
                     {
@@ -1189,21 +1165,32 @@ public class OverlayService extends Service {
     }
 
     private void toggleRecording() {
-        if (recordBusy) return;
+        if (recordBusy || actionExecutor == null) return;
+        recordBusy = true;
         triggerHaptic();
-        if (ScreenRecorder.isRecording()) {
-            recordBusy = true;
-            if (btnCaptureRecord != null) btnCaptureRecord.setEnabled(false);
-            ScreenRecorder.stop(); // result arrives via ScreenRecorder callback
-        } else if (RecorderService.hasConsent()) {
-            // Consent already granted: start instantly, no dialog, no
-            // leaving the game.
-            RecorderService.requestStart(this, 0, null, recordPreset, audioMode);
-        } else {
-            // First ever recording (per app process): one consent dialog.
-            startActivity(new Intent(this, RecordConsentActivity.class)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-        }
+        final boolean stopping = recordUiState;
+        if (btnCaptureRecord != null) btnCaptureRecord.setEnabled(false);
+        actionExecutor.execute(() -> {
+            String res = IpcClient.sendCommand(stopping
+                    ? "record_stop"
+                    : "record_start " + recordPreset);
+            boolean ok = res != null && res.contains("\"status\":\"ok\"");
+            String message = ok
+                    ? (stopping ? "Recording saved" : "Recording started")
+                    : "Recording failed";
+            try {
+                message = new org.json.JSONObject(res).optString("message", message);
+            } catch (Exception ignored) {
+            }
+            final String toast = message;
+            final boolean started = ok && !stopping;
+            handler.post(() -> {
+                recordBusy = false;
+                if (btnCaptureRecord != null) btnCaptureRecord.setEnabled(true);
+                if (ok) updateRecordButton(started);
+                android.widget.Toast.makeText(this, toast, android.widget.Toast.LENGTH_SHORT).show();
+            });
+        });
     }
 
     private void updateRecordButton(boolean recording) {
@@ -1213,19 +1200,6 @@ public class OverlayService extends Service {
         btnCaptureRecord.setBackgroundResource(
                 recording ? R.drawable.bg_segment_record : R.drawable.bg_segment_track);
         btnCaptureRecord.setTextColor(recording ? 0xFFFF8A9A : COLOR_DIM);
-    }
-
-    private void highlightAudioMode() {
-        if (btnRecAudio == null) return;
-        String label;
-        int color;
-        switch (audioMode) {
-            case "off": label = "AUDIO: OFF"; color = COLOR_DIM; break;
-            case "game_mic": label = "AUDIO: GAME + MIC"; color = 0xFF81C995; break;
-            default: label = "AUDIO: GAME"; color = 0xFF8AB4F8; break;
-        }
-        btnRecAudio.setText(label);
-        btnRecAudio.setTextColor(color);
     }
 
     /** Panel accent follows the active game preset, matching the WebUI palette. */
