@@ -56,7 +56,6 @@
             android:name=".RecorderService"
             android:enabled="true"
             android:exported="false"
-            android:process=":recorder"
             android:foregroundServiceType="mediaProjection" />
 
         <activity

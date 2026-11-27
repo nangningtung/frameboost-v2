@@ -9,13 +9,29 @@ import android.content.Intent;
 import android.os.IBinder;
 
 /**
- * Foreground shell (mediaProjection type) in its OWN process (:recorder).
- * Running the MediaProjection + encoders in a separate process means an OOM
- * while recording can never kill the overlay/WebUI process (the side panel
- * used to disappear mid-recording because of this).
+ * Foreground shell (mediaProjection type) required while MediaProjection
+ * captures. The actual work runs inside ScreenRecorder.
  */
 public class RecorderService extends Service {
     private static final String CHANNEL = "secreto_recording";
+
+    // Cached MediaProjection consent token. Obtained once (consent is
+    // pre-granted via appops so no dialog), then reused for every recording.
+    // This is what makes RECORD instant in-game: no activity is launched.
+    private static int sConsentCode = 0;
+    private static Intent sConsentData = null;
+
+    public static boolean hasConsent() { return sConsentData != null; }
+
+    public static void saveConsent(int code, Intent data) {
+        sConsentCode = code;
+        sConsentData = data;
+    }
+
+    public static void clearConsent() {
+        sConsentCode = 0;
+        sConsentData = null;
+    }
 
     public static void requestStart(Context ctx, int resultCode, Intent data,
                                     String preset, String audioMode) {
@@ -47,8 +63,12 @@ public class RecorderService extends Service {
         startAsForeground();
         String preset = intent.getStringExtra("preset");
         String audio = intent.getStringExtra("audio");
-        ScreenRecorder.start(this, intent.getIntExtra("code", 0),
-                intent.getParcelableExtra("data"), preset, audio);
+        Intent data = intent.getParcelableExtra("data");
+        int code = intent.getIntExtra("code", 0);
+        if (data != null) {
+            saveConsent(code, data);
+        }
+        ScreenRecorder.start(this, sConsentCode, sConsentData, preset, audio);
         new Thread(() -> {
             while (ScreenRecorder.isRecording()) {
                 try { Thread.sleep(500); } catch (InterruptedException e) { return; }

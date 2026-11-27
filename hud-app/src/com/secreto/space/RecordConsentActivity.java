@@ -72,7 +72,7 @@ public class RecordConsentActivity extends Activity {
                         .getString("record_preset", "std");
                 String audioMode = getSharedPreferences(OverlayService.PREFS, MODE_PRIVATE)
                         .getString("record_audio_mode", "game");
-                RecorderBridge.save(res, data);
+                RecorderService.saveConsent(res, data);
                 if (startRecording) {
                     RecorderService.requestStart(this, res, data, preset, audioMode);
                 }
