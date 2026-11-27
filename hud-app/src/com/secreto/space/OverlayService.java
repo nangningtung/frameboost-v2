@@ -1195,6 +1195,7 @@ public class OverlayService extends Service {
 
     private void updateRecordButton(boolean recording) {
         if (btnCaptureRecord == null) return;
+        if (recordUiState == recording) return; // jangan reset timer tiap tick
         recordUiState = recording;
         btnCaptureRecord.setText(recording ? "STOP REC 0:00" : "RECORD");
         btnCaptureRecord.setBackgroundResource(
