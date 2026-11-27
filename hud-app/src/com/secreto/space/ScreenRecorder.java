@@ -505,8 +505,8 @@ public final class ScreenRecorder {
                 int idx;
                 try {
                     idx = codec.dequeueOutputBuffer(info, 50_000);
-                } catch (IllegalStateException | MediaCodec.CodecException e) {
-                    return;
+                } catch (IllegalStateException e) {
+                    return; // codec released/failed while we waited (covers CodecException)
                 }
                 if (idx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                     track = sync.addTrack(codec.getOutputFormat());
