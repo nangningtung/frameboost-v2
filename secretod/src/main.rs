@@ -819,20 +819,6 @@ fn handle_client(
     let _ = stream.write_all(b"\n");
 }
 
-fn grant_capture() {
-    let pkg = "com.secreto.space";
-    for cmd in [
-        ("pm", &["grant", pkg, "android.permission.CAPTURE_AUDIO_OUTPUT"][..]),
-        ("appops", &["set", pkg, "PROJECT_MEDIA", "allow"][..]),
-        ("appops", &["set", pkg, "RECORD_AUDIO", "allow"][..]),
-    ] {
-        let out = run_cmd(cmd.0, cmd.1);
-        if !out.is_empty() {
-            log_line(&format!("grant_capture {}: {}", cmd.0, out.trim()));
-        }
-    }
-}
-
 fn main() {
     // Secreto Space is built for one device. `customize.sh` and `service.sh`
     // already refuse other phones; this is the last line of defence in case the
@@ -871,15 +857,6 @@ fn main() {
     };
 
     GOS_DISABLED.store(check_gos_disabled(), Ordering::Relaxed);
-
-    // Root-level grants so the HUD app can record in-game audio without any
-    // consent dialog (community GameSpace pattern, e.g. Xiaomi/vivo game
-    // spaces and the Shizuku-based Screen-Recorder):
-    //  - PROJECT_MEDIA allow  -> skip the MediaProjection consent dialog
-    //  - CAPTURE_AUDIO_OUTPUT -> capture internal audio of apps that did not
-    //    opt into playback capture
-    //  - RECORD_AUDIO allow   -> mic without a runtime permission prompt
-    grant_capture();
 
     // Initial stock capture so baseline is preserved
     let snap = StockSnapshot::capture();
