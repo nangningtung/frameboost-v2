@@ -1192,14 +1192,11 @@ public class OverlayService extends Service {
             recordBusy = true;
             if (btnCaptureRecord != null) btnCaptureRecord.setEnabled(false);
             ScreenRecorder.stop(); // result arrives via ScreenRecorder callback
-        } else if (RecorderService.hasConsent()) {
-            // Token cached: start instantly, no activity, never leaves game.
-            RecorderService.requestStart(this, 0, null, recordPreset, audioMode);
         } else {
-            // One-time consent (pre-granted via appops -> no dialog).
+            // Consent is pre-granted by the daemon (PROJECT_MEDIA allow), so
+            // this gateway activity returns instantly and never leaves the game.
             startActivity(new Intent(this, RecordConsentActivity.class)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    .putExtra("start_recording", true));
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         }
     }
 

@@ -19,12 +19,10 @@ public class RecordConsentActivity extends Activity {
     private static final int REQ_PERMISSION = 41;
     private static final int REQ_PROJECTION = 42;
     private boolean micNeeded;
-    private boolean startRecording;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        startRecording = getIntent().getBooleanExtra("start_recording", false);
         String audioMode = getSharedPreferences(OverlayService.PREFS, MODE_PRIVATE)
                 .getString("record_audio_mode", "game");
         micNeeded = "game_mic".equals(audioMode);
@@ -72,10 +70,7 @@ public class RecordConsentActivity extends Activity {
                         .getString("record_preset", "std");
                 String audioMode = getSharedPreferences(OverlayService.PREFS, MODE_PRIVATE)
                         .getString("record_audio_mode", "game");
-                RecorderService.saveConsent(res, data);
-                if (startRecording) {
-                    RecorderService.requestStart(this, res, data, preset, audioMode);
-                }
+                RecorderService.requestStart(this, res, data, preset, audioMode);
             }
             finish();
         }

@@ -15,24 +15,6 @@ import android.os.IBinder;
 public class RecorderService extends Service {
     private static final String CHANNEL = "secreto_recording";
 
-    // Cached MediaProjection consent token. Obtained once (consent is
-    // pre-granted via appops so no dialog), then reused for every recording.
-    // This is what makes RECORD instant in-game: no activity is launched.
-    private static int sConsentCode = 0;
-    private static Intent sConsentData = null;
-
-    public static boolean hasConsent() { return sConsentData != null; }
-
-    public static void saveConsent(int code, Intent data) {
-        sConsentCode = code;
-        sConsentData = data;
-    }
-
-    public static void clearConsent() {
-        sConsentCode = 0;
-        sConsentData = null;
-    }
-
     public static void requestStart(Context ctx, int resultCode, Intent data,
                                     String preset, String audioMode) {
         Intent i = new Intent(ctx, RecorderService.class);
@@ -63,12 +45,8 @@ public class RecorderService extends Service {
         startAsForeground();
         String preset = intent.getStringExtra("preset");
         String audio = intent.getStringExtra("audio");
-        Intent data = intent.getParcelableExtra("data");
-        int code = intent.getIntExtra("code", 0);
-        if (data != null) {
-            saveConsent(code, data);
-        }
-        ScreenRecorder.start(this, sConsentCode, sConsentData, preset, audio);
+        ScreenRecorder.start(this, intent.getIntExtra("code", 0),
+                intent.getParcelableExtra("data"), preset, audio);
         new Thread(() -> {
             while (ScreenRecorder.isRecording()) {
                 try { Thread.sleep(500); } catch (InterruptedException e) { return; }
