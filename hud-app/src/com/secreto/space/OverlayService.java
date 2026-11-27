@@ -95,6 +95,7 @@ public class OverlayService extends Service {
     private Button btnRecAudio;
     private String recordPreset = "std";
     private String audioMode = "game"; // game | game_mic
+    private String lastRecResult = "";
     private int recStatusTick = 0;
     private boolean captureHiding = false;
     private boolean recordUiState = false;
@@ -303,7 +304,7 @@ public class OverlayService extends Service {
         highlightAudioMode();
         if (btnRecAudio != null) {
             btnRecAudio.setOnClickListener(v -> {
-                if (ScreenRecorder.isRecording()) {
+                if (RecorderStatus.recording(this)) {
                     android.widget.Toast.makeText(this, "Stop recording to change audio source",
                             android.widget.Toast.LENGTH_SHORT).show();
                     return;
@@ -315,14 +316,6 @@ public class OverlayService extends Service {
                 highlightAudioMode();
             });
         }
-        ScreenRecorder.setCallback((ok, path, message) -> {
-            recordBusy = false;
-            if (btnCaptureRecord != null) btnCaptureRecord.setEnabled(true);
-            recordUiState = false;
-            updateRecordButton(false);
-            android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_SHORT).show();
-        });
-
         Handler main = new Handler(Looper.getMainLooper());
         viewBubble.post(() -> {
             if (yAutoCentered) {
@@ -370,19 +363,32 @@ public class OverlayService extends Service {
                     // session engine uses; ROR does the same with dumpsys).
                     recStatusTick++;
                     if (isPanelOpen() && recStatusTick % 5 == 0) {
-                        // In-app MediaProjection recorder state (with audio).
-                        boolean rec = ScreenRecorder.isRecording();
+                        // Cross-process recorder state (recorder lives in
+                        // :recorder process; status shared via a file).
+                        final Context ctx = OverlayService.this;
+                        boolean rec = RecorderStatus.recording(ctx);
                         if (rec != recordUiState) {
                             recordUiState = rec;
                             handler.post(() -> updateRecordButton(rec));
                         }
                         if (rec) {
-                            final long el = ScreenRecorder.elapsedSecs();
+                            final long el = RecorderStatus.elapsedSecs(ctx);
                             handler.post(() -> {
                                 if (btnCaptureRecord != null) {
                                     btnCaptureRecord.setText(String.format("STOP REC %d:%02d", el / 60, el % 60));
                                 }
                             });
+                        } else {
+                            final String res = RecorderStatus.result(ctx);
+                            if (!res.isEmpty() && !res.equals(lastRecResult)) {
+                                lastRecResult = res;
+                                recordBusy = false;
+                                handler.post(() -> {
+                                    if (btnCaptureRecord != null) btnCaptureRecord.setEnabled(true);
+                                    android.widget.Toast.makeText(OverlayService.this, res,
+                                            android.widget.Toast.LENGTH_SHORT).show();
+                                });
+                            }
                         }
                     }
                     {
@@ -1188,13 +1194,14 @@ public class OverlayService extends Service {
     private void toggleRecording() {
         if (recordBusy) return;
         triggerHaptic();
-        if (ScreenRecorder.isRecording()) {
+        if (RecorderStatus.recording(this)) {
             recordBusy = true;
             if (btnCaptureRecord != null) btnCaptureRecord.setEnabled(false);
-            ScreenRecorder.stop(); // result arrives via ScreenRecorder callback
-        } else if (RecorderService.hasConsent()) {
+            RecorderService.requestStop(this);
+        } else if (RecorderBridge.hasConsent()) {
             // Token cached: start instantly, no activity, never leaves game.
-            RecorderService.requestStart(this, 0, null, recordPreset, audioMode);
+            RecorderService.requestStart(this, RecorderBridge.code(),
+                    RecorderBridge.data(), recordPreset, audioMode);
         } else {
             // One-time consent (pre-granted via appops -> no dialog).
             startActivity(new Intent(this, RecordConsentActivity.class)

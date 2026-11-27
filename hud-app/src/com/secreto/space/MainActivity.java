@@ -36,7 +36,7 @@ public class MainActivity extends Activity {
         // app (not in-game). Once cached, in-game RECORD starts instantly
         // without any activity launch. Consent is pre-granted via appops, so
         // this shows no dialog.
-        if (!RecorderService.hasConsent()) {
+        if (!RecorderBridge.hasConsent()) {
             startActivity(new Intent(this, RecordConsentActivity.class));
         }
 

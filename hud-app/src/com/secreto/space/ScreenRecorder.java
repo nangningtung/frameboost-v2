@@ -101,14 +101,17 @@ public final class ScreenRecorder {
         }
         sRecording = true;
         sStartedElapsed = SystemClock.elapsedRealtime();
+        RecorderStatus.start(ctx);
         new Thread(() -> {
             String path = null;
             try {
                 path = run(ctx, resultCode, projectionData, preset, audioMode);
+                RecorderStatus.finish(ctx, "Recording saved");
                 notify(true, path, "Recording saved");
             } catch (Throwable e) {
                 Log.e(TAG, "record failed", e);
                 if (path != null) new File(path).delete();
+                RecorderStatus.finish(ctx, "Recording failed: " + e.getMessage());
                 notify(false, null, "Recording failed: " + e.getMessage());
             } finally {
                 sRecording = false;
@@ -378,7 +381,7 @@ public final class ScreenRecorder {
             game = new AudioRecord.Builder()
                     .setAudioPlaybackCaptureConfig(cfg)
                     .setAudioFormat(fmt)
-                    .setBufferSizeInBytes(SAMPLE_RATE * 4)
+                    .setBufferSizeInBytes(SAMPLE_RATE * 2)
                     .build();
             if (game.getState() != AudioRecord.STATE_INITIALIZED) {
                 throw new IllegalStateException("playback capture unavailable");
