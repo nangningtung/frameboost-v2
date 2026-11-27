@@ -1,6 +1,6 @@
 # Secreto Space 0.1.0 - Project Report
 
-Status: **rilis harian untuk A50; semua fitur inti terverifikasi di device; side panel keluar-masuk game instan (245-375 ms); state terakhir tersimpan di semua lapisan; capture preset + timer + tanpa batas waktu + aksen dinamis di side panel; renice + ionice game berjurnal; kontrak powercfg.json kompatibel Scene; standby hint + fail-safe apply + polling adaptif; daemon panic-resilient (catch_unwind + lock anti-poison); eksperimen HUD in-process di-shelve (kode tersimpan); tombol KernelSU access di WebUI; commit terakhir `703f5fd`**  
+Status: **rilis harian untuk A50; semua fitur inti terverifikasi di device; side panel keluar-masuk game instan (245-375 ms); state terakhir tersimpan di semua lapisan; capture preset + timer + tanpa batas waktu + aksen dinamis di side panel; renice + ionice game berjurnal; kontrak powercfg.json kompatibel Scene; standby hint + fail-safe apply + polling adaptif; daemon panic-resilient (catch_unwind + lock anti-poison); eksperimen HUD in-process di-shelve (kode tersimpan); tombol KernelSU access di WebUI; commit terakhir `6fe3bf9`**  
 Device uji: `RR8M50C0W8T` (Samsung Galaxy A50, GSI API 36)  
 
 ---
