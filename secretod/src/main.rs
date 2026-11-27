@@ -605,8 +605,12 @@ fn handle_client(
                 name: prof.preset.clone(),
                 gpu_gov: prof.gpu_gov.clone(),
                 gpu_min: prof.gpu_min,
+                cpu0_gov: prof.cpu0_gov.clone(),
+                cpu4_gov: prof.cpu4_gov.clone(),
                 cpu0_min: prof.cpu0_min,
                 cpu4_min: prof.cpu4_min,
+                cpu0_max: prof.cpu0_max,
+                cpu4_max: prof.cpu4_max,
             };
             let res = crate::apply::apply_profile(&boost);
             format!(r#"{{"status":"{}","preset":"{}"}}"#, if res.success { "ok" } else { "fail" }, prof.preset)

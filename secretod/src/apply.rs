@@ -9,8 +9,12 @@ pub struct BoostProfile {
     pub name: String,
     pub gpu_gov: String,
     pub gpu_min: u32,
+    pub cpu0_gov: String,
+    pub cpu4_gov: String,
     pub cpu0_min: u32,
     pub cpu4_min: u32,
+    pub cpu0_max: u32,
+    pub cpu4_max: u32,
 }
 
 /// Result of an apply operation with fine-grained per-knob status.
@@ -22,6 +26,8 @@ pub struct ApplyReport {
 const GPU_GOV: &str = "/sys/kernel/gpu/gpu_governor";
 const GPU_MIN: &str = "/sys/kernel/gpu/gpu_min_clock";
 const GPU_MAX: &str = "/sys/kernel/gpu/gpu_max_clock";
+const CPU0_GOV: &str = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor";
+const CPU4_GOV: &str = "/sys/devices/system/cpu/cpu4/cpufreq/scaling_governor";
 const CPU0_MIN: &str = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq";
 const CPU4_MIN: &str = "/sys/devices/system/cpu/cpu4/cpufreq/scaling_min_freq";
 const CPU0_MAX: &str = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq";
@@ -58,26 +64,45 @@ pub fn apply_profile(profile: &BoostProfile) -> ApplyReport {
         }
     }
 
-    // 2. Apply GPU governor
+    // 2. Cap max first (so the min clamp below sees the new ceiling; this is
+    //    what keeps ESPORTS below the 2314 MHz overheat point).
+    let c0max = profile.cpu0_max.to_string();
+    let c4max = profile.cpu4_max.to_string();
+    if let Err(e) = write_verified(CPU0_MAX, &c0max) {
+        errors.push(e);
+    }
+    if let Err(e) = write_verified(CPU4_MAX, &c4max) {
+        errors.push(e);
+    }
+
+    // 3. Apply GPU governor
     if let Err(e) = write_verified(GPU_GOV, &profile.gpu_gov) {
         errors.push(e);
     }
 
-    // 3. Apply GPU min clock
+    // 4. Apply GPU min clock
     let min_s = gpu_min.to_string();
     if let Err(e) = write_verified(GPU_MIN, &min_s) {
         errors.push(e);
     }
 
-    // 4. Apply CPU LITTLE (cpu0) min freq
+    // 5. Apply CPU LITTLE (cpu0) min freq
     let c0_s = cpu0_min.to_string();
     if let Err(e) = write_verified(CPU0_MIN, &c0_s) {
         errors.push(e);
     }
 
-    // 5. Apply CPU BIG (cpu4) min freq
+    // 6. Apply CPU BIG (cpu4) min freq
     let c4_s = cpu4_min.to_string();
     if let Err(e) = write_verified(CPU4_MIN, &c4_s) {
+        errors.push(e);
+    }
+
+    // 7. Apply CPU governors (ESPORTS pins to "performance").
+    if let Err(e) = write_verified(CPU0_GOV, &profile.cpu0_gov) {
+        errors.push(e);
+    }
+    if let Err(e) = write_verified(CPU4_GOV, &profile.cpu4_gov) {
         errors.push(e);
     }
 
@@ -105,6 +130,10 @@ pub fn profile_drifted(profile: &BoostProfile) -> bool {
         || read_file(GPU_MIN) != gpu_min.to_string()
         || read_file(CPU0_MIN) != cpu0_min.to_string()
         || read_file(CPU4_MIN) != cpu4_min.to_string()
+        || read_file(CPU0_GOV) != profile.cpu0_gov
+        || read_file(CPU4_GOV) != profile.cpu4_gov
+        || read_file(CPU0_MAX) != profile.cpu0_max.to_string()
+        || read_file(CPU4_MAX) != profile.cpu4_max.to_string()
 }
 
 /// Samsung's power service resets clock knobs a few seconds after they are

@@ -46,8 +46,12 @@ pub struct GameProfile {
     pub preset: String,
     pub gpu_gov: String,
     pub gpu_min: u32,
+    pub cpu0_gov: String,
+    pub cpu4_gov: String,
     pub cpu0_min: u32,
     pub cpu4_min: u32,
+    pub cpu0_max: u32,
+    pub cpu4_max: u32,
     pub warn_min: u32,
     pub auto_bbr: bool,
 }
@@ -134,13 +138,20 @@ impl GameProfile {
     pub fn build(name: &str, preset: Preset, auto_bbr: bool) -> Self {
         let p_str = preset.as_str().to_string();
         match preset {
+            // ECO: benar-benar hemat. Floor = stock min (260/702/1040) supaya
+            // CPU/GPU boleh turun ke titik terendah; governor Dynamic bisa
+            // menurunkan clock saat idle. Bukan overclock.
             Preset::Battery => Self {
                 name: name.into(),
                 preset: p_str,
                 gpu_gov: "Dynamic".into(),
-                gpu_min: 385000,
-                cpu0_min: 910000,
-                cpu4_min: 1248000,
+                gpu_min: 260000,
+                cpu0_gov: "energy_adaptive".into(),
+                cpu4_gov: "energy_adaptive".into(),
+                cpu0_min: 702000,
+                cpu4_min: 1040000,
+                cpu0_max: 1742000,
+                cpu4_max: 2314000,
                 warn_min: 338000,
                 auto_bbr,
             },
@@ -149,8 +160,12 @@ impl GameProfile {
                 preset: p_str,
                 gpu_gov: "Booster".into(),
                 gpu_min: 455000,
+                cpu0_gov: "energy_adaptive".into(),
+                cpu4_gov: "energy_adaptive".into(),
                 cpu0_min: 910000,
                 cpu4_min: 1352000,
+                cpu0_max: 1742000,
+                cpu4_max: 2314000,
                 warn_min: 385000,
                 auto_bbr,
             },
@@ -159,18 +174,30 @@ impl GameProfile {
                 preset: p_str,
                 gpu_gov: "Booster".into(),
                 gpu_min: 572000,
-                cpu0_min: 1053000,
-                cpu4_min: 1508000,
+                cpu0_gov: "energy_adaptive".into(),
+                cpu4_gov: "energy_adaptive".into(),
+                cpu0_min: 1118000,
+                cpu4_min: 1664000,
+                cpu0_max: 1742000,
+                cpu4_max: 2314000,
                 warn_min: 455000,
                 auto_bbr,
             },
+            // ESPORTS: governor performance dikunci, tapi max di-cap di bawah
+            // puncak (little 1638, big 1898) agar tidak menyentuh 2314 MHz yang
+            // membuat BIG cluster overheat (sudah 81C di Balanced). GPU 683MHz
+            // (level 4, sebelum thermal throttle 764). Ini batas aman.
             Preset::Esports => Self {
                 name: name.into(),
                 preset: p_str,
                 gpu_gov: "Booster".into(),
                 gpu_min: 683000,
-                cpu0_min: 1053000,
-                cpu4_min: 1508000,
+                cpu0_gov: "performance".into(),
+                cpu4_gov: "performance".into(),
+                cpu0_min: 1534000,
+                cpu4_min: 1768000,
+                cpu0_max: 1638000,
+                cpu4_max: 1898000,
                 warn_min: 455000,
                 auto_bbr,
             },

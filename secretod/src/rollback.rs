@@ -36,7 +36,38 @@ pub fn restore_from_snapshot(snap: &StockSnapshot) -> Result<(), Vec<String>> {
         errors.push(e);
     }
 
-    // 5. Restore network CC if modified
+    // 5. Restore CPU max freqs (raise AFTER lowering min so min never
+    //    exceeds the ceiling; ESPORTS caps these below stock).
+    let c0max = snap.cpu0_max.to_string();
+    if let Err(e) = write_verified(
+        "/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq",
+        &c0max,
+    ) {
+        errors.push(e);
+    }
+    let c4max = snap.cpu4_max.to_string();
+    if let Err(e) = write_verified(
+        "/sys/devices/system/cpu/cpu4/cpufreq/scaling_max_freq",
+        &c4max,
+    ) {
+        errors.push(e);
+    }
+
+    // 6. Restore CPU governors (ESPORTS pins them to "performance").
+    if let Err(e) = write_verified(
+        "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor",
+        &snap.cpu0_gov,
+    ) {
+        errors.push(e);
+    }
+    if let Err(e) = write_verified(
+        "/sys/devices/system/cpu/cpu4/cpufreq/scaling_governor",
+        &snap.cpu4_gov,
+    ) {
+        errors.push(e);
+    }
+
+    // 7. Restore network CC if modified
     if !snap.net_cc.is_empty() {
         let _ = write_verified("/proc/sys/net/ipv4/tcp_congestion_control", &snap.net_cc);
     }
@@ -74,8 +105,10 @@ pub fn restore_hardcoded_stock() -> Result<(), Vec<String>> {
         gpu_min_clock: 260000,
         cpu0_gov: "energy_adaptive".to_string(),
         cpu0_min: 702000,
+        cpu0_max: 1742000,
         cpu4_gov: "energy_adaptive".to_string(),
         cpu4_min: 1040000,
+        cpu4_max: 2314000,
         net_cc: "westwood".to_string(),
         net_fastopen: "1543".to_string(),
         net_tw_reuse: "0".to_string(),

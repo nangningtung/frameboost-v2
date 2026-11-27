@@ -274,8 +274,12 @@ impl AutoDaemon {
                 name: "KEEP".to_string(),
                 gpu_gov: prof.gpu_gov.clone(),
                 gpu_min: target,
+                cpu0_gov: prof.cpu0_gov.clone(),
+                cpu4_gov: prof.cpu4_gov.clone(),
                 cpu0_min: prof.cpu0_min,
                 cpu4_min: prof.cpu4_min,
+                cpu0_max: prof.cpu0_max,
+                cpu4_max: prof.cpu4_max,
             };
             if let Some(rep) = apply_profile_if_drifted(&boost) {
                 if !rep.success {
@@ -350,8 +354,12 @@ impl AutoDaemon {
                     name: "GAME".to_string(),
                     gpu_gov: prof.gpu_gov.clone(),
                     gpu_min: prof.gpu_min,
+                    cpu0_gov: prof.cpu0_gov.clone(),
+                    cpu4_gov: prof.cpu4_gov.clone(),
                     cpu0_min: prof.cpu0_min,
                     cpu4_min: prof.cpu4_min,
+                    cpu0_max: prof.cpu0_max,
+                    cpu4_max: prof.cpu4_max,
                 };
                 let _ = apply_profile(&boost);
 
@@ -392,8 +400,12 @@ impl AutoDaemon {
                         name: "WARN".to_string(),
                         gpu_gov: prof.gpu_gov.clone(),
                         gpu_min: prof.warn_min,
+                        cpu0_gov: prof.cpu0_gov.clone(),
+                        cpu4_gov: prof.cpu4_gov.clone(),
                         cpu0_min: prof.cpu0_min,
                         cpu4_min: prof.cpu4_min,
+                        cpu0_max: prof.cpu0_max,
+                        cpu4_max: prof.cpu4_max,
                     };
                     let _ = apply_profile(&warn);
                 }

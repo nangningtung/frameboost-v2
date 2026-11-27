@@ -420,6 +420,29 @@ Gunakan checklist ini setiap kali ada perubahan.
 
 ## 9. Changelog
 
+### `preset-remap-safe` - 2026-11-27
+
+`feat: remap preset agar sesuai nama + batas aman termal Exynos 9610`
+
+Sebelumnya preset hanya menaikkan min clock; ECO tidak hemat, PERFORMANCE≈ESPORTS (CPU sama). Sekarang:
+
+| Preset | GPU gov/min | CPU0 gov/min/max | CPU4 gov/min/max |
+|---|---|---|---|
+| ECO (BATTERY) | Dynamic 260M | energy_adaptive 702M/1742M | energy_adaptive 1040M/2314M |
+| BALANCED | Booster 455M | energy_adaptive 910M/1742M | energy_adaptive 1352M/2314M |
+| PERFORMANCE | Booster 572M | energy_adaptive 1118M/1742M | energy_adaptive 1664M/2314M |
+| ESPORTS | Booster 683M | **performance** 1534M/1638M | **performance** 1768M/1898M |
+
+Batas aman (dari kernel source `topser9/kernel_samsung_universal9610`):
+- BIG cluster (A73) **tidak dikunci ke max 2314 MHz** — itu titik overheat (device sudah 81C di Balanced). ESPORTS di-cap 1898 MHz, tetap di bawah puncak.
+- GPU ditahan di 683 MHz (level 4, sebelum thermal throttle 764).
+- Tambah tulis/restore CPU governor + scaling_max_freq (sebelumnya hanya min), plus clamp ke ceiling termal yang aktif. Hasil: preset TIDAK akan memaksa clock naik saat thermal throttling aktif — ini yang mencegah freeze/reboot.
+
+Testing device (Auto Chess):
+- PERFORMANCE ter-apply benar (GPU 572M, CPU 1118M/1664M).
+- ESPORTS `apply_preset` mengembalikan `fail` saat device panas (BIG cluster di-throttle ke 1248-1508M) — safety menolak naikkan clock. Ini bukti proteksi bekerja.
+- Restore-on-exit: scaling_max_freq kembali ke 2314M setelah keluar game.
+
 ### `record-audio-investigation` - 2026-11-27
 
 `docs: rekam suara game tidak feasible di device ini (temuan + keputusan)`
