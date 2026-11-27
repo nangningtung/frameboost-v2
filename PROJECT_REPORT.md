@@ -420,6 +420,24 @@ Gunakan checklist ini setiap kali ada perubahan.
 
 ## 9. Changelog
 
+### `ksu-root-handshake` - 2026-11-27
+
+`feat: tombol KernelSU access + perapian daemon`
+
+Perubahan:
+- WebUI tab System: panel "KernelSU access" — tombol request root yang
+  menjalankan `su -c id` dari UID app lewat bridge (`requestRoot()`).
+  Dialog Superuser KernelSU muncul sekali; setelah diizinkan app terdaftar
+  di daftar Superuser. Badge GRANTED/NOT GRANTED + status line.
+- Daemon: hapus dead code `get_foreground_pkg_live`, hapus renice duplikat
+  di extras (boost/reapply sudah menangani), API root tidak berubah.
+- Tidy device: targets HUD kembali default (MLBB), temp files
+  /data/local/tmp dibersihkan.
+
+Testing:
+- build daemon + APK + ZIP ok; deploy device: daemon PID baru, APK
+  "Success", `hud_inproc` → targets [com.mobile.legends].
+
 ### `hud-inproc-powercfg` - 2026-11-27
 
 `feat: HUD in-process Zygisk + kontrak powercfg + standby/fail-safe + poll adaptif`

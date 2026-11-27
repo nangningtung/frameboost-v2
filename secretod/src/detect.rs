@@ -237,28 +237,6 @@ impl GameDetector {
         String::new()
     }
 
-    pub fn get_foreground_pkg_live() -> String {
-        let win_dump = run_cmd("dumpsys", &["window", "displays"]);
-        for line in win_dump.lines() {
-            if line.contains("mCurrentFocus") || line.contains("mFocusedApp") {
-                if let Some(pkg) = Self::parse_pkg_from_line(line) {
-                    return pkg;
-                }
-            }
-        }
-
-        let act_dump = run_cmd("dumpsys", &["activity", "top"]);
-        for line in act_dump.lines() {
-            if line.contains("ACTIVITY") || line.contains("topResumedActivity") {
-                if let Some(pkg) = Self::parse_pkg_from_line(line) {
-                    return pkg;
-                }
-            }
-        }
-
-        String::new()
-    }
-
     /// Cek apakah package adalah sistem Android (bukan game)
     pub fn is_system_pkg(pkg: &str) -> bool {
         pkg.is_empty()

@@ -445,13 +445,8 @@ impl AutoDaemon {
                     let _ = run_cmd("settings", &["put", "system", "screen_brightness_mode", "0"]);
 
                     // ponytail: never drop_caches on game launch; causes eMMC I/O stalls and startup freeze
-                    // 4. Renice game process(es) safely without blocking
-                    let pid_out = run_cmd("pidof", &[&self.current_game]);
-                    for p in pid_out.split_whitespace() {
-                        if !p.is_empty() {
-                            let _ = run_cmd("renice", &["-n", "-10", "-p", p]);
-                        }
-                    }
+                    // 4. Renice handled by priority::boost at session start and
+                    //    priority::reapply at every keep-alive tick — no fork needed here.
 
                     // 5. Auto-BBR for online titles
                     if prof.auto_bbr {
