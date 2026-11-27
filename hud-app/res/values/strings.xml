@@ -1,9 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Secreto Space</string>
-    <string name="enable_hud">Enable In-Game Floating HUD</string>
-    <string name="auto_hide">Auto-hide outside games</string>
-    <string name="grant_permission">Grant Overlay Permission</string>
-    <string name="status_running">HUD Service: Running</string>
-    <string name="status_stopped">HUD Service: Stopped</string>
 </resources>
