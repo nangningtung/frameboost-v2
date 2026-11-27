@@ -207,6 +207,9 @@ public final class ScreenRecorder {
 
         video.awaitEos(8000);
         if (audio != null) audio.awaitEos(4000);
+        // Give drain threads time to exit their dequeue waits before we stop
+        // the codecs underneath them.
+        Thread.sleep(200);
 
         video.release();
         if (audio != null) audio.release();
@@ -328,19 +331,36 @@ public final class ScreenRecorder {
         }
 
         private void drainLoop() {
-            while (!eos) {
-                int idx = codec.dequeueOutputBuffer(info, 100_000);
-                if (idx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-                    track = sync.addTrack(codec.getOutputFormat());
-                } else if (idx >= 0) {
-                    ByteBuffer buf = codec.getOutputBuffer(idx);
-                    if (buf != null && info.size > 0 && track >= 0) {
-                        buf.position(info.offset).limit(info.offset + info.size);
-                        sync.write(track, buf, info);
+            // Never let this thread die: an uncaught exception here kills the
+            // whole app process (FATAL EXCEPTION) and leaves the mp4 without
+            // its moov atom -> unplayable file + side panel crash.
+            try {
+                while (!eos) {
+                    int idx;
+                    try {
+                        idx = codec.dequeueOutputBuffer(info, 100_000);
+                    } catch (MediaCodec.CodecException e) {
+                        Log.w(TAG, "video dequeue: " + e.getMessage());
+                        return;
+                    } catch (IllegalStateException e) {
+                        return; // codec released while we waited; normal at stop
                     }
-                    codec.releaseOutputBuffer(idx, false);
-                    if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) eos = true;
+                    if (idx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+                        track = sync.addTrack(codec.getOutputFormat());
+                    } else if (idx >= 0) {
+                        ByteBuffer buf = codec.getOutputBuffer(idx);
+                        if (buf != null && info.size > 0 && track >= 0) {
+                            buf.position(info.offset).limit(info.offset + info.size);
+                            sync.write(track, buf, info);
+                        }
+                        try {
+                            codec.releaseOutputBuffer(idx, false);
+                        } catch (IllegalStateException ignored) {}
+                        if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) eos = true;
+                    }
                 }
+            } catch (Throwable t) {
+                Log.w(TAG, "video drainLoop: " + t);
             }
         }
 
@@ -350,6 +370,9 @@ public final class ScreenRecorder {
         }
 
         void release() {
+            // Order matters (ROR pattern): wait for the drain thread to exit
+            // its dequeue loop before stopping the codec, otherwise the
+            // blocked dequeue throws "request cancelled".
             try { vd.release(); } catch (Exception ignored) {}
             try { codec.stop(); } catch (Exception ignored) {}
             try { codec.release(); } catch (Exception ignored) {}
@@ -422,6 +445,15 @@ public final class ScreenRecorder {
         }
 
         private void feedLoop() {
+            // Never let this thread die (see video drainLoop note).
+            try {
+                runFeed();
+            } catch (Throwable t) {
+                Log.w(TAG, "audio feedLoop: " + t);
+            }
+        }
+
+        private void runFeed() {
             int frames = SAMPLE_RATE / 10; // 100 ms per read
             short[] gamePcm = new short[frames * CHANNELS];
             short[] micPcm = new short[frames];
@@ -470,7 +502,12 @@ public final class ScreenRecorder {
 
         private void drain() {
             while (true) {
-                int idx = codec.dequeueOutputBuffer(info, 50_000);
+                int idx;
+                try {
+                    idx = codec.dequeueOutputBuffer(info, 50_000);
+                } catch (IllegalStateException | MediaCodec.CodecException e) {
+                    return;
+                }
                 if (idx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                     track = sync.addTrack(codec.getOutputFormat());
                 } else if (idx >= 0) {
