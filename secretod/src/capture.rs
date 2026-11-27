@@ -195,7 +195,7 @@ pub fn start(preset: &str) -> String {
         .stderr(Stdio::from(log_err))
         .spawn();
     match child {
-        Ok(child) => {
+        Ok(mut child) => {
             let pid = child.id();
             let now_secs = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -211,6 +211,11 @@ pub fn start(preset: &str) -> String {
                 let _ = fs::remove_file(RECORD_START);
                 return error("failed to persist recording state");
             }
+            // Reap the child when it exits so it never lingers as a zombie
+            // (previously `screenrecord` stayed defunct after every stop).
+            std::thread::spawn(move || {
+                let _ = child.wait();
+            });
             log_line(&format!("screenrecord started pid={} path={}", pid, path));
             reply("ok", "Recording started", &path)
         }

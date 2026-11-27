@@ -420,6 +420,28 @@ Gunakan checklist ini setiap kali ada perubahan.
 
 ## 9. Changelog
 
+### `record-audio-investigation` - 2026-11-27
+
+`docs: rekam suara game tidak feasible di device ini (temuan + keputusan)`
+
+Upaya menambahkan suara game ke rekaman (MediaProjection + AudioPlaybackCapture) dieksplorasi penuh lalu dibatalkan. Dua dinding teknis yang terbukti dari logcat device:
+
+1. **Token MediaProjection sekali pakai (Android 14+).** Error nyata: `SecurityException: Don't re-use the resultData to retrieve the same projection instance`. Setiap rekaman wajib consent baru -> wajib activity -> game ter-background/keluar. Token tidak bisa di-cache.
+2. **RAM device kepepet saat game berat jalan.** `lowmemorykiller` membunuh proses rekaman (`low watermark is breached`) saat `MemFree` ~45-58 MB dari 3,6 GB. Bahkan setelah rekaman dipisah ke proses `:recorder`, prosesnya tetap di-kill OOM.
+
+Keputusan: rekaman kembali ke daemon `screenrecord` (instan, tanpa dialog, stabil, **tanpa suara** — keterbatasan biner `screenrecord`). Kode audio (ScreenRecorder/RecorderService/RecordConsentActivity + root grant PROJECT_MEDIA/CAPTURE_AUDIO_OUTPUT) direvert; tetap tersedia di riwayat git jika device dengan RAM lebih besar dipakai.
+
+Referensi riset: Screen-Recorder 178★ (Shizuku/root: `appops PROJECT_MEDIA allow` + `pm grant CAPTURE_AUDIO_OUTPUT`), OpenRecorder 39★, ROR, RecCore, FluxRecorder, plus pola Game Space OEM China.
+
+### `record-zombie-fix` - 2026-11-27
+
+`fix: reap child screenrecord agar tidak ninggalin proses zombie`
+
+Daemon `screenrecord` meninggalkan proses `[screenrecord]` state Z (defunct) setiap kali stop karena `Child` tidak pernah di-`wait()`. Fix: reaper thread `child.wait()` saat spawn.
+
+Testing:
+- device: `record_start std` -> `record_stop` -> `ps -A | grep screenrecord` kosong (tidak ada zombie).
+
 ### `capture-sidepanel-only` - 2026-11-26
 
 `refactor: tangkap hanya di side panel, hapus panel capture dari WebUI`
