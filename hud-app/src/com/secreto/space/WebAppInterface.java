@@ -103,6 +103,28 @@ public class WebAppInterface {
         } catch (Exception ignored) {}
     }
 
+    /**
+     * KernelSU/Magisk root handshake: menjalankan `su -c id` dari UID app.
+     * Permulaan pertama memunculkan dialog Superuser di manager (KernelSU /
+     * Magisk); setelah diizinkan, app terdaftar di daftar Superuser dan
+     * pemanggilan berikutnya senyap mengembalikan "uid=0(...)".
+     * Dipanggil manual dari WebUI (System tab) supaya tidak ada prompt yang
+     * muncul tiba-tiba saat halaman dibuka.
+     */
+    @JavascriptInterface
+    public String requestRoot() {
+        try {
+            Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", "id"});
+            java.io.BufferedReader r = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(p.getInputStream()));
+            String out = r.readLine();
+            p.waitFor();
+            return out != null ? out : "";
+        } catch (Exception e) {
+            return "error: " + e.getMessage();
+        }
+    }
+
     @JavascriptInterface
     public boolean launchGame(String pkg) {
         if (pkg == null || pkg.isEmpty()) return false;

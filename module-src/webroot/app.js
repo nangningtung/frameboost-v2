@@ -1921,6 +1921,28 @@
     });
   }
 
+  // KernelSU root handshake: su -c id lewat bridge app (UID app).
+  // Prompt Superuser muncul sekali; setelah diizinkan, app terdaftar di
+  // daftar Superuser KernelSU dan pemanggilan berikutnya senyap.
+  const btnKsuRoot = document.getElementById("btn-ksu-root");
+  if (btnKsuRoot) {
+    btnKsuRoot.addEventListener("click", async () => {
+      const badge = document.getElementById("ksu-badge");
+      const st = document.getElementById("ksu-status");
+      if (badge) badge.textContent = "REQUESTING";
+      if (btnKsuRoot.disabled === true) return;
+      btnKsuRoot.disabled = true;
+      let out = "";
+      try { out = await window._nativeBridge.requestRoot(); } catch (e) { out = "error: " + e; }
+      btnKsuRoot.disabled = false;
+      const ok = typeof out === "string" && out.startsWith("uid=0");
+      if (badge) badge.textContent = ok ? "GRANTED" : "NOT GRANTED";
+      if (st) st.textContent = ok
+        ? "Status: root diberikan - app terdaftar di Superuser KernelSU"
+        : "Status: belum diizinkan - tekan lagi lalu izinkan dialog KernelSU";
+    });
+  }
+
   if (presetSegmentBtns && presetSegmentBtns.length) {
     presetSegmentBtns.forEach(btn => {
       btn.addEventListener("click", async () => {

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <title>Secreto Space</title>
-  <link rel="stylesheet" href="style.css?v=0.1.0-ui9">
+  <link rel="stylesheet" href="style.css?v=0.1.0-ui10">
 </head>
 <body>
   <div class="app-container">
@@ -644,6 +644,18 @@
           <div id="gos-status" class="status-line">Status: checking for GOS package</div>
         </section>
 
+        <section class="panel" aria-labelledby="ksu-title">
+          <div class="panel-head">
+            <h2 class="panel-title" id="ksu-title">KernelSU access</h2>
+            <span class="badge" id="ksu-badge">UNREGISTERED</span>
+          </div>
+          <p class="panel-note block">Daftarkan app ke KernelSU: tekan sekali, lalu izinkan dialog "Superuser request" untuk com.secreto.space. Setelah diizinkan, app muncul di daftar Superuser KernelSU dengan akses root.</p>
+          <div class="btn-group">
+            <button class="hud-btn secondary" id="btn-ksu-root">Request root access</button>
+          </div>
+          <div id="ksu-status" class="status-line">Status: belum dicek (tekan tombol untuk meminta akses)</div>
+        </section>
+
         <section class="panel">
           <div class="panel-head">
             <h2 class="panel-title">Emergency restore</h2>
@@ -789,6 +801,6 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script src="app.js?v=0.1.0-ui9"></script>
+  <script src="app.js?v=0.1.0-ui10"></script>
 </body>
 </html>
