@@ -420,6 +420,23 @@ Gunakan checklist ini setiap kali ada perubahan.
 
 ## 9. Changelog
 
+### `daemon-panic-resilient` - 2026-11-27
+
+`fix: tick daemon tahan panic + lock anti-poison`
+
+Perubahan:
+- Loop daemon adalah thread di proses yang sama dengan handler IPC — panic
+  yang tidak tertangkap membunuh loop sementara watchdog tetap melihat pid
+  hidup → daemon mati diam-diam dan preset bisa nyangkut sampai reboot.
+- `tick()` kini dibungkus `catch_unwind`: panic dicatat, tick dilewati, loop
+  tetap hidup.
+- 6 `unwrap()` lock (detector/Paused/game_sink) diganti
+  `unwrap_or_else(into_inner)` — lock ter-poison pulih, tidak menjatuhkan
+  thread.
+
+Testing:
+- device: swap OK (23:36), probe IPC menjawab.
+
 ### `daemon-tidy-2` - 2026-11-27
 
 `chore: audit perapian - nol spawn pidof, SF check dikadali, drawable yatim dihapus`

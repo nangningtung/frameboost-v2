@@ -30,7 +30,7 @@ const KEEPALIVE_SECS: u64 = 5;
 static PAUSED_PKG: Mutex<String> = Mutex::new(String::new());
 
 pub fn pause_current(pkg: &str) {
-    let mut p = PAUSED_PKG.lock().unwrap();
+    let mut p = PAUSED_PKG.lock().unwrap_or_else(|e| e.into_inner());
     if pkg.is_empty() {
         p.clear();
     } else {
@@ -115,13 +115,13 @@ impl AutoDaemon {
         // A manual restore pauses Secreto for this game until it leaves the
         // foreground; otherwise keep-alive would undo the restore in 5s.
         {
-            let mut paused = PAUSED_PKG.lock().unwrap();
+            let mut paused = PAUSED_PKG.lock().unwrap_or_else(|e| e.into_inner());
             if !paused.is_empty() && *paused != fg {
                 paused.clear();
             }
         }
         let paused = {
-            let p = PAUSED_PKG.lock().unwrap();
+            let p = PAUSED_PKG.lock().unwrap_or_else(|e| e.into_inner());
             !p.is_empty() && *p == fg
         };
 
@@ -134,7 +134,7 @@ impl AutoDaemon {
         }
 
         let fast_check = {
-            let det = self.detector.read().unwrap();
+            let det = self.detector.read().unwrap_or_else(|e| e.into_inner());
             det.is_game_fast(&fg)
         };
         let is_game = if paused {
@@ -142,7 +142,7 @@ impl AutoDaemon {
         } else {
             match fast_check {
                 Some(val) => val,
-                None => self.detector.write().unwrap().is_game(&fg),
+                None => self.detector.write().unwrap_or_else(|e| e.into_inner()).is_game(&fg),
             }
         };
         let temp_big = read_u32("/sys/class/thermal/thermal_zone0/temp");
@@ -511,9 +511,22 @@ pub fn spawn_auto_daemon(
         let mut daemon = AutoDaemon::new(detector);
         let mut idle_streak: u32 = 0;
         while running.load(Ordering::Relaxed) {
-            let st = daemon.tick();
+            // Panic-resilient tick: the daemon loop is a THREAD inside the
+            // same process as the IPC handlers — an uncaught panic here would
+            // kill the loop while the watchdog keeps seeing a live pid,
+            // leaving presets applied until the next reboot. Swallow the
+            // panic, log it, and keep ticking (best effort).
+            let st = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                daemon.tick()
+            })) {
+                Ok(st) => st,
+                Err(_) => {
+                    log_line("panic: tick gagal, dilewati — daemon tetap hidup");
+                    DaemonState::Idle
+                }
+            };
             state_sink.store(st as u8, Ordering::Relaxed);
-            *game_sink.write().unwrap() = daemon.current_game.clone();
+            *game_sink.write().unwrap_or_else(|e| e.into_inner()) = daemon.current_game.clone();
             // Adaptive polling: 250 ms while a game is active (snappy state
             // machine), a lazy 1 s when idle to cut dumpsys churn ~4x.
             idle_streak = if matches!(st, DaemonState::Idle) {
