@@ -32,6 +32,14 @@ public class MainActivity extends Activity {
 
         setContentView(R.layout.activity_main);
 
+        // Pre-warm the MediaProjection consent token while the user is in the
+        // app (not in-game). Once cached, in-game RECORD starts instantly
+        // without any activity launch. Consent is pre-granted via appops, so
+        // this shows no dialog.
+        if (!RecorderService.hasConsent()) {
+            startActivity(new Intent(this, RecordConsentActivity.class));
+        }
+
         webView = findViewById(R.id.webview);
         bridge = new WebAppInterface(this);
 
