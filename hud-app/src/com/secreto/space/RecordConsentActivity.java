@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.media.projection.MediaProjectionManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.widget.Toast;
 
@@ -52,7 +53,22 @@ public class RecordConsentActivity extends Activity {
     private void askProjection() {
         MediaProjectionManager pm = (MediaProjectionManager)
                 getSystemService(Context.MEDIA_PROJECTION_SERVICE);
-        startActivityForResult(pm.createScreenCaptureIntent(), REQ_PROJECTION);
+        if (Build.VERSION.SDK_INT >= 35) {
+            // Android 15+: force the entire-screen consent (no "single app"
+            // mode). Single-app capture locks to one chosen app and breaks
+            // in-game recording (game restarts / nothing recorded).
+            android.media.projection.MediaProjectionConfig cfg =
+                    android.media.projection.MediaProjectionConfig
+                            .createConfigForDefaultDisplay();
+            startActivityForResult(pm.createScreenCaptureIntent(cfg), REQ_PROJECTION);
+        } else {
+            if (Build.VERSION.SDK_INT >= 34) {
+                android.widget.Toast.makeText(this,
+                        "Pilih 'Seluruh layar' (bukan 'Satu aplikasi') saat dialog muncul",
+                        Toast.LENGTH_LONG).show();
+            }
+            startActivityForResult(pm.createScreenCaptureIntent(), REQ_PROJECTION);
+        }
     }
 
     @Override
