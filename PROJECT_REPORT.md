@@ -420,6 +420,40 @@ Gunakan checklist ini setiap kali ada perubahan.
 
 ## 9. Changelog
 
+### `hud-inproc-powercfg` - 2026-11-27
+
+`feat: HUD in-process Zygisk + kontrak powercfg + standby/fail-safe + poll adaptif`
+
+Perubahan:
+- `inproc-hud/`: modul Zygisk baru (Dobby hook `eglSwapBuffers` + ImGui)
+  yang menggambar HUD FPS/frametime/preset **di dalam proses game**.
+  Toggle via flag `/data/adb/secreto_space/inproc_enable`, target via
+  `inproc_targets.list`, statistik dari `hud_stats.json` (ditulis daemon,
+  throttle 2 s). Off by default; ImGui/Dobby/Magisk zygisk.hpp dicatat di
+  THIRD_PARTY_NOTICES 17-19.
+- Kontrak `powercfg.json` ala uperf/fas-rs (kompatibel Scene): daemon
+  memasang `/data/powercfg.sh`; mode `balance/powersave/performance/fast/auto`
+  dipetakan ke preset global ECO/BALANCED/PERFORMANCE/ESPORTS. Config
+  per-game custom tetap menang. IPC baru: `hud_inproc`, `set_global_preset`.
+- Standby hint ala uperf: layar mati 20 s saat sesi game -> restore stock,
+  re-apply profil saat layar nyala.
+- Fail-safe apply: 3 kegagalan beruntun -> suspend auto-apply sampai transisi
+  state berikutnya (anti write/read-fail loop).
+- Polling adaptif: 250 ms saat game aktif, 1 s saat idle (dumpsys churn turun ~4x).
+- `priority.rs`: buang spawn `pidof` -> scan `/proc/*/cmdline` cache 1 s.
+- WebUI: tombol HUD-IN di quick tools (kedua webroot, ui9); `module.yaml`
+  schema KernelSU-Modules v1 sebagai pendamping `module.prop`.
+
+Testing:
+- build: daemon release tanpa error (1 warning dead_code pre-existing),
+  .so 2.5 MB self-contained (REA: DT_NEEDED hanya lib sistem), APK + ZIP
+  rebuild dengan payload `zygisk/arm64-v8a.so`.
+- device: ReZygisk memuat modul (state.json), inject terverifikasi di
+  `com.secreto.space` (`eglSwapBuffers hooked`); MLBB tertahan denylist
+  umount KSU (per-app) - verifikasi in-game menunggu toggle user.
+- IPC: `hud_inproc` status ok; `set_global_preset fast` -> preset ESPORTS +
+  `cur_powermode.txt`; `/data/powercfg.sh auto` -> kembali ke auto (end-to-end).
+
 ### `preset-remap-safe` - 2026-11-27
 
 `feat: remap preset agar sesuai nama + batas aman termal Exynos 9610`

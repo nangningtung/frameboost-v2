@@ -1,0 +1,24 @@
+# Metadata modul generasi baru (schema KernelSU-Modules/tools).
+# Ditempatkan di samping module.prop untuk kompatibilitas loader KSU/MMRL baru.
+schemaVersion: 1
+id: secreto_space
+name: Secreto Space
+summary: Game space untuk Galaxy A50 (Exynos 9610)
+description: Per-game profiles, background app sleep, in-process HUD (Zygisk), real SurfaceFlinger FPS stats, side panel overlay, dan restore ke stock yang terjamin. Khusus Galaxy A50.
+license: Proprietary
+homepage: https://github.com/nongtothejo/frameboost-v2
+support: https://github.com/nongtothejo/frameboost-v2/issues
+tags:
+  - performance
+  - gaming
+  - tools
+metamodule: false
+authors:
+  - name: nangningtung
+    url: https://github.com/nongtothejo
+compatibility:
+  androidMinApi: 28
+  architectures:
+    - arm64-v8a
+release:
+  assetPattern: SecretoSpace-*.zip
