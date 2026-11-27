@@ -124,6 +124,13 @@ public final class ScreenRecorder {
         MediaProjection projection = pm.getMediaProjection(resultCode, data);
         if (projection == null) throw new IllegalStateException("projection denied");
 
+        // Android requires the callback to be registered before any capture
+        // starts (createVirtualDisplay / AudioPlaybackCapture).
+        final MediaProjection.Callback stopCb = new MediaProjection.Callback() {
+            @Override public void onStop() { stop(); }
+        };
+        projection.registerCallback(stopCb, sMain);
+
         File dir = new File(MOV_DIR);
         if (!dir.exists() && !dir.mkdirs()) throw new IllegalStateException("cannot create " + MOV_DIR);
         final String path = MOV_DIR + "/Secreto_"
@@ -159,11 +166,6 @@ public final class ScreenRecorder {
         } else {
             audio = null;
         }
-
-        final MediaProjection.Callback stopCb = new MediaProjection.Callback() {
-            @Override public void onStop() { stop(); }
-        };
-        projection.registerCallback(stopCb, sMain);
 
         video.start();
         if (audio != null) audio.start();
