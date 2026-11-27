@@ -1195,8 +1195,12 @@ public class OverlayService extends Service {
             recordBusy = true;
             if (btnCaptureRecord != null) btnCaptureRecord.setEnabled(false);
             ScreenRecorder.stop(); // result arrives via ScreenRecorder callback
+        } else if (RecorderService.hasConsent()) {
+            // Consent already granted: start instantly, no dialog, no
+            // leaving the game.
+            RecorderService.requestStart(this, 0, null, recordPreset, audioMode);
         } else {
-            // Consent dialog (mic + projection) needs a foreground activity.
+            // First ever recording (per app process): one consent dialog.
             startActivity(new Intent(this, RecordConsentActivity.class)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         }

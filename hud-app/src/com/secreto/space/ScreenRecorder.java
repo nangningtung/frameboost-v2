@@ -121,8 +121,19 @@ public final class ScreenRecorder {
                               String preset, String audioMode) throws Exception {
         MediaProjectionManager pm = (MediaProjectionManager)
                 ctx.getSystemService(Context.MEDIA_PROJECTION_SERVICE);
-        MediaProjection projection = pm.getMediaProjection(resultCode, data);
-        if (projection == null) throw new IllegalStateException("projection denied");
+        MediaProjection projection;
+        try {
+            projection = pm.getMediaProjection(resultCode, data);
+        } catch (Throwable e) {
+            // Token revoked/expired: drop the cache so the next RECORD tap
+            // asks for consent again.
+            RecorderService.clearConsent();
+            throw e;
+        }
+        if (projection == null) {
+            RecorderService.clearConsent();
+            throw new IllegalStateException("projection denied");
+        }
 
         // Android requires the callback to be registered before any capture
         // starts (createVirtualDisplay / AudioPlaybackCapture).
