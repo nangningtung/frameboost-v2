@@ -420,6 +420,24 @@ Gunakan checklist ini setiap kali ada perubahan.
 
 ## 9. Changelog
 
+### `daemon-tidy-2` - 2026-11-27
+
+`chore: audit perapian - nol spawn pidof, SF check dikadali, drawable yatim dihapus`
+
+Perubahan:
+- `ensure_hud_running`: pidof diganti scan /proc (`priority::pids_of`, cache
+  1 s); `dumpsys SurfaceFlinger --list` (spawn berat) hanya tiap keep-alive
+  ke-4 (~20 s), bukan tiap 5 s.
+- Blob stats eksperimen HUD (`hud_stats.json`) hanya ditulis saat flag
+  eksperimen aktif — tidak ada lagi file yatim saat eksperimen di-shelve.
+- `hud.rs`: tambah `enabled()`; `priority.rs`: `pids_of` jadi pub.
+- Hapus drawable yatim: `bg_bubble.xml`, `bg_metric_card.xml`.
+- Build daemon: **nol warning** (termasuk warning dead_code lama yang hilang
+  setelah pembersihan sebelumnya).
+
+Testing:
+- device: daemon swap OK, probe IPC menjawab (device a50/SM-A505F/Android 16).
+
 ### `inproc-hud-shelved` - 2026-11-27
 
 `chore: HUD in-process dikeluarkan dari payload, tetap di repo sebagai eksperimen`

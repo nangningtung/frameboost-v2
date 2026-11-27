@@ -80,6 +80,7 @@ pub struct AutoDaemon {
     screen_off_since: Option<Instant>,
     standby_active: bool,
     last_hud_poll: Instant,
+    sf_check_skip: u32,
 }
 
 impl AutoDaemon {
@@ -97,6 +98,7 @@ impl AutoDaemon {
             screen_off_since: None,
             standby_active: false,
             last_hud_poll: Instant::now(),
+            sf_check_skip: 0,
         }
     }
 
@@ -281,8 +283,9 @@ impl AutoDaemon {
             }
         }
 
-        // In-process HUD stats blob (throttled to 2 s, cheap file write).
+        // In-process HUD stats blob (hanya saat eksperimen aktif, throttle 2 s).
         if !self.current_game.is_empty()
+            && crate::hud::enabled()
             && self.last_hud_poll.elapsed() >= Duration::from_secs(2)
         {
             self.last_hud_poll = Instant::now();
@@ -342,17 +345,23 @@ impl AutoDaemon {
     /// service, pins its oom_score_adj and verifies that the overlay layer is
     /// actually present (a live service with no window is still a dead HUD).
     fn ensure_hud_running(&mut self) {
-        let pids = run_cmd("pidof", &["com.secreto.space"]);
-        if pids.trim().is_empty() {
+        let pids = crate::priority::pids_of("com.secreto.space");
+        if pids.is_empty() {
             self.start_hud_service();
             self.hud_miss = 0;
             return;
         }
 
-        for p in pids.split_whitespace() {
-            if !p.is_empty() {
-                let _ = fs::write(format!("/proc/{}/oom_score_adj", p), "-800");
-            }
+        for p in &pids {
+            let _ = fs::write(format!("/proc/{}/oom_score_adj", p), "-800");
+        }
+
+        // `dumpsys SurfaceFlinger --list` is a heavy spawn: only run it every
+        // 4th keep-alive (~20 s) instead of every tick; the other ticks just
+        // proved the app process is alive via /proc.
+        self.sf_check_skip = self.sf_check_skip.saturating_add(1);
+        if self.sf_check_skip % 4 != 0 {
+            return;
         }
 
         let layers = run_cmd("dumpsys", &["SurfaceFlinger", "--list"]);

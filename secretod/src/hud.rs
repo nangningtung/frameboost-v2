@@ -17,6 +17,12 @@ const TARGETS_PATH: &str = "/data/adb/secreto_space/inproc_targets.list";
 
 static LAST_WRITE: Mutex<Option<Instant>> = Mutex::new(None);
 
+/// Enable flag ada? Dipakai daemon supaya blob stats tidak ditulis saat
+/// eksperimen tidak aktif.
+pub fn enabled() -> bool {
+    fs::metadata(ENABLE_PATH).is_ok()
+}
+
 /// Write the stats blob the in-process HUD reads. Throttled to 2 s so the
 /// daemon tick can call this unconditionally.
 pub fn write_stats(game: &str, preset: &str, fps: Option<f64>) {
