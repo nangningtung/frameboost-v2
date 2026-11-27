@@ -420,6 +420,23 @@ Gunakan checklist ini setiap kali ada perubahan.
 
 ## 9. Changelog
 
+### `inproc-hud-shelved` - 2026-11-27
+
+`chore: HUD in-process dikeluarkan dari payload, tetap di repo sebagai eksperimen`
+
+Perubahan:
+- `module-src/zygisk/` dihapus dari payload; `customize.sh` bersih dari blok
+  zygisk; tombol HUD-IN dihapus dari WebUI (kedua webroot, ui11).
+- Kode `inproc-hud/` + `hud.rs` + IPC `hud_inproc` tetap di repo
+  (eksperimen terdokumentasi; bisa dipasang manual bila dibutuhkan).
+- Alasan: MLBB render Vulkan (hook GL tidak kena frame), risiko anticheat,
+  dan pelajaran deployment — zygisk .so dipetakan zygote sejak boot;
+  menimpa in-place dengan `cp` membuat semua app crash hingga reboot.
+- Verifikasi: inject terbukti jalan di proses com.secreto.space & MLBB
+  (match + eglSwapBuffers hooked), bridge daemon→hud_stats.json bekerja
+  (fps 8.3 saat lobby loading). Side panel + FPS overlay tetap jalan
+  in-game (terlihat di screenshot MLBB).
+
 ### `ksu-root-handshake` - 2026-11-27
 
 `feat: tombol KernelSU access + perapian daemon`

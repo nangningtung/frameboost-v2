@@ -123,6 +123,11 @@ static void draw_hud(float dt) {
 }
 
 static EGLBoolean swap_hook(EGLDisplay dpy, EGLSurface surface) {
+    static bool logged_first = false;
+    if (!logged_first) {
+        LOGI("swap called: GL present terdeteksi (frame pertama)");
+        logged_first = true;
+    }
     auto now = std::chrono::steady_clock::now();
     double ms = g_has_last
                     ? std::chrono::duration<double, std::milli>(now - g_last).count()

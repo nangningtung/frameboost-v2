@@ -342,6 +342,18 @@ pemicu anticheat, tidak perlu build per game). Teknik ImGui relevan bila suatu
 saat butuh HUD yang ter-tie ke frame game (60 fps ikut vsync game), tapi biaya
 turnamen/risk anticheat tinggi. **Keputusan: tetap window overlay.**
 
+**Update keputusan (2026-11-27 malam)**: eksperimen `inproc-hud/` berhasil
+sebagai riset (injeksi terverifikasi di proses app + MLBB setelah umount
+dimatikan; hook `eglSwapBuffers` terpasang; bridge daemon→HUD bekerja),
+tapi **di-shelve dari payload produksi**: (1) MLBB ternyata render via
+Vulkan sehingga hook GL tidak pernah kena frame — butuh renderer Vulkan
+baru yang berat; (2) risiko anticheat untuk akun user; (3) pelajaran
+deployment: **file zygisk .so dipetakan zygote sejak boot — jangan pernah
+timpa in-place dengan `cp`** (mapping kotor membuat SEMUA app baru crash
+`execute non-executable memory` hingga reboot). Ganti selalu dengan
+inode baru (`mv`) + reboot. Kode eksperimen tetap di repo (`inproc-hud/`),
+payload modul bersih tanpa `zygisk/`.
+
 ## 14. Metadata modul generasi baru
 
 AZenith `module.yaml` memakai **schema resmi `KernelSU-Modules/tools`

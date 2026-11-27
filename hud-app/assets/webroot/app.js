@@ -34,8 +34,6 @@
   const lblQuickBypass = document.getElementById("lbl-quick-bypass");
   const lblQuickDnd = document.getElementById("lbl-quick-dnd");
   const lblQuickGosWeb = document.getElementById("lbl-quick-gos-web");
-  const btnQuickHud = document.getElementById("btn-quick-hud");
-  const lblQuickHud = document.getElementById("lbl-quick-hud");
   const presetSegmentBtns = document.querySelectorAll(".preset-segment-btn[data-preset]");
   const gpuBusyFill = document.getElementById("gpu-busy-fill");
   const gpuBusyText = document.getElementById("gpu-busy-text");
@@ -901,7 +899,6 @@
           setDaemonActions(true);
           setEngineBadge(true);
           refreshGosStatus();
-          refreshHudInprocStatus();
         }
         renderSnapshot(snap);
         if (daemonStatus) {
@@ -1896,28 +1893,6 @@
       if (lblQuickGosWeb) lblQuickGosWeb.textContent = targetDisable ? "GOS KILLED" : "GOS BYPASS";
       await sendSocketCmd(targetDisable ? "gos_disable" : "gos_restore");
       setTimeout(refreshGosStatus, 300);
-    });
-  }
-
-  // In-process HUD (Zygisk) toggle: flips /data/adb/secreto_space/inproc_enable.
-  function refreshHudInprocStatus(res) {
-    const apply = (j) => {
-      if (!j || j.status !== "ok") return;
-      const on = !!j.enabled;
-      if (btnQuickHud) btnQuickHud.classList.toggle("active", on);
-      if (lblQuickHud) lblQuickHud.textContent = on ? "HUD-IN ON" : "HUD-IN OFF";
-    };
-    if (res && typeof res === "string") {
-      try { apply(JSON.parse(res)); } catch (e) {}
-    } else {
-      sendSocketCmd("hud_inproc").then((r) => { try { apply(JSON.parse(r)); } catch (e) {} });
-    }
-  }
-
-  if (btnQuickHud) {
-    btnQuickHud.addEventListener("click", async () => {
-      const res = await sendSocketCmd("hud_inproc toggle");
-      refreshHudInprocStatus(res);
     });
   }
 
