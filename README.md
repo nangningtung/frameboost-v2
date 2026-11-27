@@ -9,7 +9,10 @@ This module is device locked on purpose. `customize.sh` aborts the install and
 
 ## Features
 
-- **Native Rust daemon (`secretod`)**: low memory footprint, no shell fork during polling.
+- **Native Rust daemon (`secretod`)**: low memory footprint, adaptive polling (250 ms in-game, 1 s idle), panic-resilient loop (catch_unwind + poison-recovering locks).
+- **Scene-compatible `powercfg.json` contract**: `sh /data/powercfg.sh balance|powersave|performance|fast|auto` switches the global preset from any ecosystem UI.
+- **Standby hint**: screen off for 20 s during a session restores stock floors; re-applies the profile when the screen returns.
+- **Fail-safe apply**: 3 consecutive apply failures suspend auto-apply instead of fighting the knob in a loop.
 - **Safety engine**: readback verification, stock snapshot, automatic rollback on exit or reboot.
 - **4-layer game detection**:
   - `config.sh` static list (`GAME_PKGS`)

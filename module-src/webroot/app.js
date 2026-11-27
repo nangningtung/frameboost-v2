@@ -1530,7 +1530,6 @@
 
   const gamesListView = document.getElementById("games-list-view");
   const gameDetailView = document.getElementById("game-detail-view");
-  const gamesToolbar = document.getElementById("games-toolbar");
   let selectedGamePkg = "";
 
   function openGameDetail(pkg) {
@@ -1558,7 +1557,6 @@
       btn.classList.toggle("active", btn.dataset.preset === (game.preset || "").toLowerCase());
     });
     if (gamesListView) gamesListView.classList.add("hidden");
-    if (gamesToolbar) gamesToolbar.classList.add("hidden");
     if (addGameModal) addGameModal.classList.add("hidden");
     if (gameDetailView) gameDetailView.classList.remove("hidden");
     setReportsExpanded(false);
@@ -1572,7 +1570,6 @@
     selectedGamePkg = "";
     if (gameDetailView) gameDetailView.classList.add("hidden");
     if (gamesListView) gamesListView.classList.remove("hidden");
-    if (gamesToolbar) gamesToolbar.classList.remove("hidden");
   }
 
   document.getElementById("btn-close-game-detail")?.addEventListener("click", closeGameDetail);
