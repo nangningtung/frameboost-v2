@@ -131,24 +131,55 @@ public final class ScreenRecorder {
         };
         projection.registerCallback(stopCb, sMain);
 
-        File dir = new File(MOV_DIR);
-        if (!dir.exists() && !dir.mkdirs()) throw new IllegalStateException("cannot create " + MOV_DIR);
-        final String path = MOV_DIR + "/Secreto_"
-                + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date()) + ".mp4";
+        String stamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
+        final String path = MOV_DIR + "/Secreto_" + stamp + ".mp4";
+
+        // ROR pattern: write directly to MediaStore (IS_PENDING), so the
+        // file is properly indexed in the gallery without a manual scan.
+        android.content.ContentResolver resolver = ctx.getContentResolver();
+        android.net.Uri videoUri = null;
+        android.os.ParcelFileDescriptor pfd = null;
+        try {
+            android.content.ContentValues cv = new android.content.ContentValues();
+            cv.put(android.provider.MediaStore.Video.Media.TITLE, "Secreto Recording " + stamp);
+            cv.put(android.provider.MediaStore.Video.Media.DISPLAY_NAME, new File(path).getName());
+            cv.put(android.provider.MediaStore.Video.Media.MIME_TYPE, "video/mp4");
+            cv.put(android.provider.MediaStore.Video.Media.DATE_ADDED,
+                    System.currentTimeMillis() / 1000);
+            cv.put(android.provider.MediaStore.Video.Media.RELATIVE_PATH, "Movies/Secreto Space");
+            cv.put(android.provider.MediaStore.Video.Media.IS_PENDING, 1);
+            videoUri = resolver.insert(
+                    android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI, cv);
+            if (videoUri != null) {
+                pfd = resolver.openFileDescriptor(videoUri, "rw");
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "MediaStore insert error: " + t.getMessage());
+        }
 
         Display display = ((DisplayManager) ctx.getSystemService(Context.DISPLAY_SERVICE))
                 .getDisplay(Display.DEFAULT_DISPLAY);
         android.util.DisplayMetrics dm = new android.util.DisplayMetrics();
         display.getRealMetrics(dm);
+        // ROR pattern: derive short/long edge from the aspect ratio so the
+        // 480p/720p presets stay correct in both orientations, then force
+        // even dimensions (H.264 requirement).
         int w = dm.widthPixels, h = dm.heightPixels;
+        boolean portrait = h > w;
         int target = targetShortSide(preset);
         if (target > 0 && Math.min(w, h) > target) {
-            float f = target / (float) Math.min(w, h);
-            w = Math.max(16, ((int) (w * f)) & ~1);
-            h = Math.max(16, ((int) (h * f)) & ~1);
+            int shortEdge = target;
+            double aspect = (double) Math.max(w, h) / Math.min(w, h);
+            int longEdge = (int) Math.round(shortEdge * aspect);
+            w = portrait ? shortEdge : longEdge;
+            h = portrait ? longEdge : shortEdge;
         }
+        w = (w / 2) * 2;
+        h = (h / 2) * 2;
 
-        MediaMuxer muxer = new MediaMuxer(path, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+        MediaMuxer muxer = pfd != null
+                ? new MediaMuxer(pfd.getFileDescriptor(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+                : new MediaMuxer(path, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
         MuxerSync sync = new MuxerSync(muxer, "off".equals(audioMode) ? 1 : 2);
         long originNano = System.nanoTime();
 
@@ -186,16 +217,34 @@ public final class ScreenRecorder {
         }
         muxer.release();
 
-        File f = new File(path);
-        if (!f.exists() || f.length() < 4096) throw new IllegalStateException("output too small");
-        mediaScan(ctx, path);
+        // Publish the MediaStore entry (clear IS_PENDING) and validate size.
+        long outSize = 0;
+        try {
+            if (pfd != null) {
+                outSize = pfd.getStatSize();
+                pfd.close();
+            }
+        } catch (Throwable ignored) {}
+        if (outSize == 0) {
+            File f = new File(path);
+            outSize = f.exists() ? f.length() : 0;
+        }
+        if (videoUri != null) {
+            try {
+                android.content.ContentValues done = new android.content.ContentValues();
+                done.put(android.provider.MediaStore.Video.Media.IS_PENDING, 0);
+                resolver.update(videoUri, done, null, null);
+            } catch (Throwable t) {
+                Log.w(TAG, "MediaStore publish: " + t.getMessage());
+            }
+        }
+        if (outSize < 4096) {
+            if (videoUri != null) {
+                try { resolver.delete(videoUri, null, null); } catch (Throwable ignored) {}
+            }
+            throw new IllegalStateException("output too small");
+        }
         return path;
-    }
-
-    private static void mediaScan(Context ctx, String path) {
-        Intent scan = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
-        scan.setData(android.net.Uri.fromFile(new File(path)));
-        ctx.sendBroadcast(scan);
     }
 
     /**
@@ -237,7 +286,7 @@ public final class ScreenRecorder {
     // ------------------------------------------------------------------ video
 
     private static final class VideoEncoder implements Stoppable {
-        private final MediaCodec codec;
+        private MediaCodec codec;
         private final MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
         private final android.hardware.display.VirtualDisplay vd;
         private final MuxerSync sync;
@@ -254,7 +303,16 @@ public final class ScreenRecorder {
             fmt.setInteger(MediaFormat.KEY_FRAME_RATE, 30);
             fmt.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
             codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC);
-            codec.configure(fmt, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+            // ROR records at 60 fps; fall back to 30 if the encoder refuses.
+            fmt.setInteger(MediaFormat.KEY_FRAME_RATE, 60);
+            try {
+                codec.configure(fmt, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+            } catch (Exception e) {
+                codec.release();
+                codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC);
+                fmt.setInteger(MediaFormat.KEY_FRAME_RATE, 30);
+                codec.configure(fmt, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+            }
             vd = projection.createVirtualDisplay("SecretoRec", w, h, dpi,
                     DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                     codec.createInputSurface(), null, null);
