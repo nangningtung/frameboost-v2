@@ -1,6 +1,10 @@
 package com.secreto.space.ui
 
 import android.content.Context
+import android.util.LruCache
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
@@ -334,16 +338,27 @@ private fun sourceLabel(source: String): String = when (source) {
     else -> "BUILTIN"
 }
 
+/**
+ * Cache ikon lintas komposisi. Tanpa ini setiap kartu yang dibuat ulang (pindah
+ * halaman carousel, scroll grid) men-decode ikon dari PackageManager lagi.
+ */
+private val appIconCache = LruCache<String, ImageBitmap>(96)
+
 @Composable
 private fun rememberAppIcon(pkg: String, px: Int): ImageBitmap? {
     val context = LocalContext.current
+    val key = "$pkg@$px"
+    // Ambil dari cache secara sinkron: kartu yang sudah pernah tampil langsung
+    // punya ikon tanpa kedip.
+    val cached = appIconCache.get(key)
+    if (cached != null) return cached
     // Muat ikon di IO dispatcher: getApplicationIcon + toBitmap lumayan berat dan
     // kalau jalan di main thread bikin frame patah-patah saat pertama render.
-    return produceState<ImageBitmap?>(initialValue = null, pkg, px) {
+    return produceState<ImageBitmap?>(initialValue = null, key) {
         value = withContext(Dispatchers.IO) {
-            runCatching {
+            appIconCache.get(key) ?: runCatching {
                 context.packageManager.getApplicationIcon(pkg).toBitmap(px, px).asImageBitmap()
-            }.getOrNull()
+            }.getOrNull()?.also { appIconCache.put(key, it) }
         }
     }.value
 }
@@ -867,20 +882,26 @@ private fun CoverCard(
     onClick: () -> Unit,
     bottomAction: (@Composable () -> Unit)? = null,
 ) {
-    val hue = game.hue()
+    val hue = remember(game.pkg) { game.hue() }
     val icon = rememberAppIcon(game.pkg, 128)
+    val cardBrush = remember(hue) {
+        Brush.linearGradient(
+            listOf(
+                Color.hsv(hue, 0.62f, 0.36f),
+                Color.hsv((hue + 40f) % 360f, 0.55f, 0.19f),
+                Color.hsv((hue + 70f) % 360f, 0.50f, 0.10f),
+            )
+        )
+    }
+    val glowBrush = remember(hue) {
+        Brush.radialGradient(
+            listOf(Color.hsv(hue, 0.7f, 1f).copy(alpha = 0.34f), Color.Transparent)
+        )
+    }
     Box(
         modifier = modifier
             .clip(CARD_SHAPE)
-            .background(
-                Brush.linearGradient(
-                    listOf(
-                        Color.hsv(hue, 0.62f, 0.36f),
-                        Color.hsv((hue + 40f) % 360f, 0.55f, 0.19f),
-                        Color.hsv((hue + 70f) % 360f, 0.50f, 0.10f),
-                    )
-                )
-            )
+            .background(cardBrush)
             .border(
                 width = if (active) 1.5.dp else 1.dp,
                 color = Color.White.copy(alpha = if (active) 0.32f else 0.10f),
@@ -893,12 +914,7 @@ private fun CoverCard(
             modifier = Modifier
                 .align(Alignment.Center)
                 .size(180.dp)
-                .background(
-                    Brush.radialGradient(
-                        listOf(Color.hsv(hue, 0.7f, 1f).copy(alpha = 0.34f), Color.Transparent)
-                    ),
-                    CircleShape
-                )
+                .background(glowBrush, CircleShape)
         )
 
         Column(
@@ -1001,7 +1017,6 @@ private fun GameGrid(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 6.dp)
     ) {
         val columns = when {
@@ -1009,17 +1024,21 @@ private fun GameGrid(
             maxWidth >= 600.dp -> 3
             else -> 2
         }
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            games.chunked(columns).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    row.forEach { game ->
-                        CoverCard(
-                            game = game,
-                            live = game.pkg == sessionPkg,
-                            active = false,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(GRID_TILE_HEIGHT),
+        // Lazy: hanya kartu yang terlihat yang dikomposisi dan di-layout.
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(columns),
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            gridItems(games, key = { it.pkg }) { game ->
+                CoverCard(
+                    game = game,
+                    live = game.pkg == sessionPkg,
+                    active = false,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(GRID_TILE_HEIGHT),
                             onClick = { onTune(game) },
                             bottomAction = {
                                 Row(
@@ -1057,9 +1076,6 @@ private fun GameGrid(
                                 }
                             }
                         )
-                    }
-                    repeat(columns - row.size) { Spacer(modifier = Modifier.weight(1f)) }
-                }
             }
         }
     }
