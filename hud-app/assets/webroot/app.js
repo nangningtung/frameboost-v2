@@ -120,11 +120,17 @@
   let carouselFiltered = [];
   const frametimeHistory = [];
   const MAX_FRAMETIME_POINTS = 45;
+  let lastGraphFps = null;
+  let lastActiveCardPkg = null;
 
   function renderFrametimeGraph(fps) {
     if (!frametimeCanvas) return;
+    // Keep the history moving, but avoid a full canvas redraw when the
+    // telemetry value did not change. This is common while a game is idle.
+    if (lastGraphFps === fps) return;
     const ctx = frametimeCanvas.getContext("2d");
     if (!ctx) return;
+    lastGraphFps = fps;
 
     const ft = fps > 0 ? 1000 / fps : 0;
     frametimeHistory.push(ft);
@@ -761,7 +767,8 @@
   }
 
   function updateActiveGameCard() {
-    if (!gamesContainer) return;
+    if (!gamesContainer || lastActiveCardPkg === currentForegroundPkg) return;
+    lastActiveCardPkg = currentForegroundPkg;
     const cards = gamesContainer.querySelectorAll(".game-item");
     cards.forEach((card) => {
       const pkg = card.dataset.pkg;
@@ -1191,6 +1198,8 @@
   let swipeLastX = 0;
   let swipeLastT = 0;
   let swipeVelocity = 0;
+  let dragFrame = 0;
+  let pendingDragPx = 0;
 
   function bindCarouselSwipe() {
     if (!carouselStage) return;
@@ -1319,7 +1328,14 @@
   // dragPx > 0 = dragging right (prev), dragPx < 0 = dragging left (next).
   function applyDragOffset(games, dragPx) {
     if (!games || games.length === 0) return;
-    layoutCarousel(dragPx, true); // true = no transition during drag
+    pendingDragPx = dragPx;
+    if (dragFrame) return;
+    // Coalesce high-frequency touchmove/mousemove events to one compositor
+    // update per display frame instead of doing layout work for every event.
+    dragFrame = requestAnimationFrame(() => {
+      dragFrame = 0;
+      layoutCarousel(pendingDragPx, true);
+    });
   }
 
   // Compute and apply transform/opacity/zIndex for every card.
@@ -1477,26 +1493,8 @@
       });
     });
 
-    // Hero Play button (rebind each time since games array may change)
-    if (carouselHeroPlay) {
-      carouselHeroPlay.addEventListener("click", () => {
-        const pkg = carouselHeroPlay.dataset.pkg;
-        if (!pkg) return;
-        if (window._nativeBridge && typeof window._nativeBridge.launchGame === "function") {
-          window._nativeBridge.launchGame(pkg);
-        } else {
-          showToast("Could not launch game. Make sure it is installed.");
-        }
-      });
-    }
-
-    // Hero Tune button opens detail
-    if (carouselHeroTune) {
-      carouselHeroTune.addEventListener("click", () => {
-        const activeCard = carouselStage.querySelector(".cover-card-active");
-        if (activeCard) openGameDetail(activeCard.dataset.pkg);
-      });
-    }
+    // Hero actions are bound once during initialization. Rebinding here on
+    // every swipe used to stack click handlers and launch/open detail multiple times.
   }
 
   function setGamesViewMode(mode) {
@@ -1846,6 +1844,21 @@
   // Bind carousel swipe gestures (safe to call once; stage re-renders but
   // the touch listeners live on the parent element).
   bindCarouselSwipe();
+
+  // Bind carousel hero actions once; updateHeroAndDots only updates state.
+  carouselHeroPlay?.addEventListener("click", () => {
+    const pkg = carouselHeroPlay.dataset.pkg;
+    if (!pkg) return;
+    if (window._nativeBridge && typeof window._nativeBridge.launchGame === "function") {
+      window._nativeBridge.launchGame(pkg);
+    } else {
+      showToast("Could not launch game. Make sure it is installed.");
+    }
+  });
+  carouselHeroTune?.addEventListener("click", () => {
+    const activeCard = carouselStage?.querySelector(".cover-card-active");
+    if (activeCard) openGameDetail(activeCard.dataset.pkg);
+  });
 
   // Initial load of games
   loadGames();
