@@ -1,5 +1,6 @@
 package com.secreto.space
 
+import android.Manifest
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -24,15 +25,22 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -41,9 +49,11 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontFamily
@@ -51,6 +61,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.secreto.space.ui.HomeScreen
+import com.secreto.space.ui.GamesScreen
+import com.secreto.space.ui.SystemScreen
 import com.secreto.space.ui.SecretoTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -60,8 +73,8 @@ import kotlinx.coroutines.withContext
 /**
  * Secreto Space — Manager native (Compose), tema Pixel/Material You.
  *
- * Alur: onboarding pertama kali (izin overlay → grant root → link daemon →
- * boot hand-off) lalu Home. Side panel overlay tidak tersentuh.
+ * Alur: onboarding pertama kali → navigasi 3 tab (Beranda / Game / Sistem).
+ * Side panel in-game dan daemon tidak tersentuh.
  */
 class MainActivity : ComponentActivity() {
     private val prefs by lazy {
@@ -75,7 +88,7 @@ class MainActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     var onboarded by remember { mutableStateOf(prefs.getBoolean("onboarded", false)) }
                     if (onboarded) {
-                        ManagerHome(onOpenLegacy = { openLegacyConsole() })
+                        AppNav(onOpenLegacy = { openLegacyConsole() })
                     } else {
                         OnboardingFlow(
                             onFinished = {
@@ -91,6 +104,45 @@ class MainActivity : ComponentActivity() {
 
     private fun openLegacyConsole() {
         startActivity(Intent(this, LegacyWebViewActivity::class.java))
+    }
+}
+
+private enum class Tab(val label: String, val icon: ImageVector) {
+    Home("Beranda", Icons.Filled.Home),
+    Games("Game", Icons.Filled.Star),
+    System("Sistem", Icons.Filled.Settings),
+}
+
+@Composable
+private fun AppNav(onOpenLegacy: () -> Unit) {
+    // Game library is the front door: Secreto Space should feel like a game hub,
+    // not a diagnostics dashboard.
+    var tab by rememberSaveable { mutableIntStateOf(Tab.Games.ordinal) }
+    Scaffold(
+        bottomBar = {
+            NavigationBar {
+                Tab.entries.forEach { t ->
+                    NavigationBarItem(
+                        selected = tab == t.ordinal,
+                        onClick = { tab = t.ordinal },
+                        icon = { Icon(t.icon, contentDescription = t.label) },
+                        label = { Text(t.label) }
+                    )
+                }
+            }
+        }
+    ) { pad ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(pad)
+        ) {
+            when (tab) {
+                0 -> HomeScreen()
+                1 -> GamesScreen()
+                else -> SystemScreen(onOpenLegacy = onOpenLegacy)
+            }
+        }
     }
 }
 
