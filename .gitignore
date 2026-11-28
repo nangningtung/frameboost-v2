@@ -22,3 +22,9 @@ Thumbs.db
 .vscode/
 .idea/
 inproc-hud/third_party/imgui/
+
+# Manager app (Gradle/Compose)
+manager/.gradle/
+manager/build/
+manager/app/build/
+manager/local.properties

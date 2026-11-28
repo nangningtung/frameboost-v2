@@ -1,0 +1,254 @@
+package com.secreto.space;
+
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.os.Build;
+import android.provider.Settings;
+import android.webkit.JavascriptInterface;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+
+public class WebAppInterface {
+    private final Context context;
+    private final android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+
+    public WebAppInterface(Context context) {
+        this.context = context;
+    }
+
+    @JavascriptInterface
+    public String exec(String cmd) {
+        if (cmd == null || cmd.isEmpty()) return "";
+
+        // Fast path 1: Reading snapshot JSON
+        if (cmd.contains("secreto-snapshot.json")) {
+            File f = new File("/data/local/tmp/secreto-snapshot.json");
+            if (f.exists() && f.canRead()) {
+                try (BufferedReader br = new BufferedReader(new FileReader(f))) {
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = br.readLine()) != null) sb.append(line);
+                    return sb.toString();
+                } catch (Exception ignored) {}
+            }
+            String snap = IpcClient.sendCommand("snapshot");
+            return snap != null ? snap : "";
+        }
+
+        // Fast path 2: Socket command
+        if (cmd.contains("secreto.sock")) {
+            String snap = IpcClient.sendCommand("snapshot");
+            return snap != null ? snap : "";
+        }
+
+        // General shell execution via su for full root capability
+        try {
+            Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", cmd});
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (sb.length() > 0) sb.append("\n");
+                    sb.append(line);
+                }
+                return sb.toString();
+            }
+        } catch (Exception ignored) {}
+
+        return "";
+    }
+
+    @JavascriptInterface
+    public String sendSocket(String sockCmd) {
+        if (sockCmd == null || sockCmd.isEmpty()) return "";
+        String res = IpcClient.sendCommand(sockCmd);
+        return res != null ? res : "";
+    }
+
+    @JavascriptInterface
+    public void sendSocketAsync(String sockCmd, String callbackName) {
+        if (sockCmd == null || sockCmd.isEmpty() || callbackName == null || callbackName.isEmpty()) return;
+        new Thread(() -> {
+            String res = IpcClient.sendCommand(sockCmd);
+            String json = org.json.JSONObject.quote(res != null ? res : "");
+            mainHandler.post(() -> {
+                if (context instanceof android.app.Activity) {
+                    android.webkit.WebView webView = ((android.app.Activity) context).findViewById(R.id.webview);
+                    if (webView != null) webView.evaluateJavascript(callbackName + "(" + json + ");", null);
+                }
+            });
+        }, "secreto-ipc").start();
+    }
+
+    @JavascriptInterface
+    public void triggerHaptic() {
+        try {
+            android.os.Vibrator v = (android.os.Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
+            if (v != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    v.vibrate(android.os.VibrationEffect.createOneShot(25, android.os.VibrationEffect.DEFAULT_AMPLITUDE));
+                } else {
+                    v.vibrate(25);
+                }
+            }
+        } catch (Exception ignored) {}
+    }
+
+    /**
+     * KernelSU/Magisk root handshake: menjalankan `su -c id` dari UID app.
+     * Permulaan pertama memunculkan dialog Superuser di manager (KernelSU /
+     * Magisk); setelah diizinkan, app terdaftar di daftar Superuser dan
+     * pemanggilan berikutnya senyap mengembalikan "uid=0(...)".
+     * Dipanggil manual dari WebUI (System tab) supaya tidak ada prompt yang
+     * muncul tiba-tiba saat halaman dibuka.
+     */
+    @JavascriptInterface
+    public String requestRoot() {
+        try {
+            Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", "id"});
+            java.io.BufferedReader r = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(p.getInputStream()));
+            String out = r.readLine();
+            p.waitFor();
+            return out != null ? out : "";
+        } catch (Exception e) {
+            return "error: " + e.getMessage();
+        }
+    }
+
+    @JavascriptInterface
+    public boolean launchGame(String pkg) {
+        if (pkg == null || pkg.isEmpty()) return false;
+        try {
+            Intent intent = context.getPackageManager().getLaunchIntentForPackage(pkg);
+            if (intent != null) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(intent);
+                return true;
+            }
+        } catch (Exception ignored) {}
+        return false;
+    }
+
+    @JavascriptInterface
+    public String getInstalledApps() {
+        try {
+            PackageManager pm = context.getPackageManager();
+            List<ApplicationInfo> apps = pm.getInstalledApplications(PackageManager.GET_META_DATA);
+            ArrayList<String> entries = new ArrayList<>();
+            for (ApplicationInfo ai : apps) {
+                // Only third-party (non-system) apps
+                if ((ai.flags & ApplicationInfo.FLAG_SYSTEM) != 0) continue;
+                String pkg = ai.packageName;
+                if (pkg == null || pkg.isEmpty()) continue;
+                String label = pm.getApplicationLabel(ai).toString();
+                if (label == null || label.isEmpty()) label = pkg;
+                entries.add("{\"pkg\":\"" + escapeJson(pkg) + "\",\"label\":\"" + escapeJson(label) + "\"}");
+            }
+            Collections.sort(entries, new Comparator<String>() {
+                @Override
+                public int compare(String a, String b) {
+                    return a.toLowerCase().compareTo(b.toLowerCase());
+                }
+            });
+            StringBuilder sb = new StringBuilder("[");
+            for (int i = 0; i < entries.size(); i++) {
+                if (i > 0) sb.append(",");
+                sb.append(entries.get(i));
+            }
+            sb.append("]");
+            return sb.toString();
+        } catch (Exception e) {
+            return "[]";
+        }
+    }
+
+    @JavascriptInterface
+    public void getGameArt(String pkg, String callbackName) {
+        if (pkg == null || pkg.isEmpty() || callbackName == null || callbackName.isEmpty()) return;
+        new Thread(() -> {
+            String json = GameArt.load(context, pkg);
+            String quoted = org.json.JSONObject.quote(json);
+            mainHandler.post(() -> {
+                if (context instanceof android.app.Activity) {
+                    android.webkit.WebView webView = ((android.app.Activity) context).findViewById(R.id.webview);
+                    if (webView != null) webView.evaluateJavascript(callbackName + "(" + quoted + ");", null);
+                }
+            });
+        }, "secreto-art").start();
+    }
+
+    private static String escapeJson(String s) {
+        if (s == null) return "";
+        StringBuilder sb = new StringBuilder();
+        for (char c : s.toCharArray()) {
+            switch (c) {
+                case '"': sb.append("\\\""); break;
+                case '\\': sb.append("\\\\"); break;
+                case '\n': sb.append("\\n"); break;
+                case '\r': sb.append("\\r"); break;
+                case '\t': sb.append("\\t"); break;
+                default:
+                    if (c < 0x20) {
+                        sb.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        sb.append(c);
+                    }
+            }
+        }
+        return sb.toString();
+    }
+
+    @JavascriptInterface
+    public boolean isHudRunning() {
+        return OverlayService.isRunning();
+    }
+
+    @JavascriptInterface
+    public boolean canDrawOverlays() {
+        return Settings.canDrawOverlays(context);
+    }
+
+    @JavascriptInterface
+    public void requestOverlayPermission() {
+        try {
+            Intent intent = new Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + context.getPackageName())
+            );
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+        } catch (Exception ignored) {}
+    }
+
+    @JavascriptInterface
+    public void setHudEnabled(boolean enable) {
+        // Persist the master switch: MainActivity and BootReceiver only
+        // auto-start the overlay when the user last left it enabled.
+        context.getSharedPreferences("hud_prefs", Context.MODE_PRIVATE)
+                .edit().putBoolean("hud_master_enabled", enable).apply();
+        Intent intent = new Intent(context, OverlayService.class);
+        if (enable) {
+            if (Settings.canDrawOverlays(context)) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent);
+                } else {
+                    context.startService(intent);
+                }
+            } else {
+                requestOverlayPermission();
+            }
+        } else {
+            context.stopService(intent);
+        }
+    }
+}

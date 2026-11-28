@@ -1,0 +1,923 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/overlay_root"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content">
+
+    <!-- ============================================================== -->
+    <!-- FLOATING BUBBLE / EDGE HANDLE                                  -->
+    <!-- ============================================================== -->
+    <FrameLayout
+        android:id="@+id/view_bubble"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content">
+
+        <!-- Visible surface is 36dp wide and sits flush on the bezel. The
+             remaining 8dp stays transparent but keeps the 44dp tap target. -->
+        <FrameLayout
+            android:id="@+id/bubble_surface"
+            android:layout_width="36dp"
+            android:layout_height="match_parent"
+            android:layout_gravity="end|center_vertical"
+            android:background="@drawable/bg_edge_handle">
+
+            <!-- Status rail: tinted to the live FPS color, sits on the inner edge. -->
+            <View
+                android:id="@+id/edge_accent"
+                android:layout_width="2dp"
+                android:layout_height="match_parent"
+                android:layout_gravity="start|center_vertical"
+                android:layout_marginStart="2dp"
+                android:layout_marginTop="9dp"
+                android:layout_marginBottom="9dp"
+                android:background="@drawable/bg_monitor_rail" />
+
+            <LinearLayout
+                android:id="@+id/bubble_content"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingStart="6dp"
+                android:paddingEnd="3dp">
+
+                <View
+                    android:id="@+id/dot_state"
+                    android:layout_width="3dp"
+                    android:layout_height="20dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_handle_grip" />
+
+                <TextView
+                    android:id="@+id/txt_bubble_fps"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:maxLines="3"
+                    android:text="--"
+                    android:textAlignment="center"
+                    android:textColor="#00E5FF"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </FrameLayout>
+    </FrameLayout>
+
+    <!-- ============================================================== -->
+    <!-- EDGE SIDE PANEL (Tactical Cyber-HUD GameSpace)                 -->
+    <!-- Fixed Top Cockpit + Scrollable Tactical Actions                -->
+    <!-- ============================================================== -->
+    <LinearLayout
+        android:id="@+id/view_sidepanel"
+        android:layout_width="306dp"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_panel"
+        android:orientation="vertical"
+        android:padding="11dp"
+        android:visibility="gone">
+
+        <!-- 1. FIXED TOP SECTION (DIEM SAAT SCROLL) -->
+        <LinearLayout
+            android:id="@+id/sidepanel_fixed_top"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- Cockpit Header -->
+            <LinearLayout
+                android:id="@+id/panel_header"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <View
+                    android:id="@+id/dot_panel_state"
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:layout_marginEnd="9dp"
+                    android:background="@drawable/bg_dot" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:includeFontPadding="false"
+                        android:letterSpacing="0.04"
+                        android:text="SECRETO"
+                        android:textColor="#F1F5F9"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/txt_panel_game"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="1dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text="Game Space"
+                        android:textColor="#94A3B8"
+                        android:textSize="9.5sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/btn_close_panel"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="@drawable/bg_icon_button"
+                    android:gravity="center"
+                    android:text="✕"
+                    android:textColor="#94A3B8"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- Session strip: what the session engine is doing right now -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="7dp"
+                android:background="@drawable/bg_segment_track"
+                android:orientation="horizontal"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-medium"
+                        android:letterSpacing="0.06"
+                        android:text="SESSION"
+                        android:textColor="#8798AC"
+                        android:textSize="8sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/txt_sess_time"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-medium"
+                        android:text="--:--"
+                        android:textColor="#F1F5F9"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:letterSpacing="0.06"
+                        android:text="JANK"
+                        android:textColor="#8798AC"
+                        android:textSize="8sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/txt_sess_jank"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-medium"
+                        android:text="--"
+                        android:textColor="#F1F5F9"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:letterSpacing="0.06"
+                        android:text="ASLEEP"
+                        android:textColor="#8798AC"
+                        android:textSize="8sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/txt_sess_apps"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-medium"
+                        android:text="0"
+                        android:textColor="#F1F5F9"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:letterSpacing="0.06"
+                        android:text="THERMAL"
+                        android:textColor="#8798AC"
+                        android:textSize="8sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/txt_sess_thermal"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-medium"
+                        android:text="OK"
+                        android:textColor="#22C55E"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Unified Cockpit Telemetry Hub (Single Tactical Card) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_hero_card"
+                android:orientation="vertical">
+
+                <!-- Hero FPS Row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="sans-serif-medium"
+                            android:letterSpacing="0.08"
+                            android:text="REALTIME FPS"
+                            android:textColor="#8798AC"
+                            android:textSize="9sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/txt_m_fps"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="sans-serif-medium"
+                            android:includeFontPadding="false"
+                            android:text="-- FPS"
+                            android:textColor="#00E5FF"
+                            android:textSize="26sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/txt_m_fps_status"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_segment_track"
+                        android:fontFamily="monospace"
+                        android:letterSpacing="0.05"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp"
+                        android:paddingTop="3dp"
+                        android:paddingBottom="3dp"
+                        android:text="-- MS"
+                        android:textColor="#8798AC"
+                        android:textSize="9sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- Cockpit Divider -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="7dp"
+                    android:layout_marginBottom="7dp"
+                    android:background="#1B2433" />
+
+                <!-- 2x2 Clean Telemetry Matrix -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <!-- Col 1: GPU -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="4dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:letterSpacing="0.05"
+                            android:text="GPU CLK"
+                            android:textColor="#8798AC"
+                            android:textSize="9sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/txt_m_gpu"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="1dp"
+                            android:fontFamily="sans-serif-medium"
+                            android:text="N/A"
+                            android:textColor="#F1F5F9"
+                            android:textSize="10.5sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <!-- Col 2: CPU BIG -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:letterSpacing="0.05"
+                            android:text="CPU BIG"
+                            android:textColor="#8798AC"
+                            android:textSize="9sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/txt_m_cpu"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="1dp"
+                            android:fontFamily="sans-serif-medium"
+                            android:text="N/A"
+                            android:textColor="#F1F5F9"
+                            android:textSize="10.5sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:orientation="horizontal">
+
+                    <!-- Col 3: NETWORK -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="4dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:letterSpacing="0.05"
+                            android:text="NETWORK"
+                            android:textColor="#8798AC"
+                            android:textSize="9sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/txt_m_net"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="1dp"
+                            android:fontFamily="sans-serif-medium"
+                            android:text="N/A"
+                            android:textColor="#00E676"
+                            android:textSize="10.5sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <!-- Col 4: BATTERY -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:letterSpacing="0.05"
+                            android:text="BATTERY"
+                            android:textColor="#8798AC"
+                            android:textSize="9sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/txt_m_bat"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="1dp"
+                            android:fontFamily="sans-serif-medium"
+                            android:text="N/A"
+                            android:textColor="#F1F5F9"
+                            android:textSize="10.5sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+
+        </LinearLayout>
+        <!-- END OF FIXED TOP COCKPIT -->
+
+        <!-- 2. SCROLLABLE BOTTOM SECTION (GERAK SAAT SCROLL) -->
+        <ScrollView
+            android:id="@+id/sidepanel_scroll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fillViewport="true"
+            android:overScrollMode="never"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:id="@+id/sidepanel_scroll_content"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <!-- Divider -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="7dp"
+                    android:background="#1B2433" />
+
+                <!-- QUICK TOOLS: 2x2 Ergonomic Gaming Grid -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.06"
+                    android:text="QUICK GAMING TOOLS"
+                    android:textColor="#94A3B8"
+                    android:textSize="9sp"
+                    android:textStyle="bold" />
+
+                <!-- Row 1: DND (full width) -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btn_quick_dnd"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/bg_segment_active"
+                        android:drawableStart="@drawable/ic_quick_notif"
+                        android:drawablePadding="7dp"
+                        android:drawableTint="#00E5FF"
+                        android:fontFamily="sans-serif-medium"
+                        android:gravity="center"
+                        android:minHeight="48dp"
+                        android:minWidth="0dp"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="6dp"
+                        android:text="FOCUS DND"
+                        android:textAllCaps="false"
+                        android:textColor="#FFFFFF"
+                        android:textSize="10.5sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- Row 2: BYPASS & GOS -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btn_quick_bypass"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginEnd="4dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_segment_track"
+                        android:drawableStart="@drawable/ic_quick_bypass"
+                        android:drawablePadding="7dp"
+                        android:drawableTint="#94A3B8"
+                        android:fontFamily="sans-serif-medium"
+                        android:gravity="center"
+                        android:minHeight="48dp"
+                        android:minWidth="0dp"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="6dp"
+                        android:text="BYPASS CHG"
+                        android:textAllCaps="false"
+                        android:textColor="#F1F5F9"
+                        android:textSize="10.5sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/btn_quick_gos"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_segment_track"
+                        android:drawableStart="@drawable/ic_quick_gos"
+                        android:drawablePadding="7dp"
+                        android:drawableTint="#94A3B8"
+                        android:fontFamily="sans-serif-medium"
+                        android:gravity="center"
+                        android:minHeight="48dp"
+                        android:minWidth="0dp"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="6dp"
+                        android:text="NO GOS"
+                        android:textAllCaps="false"
+                        android:textColor="#F1F5F9"
+                        android:textSize="10.5sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- CAPTURE: screenshot dan rekaman video -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.06"
+                    android:text="CAPTURE"
+                    android:textColor="#94A3B8"
+                    android:textSize="9sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btn_capture_screenshot"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginEnd="4dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_segment_track"
+                        android:fontFamily="sans-serif-medium"
+                        android:gravity="center"
+                        android:minHeight="48dp"
+                        android:minWidth="0dp"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="6dp"
+                        android:text="SCREENSHOT"
+                        android:textAllCaps="false"
+                        android:textColor="#F1F5F9"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/btn_capture_record"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_segment_track"
+                        android:fontFamily="sans-serif-medium"
+                        android:gravity="center"
+                        android:minHeight="48dp"
+                        android:minWidth="0dp"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="6dp"
+                        android:text="RECORD"
+                        android:textAllCaps="false"
+                        android:textColor="#94A3B8"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- Record quality preset: bitrate ladder ala ROR (fps mengikuti panel) -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btn_rec_lite"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginEnd="4dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_segment_track"
+                        android:fontFamily="sans-serif-medium"
+                        android:gravity="center"
+                        android:minHeight="44dp"
+                        android:minWidth="0dp"
+                        android:text="480p 6M"
+                        android:textAllCaps="false"
+                        android:textColor="#94A3B8"
+                        android:textSize="9.5sp" />
+
+                    <Button
+                        android:id="@+id/btn_rec_std"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginEnd="4dp"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_segment_track"
+                        android:fontFamily="sans-serif-medium"
+                        android:gravity="center"
+                        android:minHeight="44dp"
+                        android:minWidth="0dp"
+                        android:text="720p 8M"
+                        android:textAllCaps="false"
+                        android:textColor="#94A3B8"
+                        android:textSize="9.5sp" />
+
+                    <Button
+                        android:id="@+id/btn_rec_high"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_segment_track"
+                        android:fontFamily="sans-serif-medium"
+                        android:gravity="center"
+                        android:minHeight="44dp"
+                        android:minWidth="0dp"
+                        android:text="1080p 16M"
+                        android:textAllCaps="false"
+                        android:textColor="#94A3B8"
+                        android:textSize="9.5sp" />
+                </LinearLayout>
+
+                <!-- Divider -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="7dp"
+                    android:background="#1B2433" />
+
+                <!-- PERFORMANCE PRESET Section -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.06"
+                    android:text="PERFORMANCE PRESET"
+                    android:textColor="#94A3B8"
+                    android:textSize="9sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:layout_marginTop="4dp"
+                    android:background="@drawable/bg_segment_track"
+                    android:orientation="horizontal"
+                    android:padding="2.5dp">
+
+                    <Button
+                        android:id="@+id/btn_preset_battery"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:background="@android:color/transparent"
+                        android:fontFamily="sans-serif-medium"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:padding="0dp"
+                        android:text="ECO"
+                        android:textAllCaps="false"
+                        android:textColor="#94A3B8"
+                        android:textSize="9.5sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/btn_preset_balanced"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="2dp"
+                        android:layout_weight="1"
+                        android:background="@android:color/transparent"
+                        android:fontFamily="sans-serif-medium"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:padding="0dp"
+                        android:text="BAL"
+                        android:textAllCaps="false"
+                        android:textColor="#94A3B8"
+                        android:textSize="9.5sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/btn_preset_perf"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="2dp"
+                        android:layout_weight="1"
+                        android:background="@android:color/transparent"
+                        android:fontFamily="sans-serif-medium"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:padding="0dp"
+                        android:text="PERF"
+                        android:textAllCaps="false"
+                        android:textColor="#94A3B8"
+                        android:textSize="9.5sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/btn_preset_esports"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="2dp"
+                        android:layout_weight="1"
+                        android:background="@android:color/transparent"
+                        android:fontFamily="sans-serif-medium"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:padding="0dp"
+                        android:text="ESP"
+                        android:textAllCaps="false"
+                        android:textColor="#94A3B8"
+                        android:textSize="9.5sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- Divider -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="7dp"
+                    android:background="#1B2433" />
+
+                <!-- FLOATING MONITOR Section -->
+                <LinearLayout
+                    android:id="@+id/btn_fps_overlay"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:fontFamily="sans-serif-medium"
+                        android:letterSpacing="0.06"
+                        android:text="FLOATING MONITOR"
+                        android:textColor="#94A3B8"
+                        android:textSize="9sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/txt_telemetry_state"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-medium"
+                        android:letterSpacing="0.04"
+                        android:text="ON"
+                        android:textColor="#00E5FF"
+                        android:textSize="9sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:layout_marginTop="4dp"
+                    android:background="@drawable/bg_segment_track"
+                    android:orientation="horizontal"
+                    android:padding="2.5dp">
+
+                    <Button
+                        android:id="@+id/btn_type_off"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:background="@android:color/transparent"
+                        android:fontFamily="sans-serif-medium"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:padding="0dp"
+                        android:text="OFF"
+                        android:textAllCaps="false"
+                        android:textColor="#94A3B8"
+                        android:textSize="9sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/btn_type_compact"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="2dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_segment_active"
+                        android:fontFamily="sans-serif-medium"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:padding="0dp"
+                        android:text="FPS"
+                        android:textAllCaps="false"
+                        android:textColor="#FFFFFF"
+                        android:textSize="9sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/btn_type_detail"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="2dp"
+                        android:layout_weight="1.1"
+                        android:background="@android:color/transparent"
+                        android:fontFamily="sans-serif-medium"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:padding="0dp"
+                        android:text="+ TEMP"
+                        android:textAllCaps="false"
+                        android:textColor="#94A3B8"
+                        android:textSize="9sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/btn_type_full"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="2dp"
+                        android:layout_weight="1.1"
+                        android:background="@android:color/transparent"
+                        android:fontFamily="sans-serif-medium"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:padding="0dp"
+                        android:text="+ GPU"
+                        android:textAllCaps="false"
+                        android:textColor="#94A3B8"
+                        android:textSize="9sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- Footer Caption -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center"
+                    android:letterSpacing="0.02"
+                    android:text="Secreto Space · Swipe to close"
+                    android:textColor="#8798AC"
+                    android:textSize="9sp" />
+
+            </LinearLayout>
+        </ScrollView>
+
+    </LinearLayout>
+
+</FrameLayout>
