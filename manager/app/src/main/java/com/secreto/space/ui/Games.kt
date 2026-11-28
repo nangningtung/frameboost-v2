@@ -7,6 +7,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import android.content.Context
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -61,6 +62,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
@@ -76,6 +78,7 @@ import kotlin.math.roundToInt
 private val PRESETS = listOf("ECO", "BALANCED", "PERFORMANCE", "ESPORTS")
 private val SCALES = listOf("native", "900p", "720p")
 private val COVER_HEIGHT = 250.dp
+private val GRID_TILE_HEIGHT = 168.dp
 
 @Composable
 fun GamesScreen() {
@@ -85,6 +88,8 @@ fun GamesScreen() {
     var sessionPkg by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(true) }
     var detailPkg by remember { mutableStateOf<String?>(null) }
+    val prefs = remember { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
+    var gridMode by remember { mutableStateOf(prefs.getString("games_view", "carousel") == "grid") }
 
     fun reload(scan: Boolean = false) {
         scope.launch {
@@ -158,6 +163,32 @@ fun GamesScreen() {
             }
         }
 
+        if (!loading && games.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = !gridMode,
+                    onClick = {
+                        gridMode = false
+                        prefs.edit().putString("games_view", "carousel").apply()
+                    },
+                    label = { Text("Carousel") }
+                )
+                FilterChip(
+                    selected = gridMode,
+                    onClick = {
+                        gridMode = true
+                        prefs.edit().putString("games_view", "grid").apply()
+                    },
+                    label = { Text("Grid") }
+                )
+            }
+        }
+
         when {
             loading -> Box(
                 modifier = Modifier
@@ -167,6 +198,13 @@ fun GamesScreen() {
             ) { CircularProgressIndicator() }
 
             games.isEmpty() -> EmptyLibrary(onScan = { reload(scan = true) })
+
+            gridMode -> GameGrid(
+                games = games,
+                sessionPkg = sessionPkg,
+                onOpen = { detailPkg = it.pkg },
+                onPlay = { startSession(it.pkg) }
+            )
 
             else -> {
                 GameCarousel(
@@ -357,7 +395,12 @@ private fun PageDot(active: Boolean) {
 }
 
 @Composable
-private fun CoverCard(game: GameRow, modifier: Modifier, onClick: () -> Unit) {
+private fun CoverCard(
+    game: GameRow,
+    modifier: Modifier,
+    iconSize: Dp = 104.dp,
+    onClick: () -> Unit,
+) {
     val context = LocalContext.current
     val icon = remember(game.pkg) {
         runCatching {
@@ -404,7 +447,7 @@ private fun CoverCard(game: GameRow, modifier: Modifier, onClick: () -> Unit) {
                     Image(
                         bitmap = icon,
                         contentDescription = game.label(),
-                        modifier = Modifier.size(104.dp)
+                        modifier = Modifier.size(iconSize)
                     )
                 } else {
                     Text(
@@ -431,6 +474,56 @@ private fun CoverCard(game: GameRow, modifier: Modifier, onClick: () -> Unit) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Mode grid: tile cover seperti WebUI lama. 2 kolom di ponsel, 3 kolom di layar >= 600 dp.
+ * Tap tile membuka detail; tombol Main di bawah tile langsung memulai sesi.
+ */
+@Composable
+private fun GameGrid(
+    games: List<GameRow>,
+    sessionPkg: String,
+    onOpen: (GameRow) -> Unit,
+    onPlay: (GameRow) -> Unit,
+) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        val columns = if (maxWidth >= 600.dp) 3 else 2
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            games.chunked(columns).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    row.forEach { game ->
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            CoverCard(
+                                game = game,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(GRID_TILE_HEIGHT),
+                                iconSize = 56.dp,
+                                onClick = { onOpen(game) }
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                if (sessionPkg == game.pkg) StatusPill("AKTIF")
+                                Spacer(modifier = Modifier.weight(1f))
+                                Button(
+                                    onClick = { onPlay(game) },
+                                    shape = RoundedCornerShape(50)
+                                ) { Text("Main") }
+                            }
+                        }
+                    }
+                    repeat(columns - row.size) { Spacer(modifier = Modifier.weight(1f)) }
+                }
             }
         }
     }

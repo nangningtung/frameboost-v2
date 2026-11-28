@@ -23,6 +23,9 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/** Nama SharedPreferences untuk state manager yang harus bertahan saat pindah tab/restart. */
+const val PREFS = "secreto_manager"
+
 /** Kirim perintah ke daemon (bloking di IO dispatcher). */
 suspend fun ipc(cmd: String): String =
     withContext(Dispatchers.IO) { com.secreto.space.IpcClient.sendCommand(cmd) }

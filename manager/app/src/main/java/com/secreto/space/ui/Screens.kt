@@ -1,6 +1,8 @@
 package com.secreto.space.ui
 
+import android.content.Context
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.runtime.mutableStateListOf
@@ -177,9 +179,15 @@ fun HomeScreen() {
 @Composable
 fun SystemScreen(onOpenLegacy: () -> Unit) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    // State disimpan di prefs: tab ini dibuang setiap kali pindah tab, jadi tanpa ini
+    // tombol root dan pilihan preset selalu kembali ke kondisi awal.
+    val prefs = remember { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
     var gos by remember { mutableStateOf<JSONObject?>(null) }
-    var globalPreset by remember { mutableStateOf<String?>(null) }
-    var rootOk by remember { mutableStateOf<Boolean?>(null) }
+    var globalPreset by remember { mutableStateOf(prefs.getString("global_preset", null)) }
+    var rootOk by remember {
+        mutableStateOf<Boolean?>(if (prefs.getBoolean("root_granted", false)) true else null)
+    }
     var rootBusy by remember { mutableStateOf(false) }
     var confirmRestore by remember { mutableStateOf(false) }
 
@@ -220,6 +228,7 @@ fun SystemScreen(onOpenLegacy: () -> Unit) {
                         selected = globalPreset == mode,
                         onClick = {
                             globalPreset = mode
+                            prefs.edit().putString("global_preset", mode).apply()
                             scope.launch { ipc("set_global_preset $mode") }
                         },
                         label = { Text(label) }
@@ -273,6 +282,7 @@ fun SystemScreen(onOpenLegacy: () -> Unit) {
                             p.waitFor()
                             out?.startsWith("uid=0") == true
                         }.getOrDefault(false)
+                        if (rootOk == true) prefs.edit().putBoolean("root_granted", true).apply()
                         rootBusy = false
                     }
                 }) { Text("Request root access") }

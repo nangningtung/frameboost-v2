@@ -190,6 +190,10 @@ fun OnboardingFlow(onFinished: () -> Unit) {
                 }.getOrDefault(false)
             }
             rootBusy = false
+            if (rootOk == true) {
+                context.getSharedPreferences("secreto_manager", android.content.Context.MODE_PRIVATE)
+                    .edit().putBoolean("root_granted", true).apply()
+            }
         }
     }
 
