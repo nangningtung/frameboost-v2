@@ -1,5 +1,8 @@
 # Secreto Space 0.1.0 (Samsung Galaxy A50)
 
+> **Catatan:** UI native di `manager/` sudah tidak dipakai lagi. UI aktif adalah WebUI
+> di `module-src/webroot` (dibundel ke `hud-app/`). Kode `manager/` dibiarkan sebagai arsip.
+
 A game space for the Galaxy A50 (SM-A505F/GN, Exynos 9610, Mali-G72 MP3) on GSI
 and One UI. KernelSU/Magisk module with a native Rust daemon, a console app and
 an in-game overlay.
