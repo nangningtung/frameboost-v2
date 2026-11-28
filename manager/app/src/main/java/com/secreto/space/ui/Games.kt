@@ -1,16 +1,28 @@
 package com.secreto.space.ui
 
+import android.content.Context
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
-import android.content.Context
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -25,8 +37,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PageSize
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -39,6 +53,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -53,12 +68,17 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -66,29 +86,35 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
+import androidx.compose.ui.zIndex
 import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlin.math.abs
 import kotlin.math.absoluteValue
+import kotlin.math.max
 import kotlin.math.roundToInt
 
 private val PRESETS = listOf("ECO", "BALANCED", "PERFORMANCE", "ESPORTS")
 private val SCALES = listOf("native", "900p", "720p")
-private val COVER_HEIGHT = 250.dp
-private val GRID_TILE_HEIGHT = 168.dp
+private val CARD_HEIGHT = 262.dp
+private val GRID_TILE_HEIGHT = 196.dp
+private val CARD_SHAPE = RoundedCornerShape(26.dp)
+private val EASE_EMPHASIZED = CubicBezierEasing(0.2f, 0f, 0f, 1f)
 
 @Composable
 fun GamesScreen() {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
     var games by remember { mutableStateOf<List<GameRow>>(emptyList()) }
     var sessionPkg by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(true) }
     var detailPkg by remember { mutableStateOf<String?>(null) }
-    val prefs = remember { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
+    var launching by remember { mutableStateOf<GameRow?>(null) }
     var gridMode by remember { mutableStateOf(prefs.getString("games_view", "carousel") == "grid") }
 
     fun reload(scan: Boolean = false) {
@@ -123,7 +149,7 @@ fun GamesScreen() {
 
     LaunchedEffect(Unit) { reload() }
 
-    // Keep the "AKTIF" badge in sync with the daemon while the screen is open.
+    // Badge "AKTIF" dan header ikut daemon selama layar terbuka.
     LaunchedEffect(Unit) {
         while (isActive) {
             runCatching { JSONObject(ipc("snapshot")) }.getOrNull()?.let { snap ->
@@ -133,101 +159,80 @@ fun GamesScreen() {
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(top = 16.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Row(
+    val bodyState = when {
+        loading -> 0
+        games.isEmpty() -> 1
+        gridMode -> 2
+        else -> 3
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(top = 16.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Column {
-                Text(
-                    "Game library",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    "Terdeteksi otomatis · ${games.size} game",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-            OutlinedButton(onClick = { reload(scan = true) }, shape = RoundedCornerShape(50)) {
-                Text("Scan")
-            }
-        }
-
-        if (!loading && games.isNotEmpty()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                FilterChip(
-                    selected = !gridMode,
-                    onClick = {
-                        gridMode = false
-                        prefs.edit().putString("games_view", "carousel").apply()
-                    },
-                    label = { Text("Carousel") }
-                )
-                FilterChip(
-                    selected = gridMode,
-                    onClick = {
-                        gridMode = true
-                        prefs.edit().putString("games_view", "grid").apply()
-                    },
-                    label = { Text("Grid") }
-                )
-            }
-        }
-
-        when {
-            loading -> Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(COVER_HEIGHT),
-                contentAlignment = Alignment.Center
-            ) { CircularProgressIndicator() }
-
-            games.isEmpty() -> EmptyLibrary(onScan = { reload(scan = true) })
-
-            gridMode -> GameGrid(
-                games = games,
-                sessionPkg = sessionPkg,
-                onOpen = { detailPkg = it.pkg },
-                onPlay = { startSession(it.pkg) }
+            GamesHeader(
+                count = games.size,
+                liveName = games.find { it.pkg == sessionPkg }?.label(),
+                onScan = { reload(scan = true) }
             )
 
-            else -> {
-                GameCarousel(
-                    games = games,
-                    sessionPkg = sessionPkg,
-                    onPlay = { startSession(it.pkg) },
-                    onTune = { detailPkg = it.pkg }
-                )
-
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        "Semua game",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    games.forEach { game ->
-                        GameRowCard(game, active = sessionPkg == game.pkg) { detailPkg = game.pkg }
+            if (!loading && games.isNotEmpty()) {
+                ModeSwitch(
+                    gridMode = gridMode,
+                    onChange = {
+                        gridMode = it
+                        prefs.edit().putString("games_view", if (it) "grid" else "carousel").apply()
                     }
+                )
+            }
+
+            AnimatedContent(
+                targetState = bodyState,
+                transitionSpec = {
+                    (fadeIn(tween(260)) + scaleIn(initialScale = 0.97f, animationSpec = tween(320)))
+                        .togetherWith(fadeOut(tween(140)))
+                },
+                label = "games-body"
+            ) { state ->
+                when (state) {
+                    0 -> Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(CARD_HEIGHT),
+                        contentAlignment = Alignment.Center
+                    ) { CircularProgressIndicator() }
+
+                    1 -> EmptyLibrary(onScan = { reload(scan = true) })
+
+                    2 -> GameGrid(
+                        games = games,
+                        sessionPkg = sessionPkg,
+                        onPlay = { launching = it },
+                        onTune = { detailPkg = it.pkg }
+                    )
+
+                    else -> CoverSection(
+                        games = games,
+                        sessionPkg = sessionPkg,
+                        onPlay = { launching = it },
+                        onTune = { detailPkg = it.pkg }
+                    )
                 }
             }
+        }
+
+        launching?.let { game ->
+            LaunchSplash(
+                game = game,
+                onDone = {
+                    launching = null
+                    startSession(game.pkg)
+                }
+            )
         }
     }
 
@@ -259,6 +264,9 @@ private fun GameRow.label(): String = name.ifEmpty { pkg }
 private fun GameRow.hue(): Float =
     ((pkg.sumOf { it.code } * 137.508) % 360).roundToInt().toFloat()
 
+/** Warna glow ambient untuk game ini. */
+private fun GameRow.glow(): Color = Color.hsv(hue(), 0.7f, 0.95f)
+
 private fun sourceLabel(source: String): String = when (source) {
     "manual" -> "MANUAL"
     "config" -> "CONFIG"
@@ -266,110 +274,208 @@ private fun sourceLabel(source: String): String = when (source) {
     else -> "BUILTIN"
 }
 
-// ------------------------------------------------------------- carousel
+@Composable
+private fun rememberAppIcon(pkg: String, px: Int): ImageBitmap? {
+    val context = LocalContext.current
+    return remember(pkg, px) {
+        runCatching {
+            context.packageManager.getApplicationIcon(pkg).toBitmap(px, px).asImageBitmap()
+        }.getOrNull()
+    }
+}
+
+// ----------------------------------------------------------------- header
 
 @Composable
-private fun GameCarousel(
+private fun GamesHeader(count: Int, liveName: String?, onScan: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column {
+            Text(
+                "Game Space",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.ExtraBold
+            )
+            Text(
+                if (liveName != null) "Sesi aktif · $liveName" else "$count game terpasang",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        OutlinedButton(onClick = onScan, shape = CircleShape) { Text("Scan") }
+    }
+}
+
+@Composable
+private fun ModeSwitch(gridMode: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .padding(horizontal = 16.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        ModeOption("Carousel", selected = !gridMode) { onChange(false) }
+        ModeOption("Grid", selected = gridMode) { onChange(true) }
+    }
+}
+
+@Composable
+private fun ModeOption(label: String, selected: Boolean, onClick: () -> Unit) {
+    val bg by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+        animationSpec = tween(260, easing = EASE_EMPHASIZED),
+        label = "modeBg"
+    )
+    val fg by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = tween(260, easing = EASE_EMPHASIZED),
+        label = "modeFg"
+    )
+    Box(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(bg)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 8.dp)
+    ) {
+        Text(
+            label,
+            color = fg,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+// --------------------------------------------------------------- carousel
+
+@Composable
+private fun CoverSection(
     games: List<GameRow>,
     sessionPkg: String,
     onPlay: (GameRow) -> Unit,
     onTune: (GameRow) -> Unit,
 ) {
     val pager = rememberPagerState(pageCount = { games.size })
-    val scope = rememberCoroutineScope()
-    val current = games.getOrNull(pager.currentPage.coerceIn(0, games.lastIndex))
+    val current = pager.currentPage.coerceIn(0, games.lastIndex)
+    val game = games.getOrNull(current)
 
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        // Lebar cover mengikuti layar, tapi dibatasi agar tidak terlalu besar di tablet.
-        val coverWidth = minOf(maxWidth * 0.58f, 260.dp)
-        HorizontalPager(
-            state = pager,
-            pageSize = PageSize.Fixed(coverWidth),
-            contentPadding = PaddingValues(horizontal = (maxWidth - coverWidth) / 2),
-            pageSpacing = 12.dp,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(COVER_HEIGHT)
-        ) { page ->
-            val distance = pager.getOffsetDistanceInPages(page).absoluteValue.coerceIn(0f, 1f)
-            CoverCard(
-                game = games[page],
-                modifier = Modifier.graphicsLayer {
-                    val s = lerp(1f, 0.88f, distance)
-                    scaleX = s
-                    scaleY = s
-                    alpha = lerp(1f, 0.6f, distance)
-                },
-                onClick = {
-                    if (pager.currentPage == page) onTune(games[page])
-                    else scope.launch { pager.animateScrollToPage(page) }
-                }
-            )
-        }
-    }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        CoverFlow(games = games, sessionPkg = sessionPkg, pager = pager, onTune = onTune)
 
-    AnimatedContent(
-        targetState = current,
-        modifier = Modifier.padding(horizontal = 16.dp),
-        transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(120)) },
-        label = "hero"
-    ) { target ->
-        if (target != null) {
-            HeroBlock(
-                game = target,
-                active = sessionPkg == target.pkg,
-                onPlay = { onPlay(target) },
-                onTune = { onTune(target) }
-            )
-        }
-    }
+        PagerDots(count = games.size, index = current)
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        games.indices.forEach { index ->
-            PageDot(active = index == pager.currentPage)
+        AnimatedContent(
+            targetState = game,
+            modifier = Modifier.padding(horizontal = 16.dp),
+            transitionSpec = {
+                (fadeIn(tween(240)) + slideInVertically(tween(300, easing = EASE_EMPHASIZED)) { it / 5 })
+                    .togetherWith(fadeOut(tween(120)))
+            },
+            label = "hero"
+        ) { target ->
+            if (target != null) {
+                HeroBlock(
+                    game = target,
+                    live = sessionPkg == target.pkg,
+                    onPlay = { onPlay(target) },
+                    onTune = { onTune(target) }
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun HeroBlock(game: GameRow, active: Boolean, onPlay: () -> Unit, onTune: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            StatusPill(game.preset)
-            if (active) StatusPill("AKTIF")
-        }
-        Text(
-            game.label(),
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+private fun CoverFlow(
+    games: List<GameRow>,
+    sessionPkg: String,
+    pager: PagerState,
+    onTune: (GameRow) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val current = pager.currentPage.coerceIn(0, games.lastIndex.coerceAtLeast(0))
+    val glow by animateColorAsState(
+        targetValue = games.getOrNull(current)?.glow() ?: Color.Transparent,
+        animationSpec = tween(700, easing = EASE_EMPHASIZED),
+        label = "ambient"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(CARD_HEIGHT + 16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        // Ambient glow: lembut dan berganti warna mengikuti game aktif.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.radialGradient(listOf(glow.copy(alpha = 0.40f), Color.Transparent))
+                )
+                .blur(48.dp)
         )
-        Text(
-            game.pkg,
-            style = MaterialTheme.typography.bodySmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(
-                onClick = onPlay,
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(50)
-            ) { Text("Main") }
-            OutlinedButton(
-                onClick = onTune,
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(50)
-            ) { Text("Atur") }
+
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val cardWidth = minOf(maxWidth * 0.49f, 200.dp)
+            val stepPx = with(LocalDensity.current) { (cardWidth * 0.8f).toPx() }
+            HorizontalPager(
+                state = pager,
+                pageSize = PageSize.Fixed(cardWidth),
+                contentPadding = PaddingValues(horizontal = (maxWidth - cardWidth) / 2),
+                pageSpacing = 0.dp,
+                beyondViewportPageCount = 2,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(CARD_HEIGHT)
+            ) { page ->
+                CoverCard(
+                    game = games[page],
+                    live = games[page].pkg == sessionPkg,
+                    active = page == current,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .zIndex(20f - abs(page - current))
+                        .graphicsLayer {
+                            // Posisi kontinu (ikut drag) — tidak perlu recompose tiap frame.
+                            val offset = page - (pager.currentPage + pager.currentPageOffsetFraction)
+                            val dist = offset.absoluteValue
+                            val t = dist.coerceIn(0f, 1f)
+                            translationX = offset * stepPx
+                            val s = if (dist <= 1f) lerp(1f, 0.86f, t)
+                            else max(0.76f, 0.86f - (dist - 1f) * 0.08f)
+                            scaleX = s
+                            scaleY = s
+                            rotationY = -10f * offset.coerceIn(-1f, 1f)
+                            cameraDistance = 12f * density
+                            alpha = if (dist > 2f) 0f else lerp(1f, 0.68f, t)
+                        },
+                    onClick = {
+                        if (page == current) onTune(games[page])
+                        else scope.launch { pager.animateScrollToPage(page) }
+                    }
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun PagerDots(count: Int, index: Int) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        repeat(count) { i -> PageDot(active = i == index) }
     }
 }
 
@@ -377,13 +483,13 @@ private fun HeroBlock(game: GameRow, active: Boolean, onPlay: () -> Unit, onTune
 private fun PageDot(active: Boolean) {
     val width by animateDpAsState(
         targetValue = if (active) 18.dp else 6.dp,
-        animationSpec = tween(250),
+        animationSpec = tween(300, easing = EASE_EMPHASIZED),
         label = "dotWidth"
     )
     val color by animateColorAsState(
         targetValue = if (active) MaterialTheme.colorScheme.primary
         else MaterialTheme.colorScheme.outlineVariant,
-        animationSpec = tween(250),
+        animationSpec = tween(300, easing = EASE_EMPHASIZED),
         label = "dotColor"
     )
     Box(
@@ -395,48 +501,135 @@ private fun PageDot(active: Boolean) {
 }
 
 @Composable
+private fun HeroBlock(game: GameRow, live: Boolean, onPlay: () -> Unit, onTune: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .background(
+                        if (live) MaterialTheme.colorScheme.tertiary
+                        else MaterialTheme.colorScheme.outline,
+                        CircleShape
+                    )
+            )
+            Text(
+                if (live) "Sesi aktif · ${game.preset}" else "Siap dimainkan · ${game.preset}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Text(
+            game.label(),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.ExtraBold,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            game.pkg,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Button(
+                onClick = onPlay,
+                shape = CircleShape,
+                contentPadding = PaddingValues(horizontal = 30.dp, vertical = 12.dp)
+            ) { Text("Main", fontWeight = FontWeight.Bold) }
+            OutlinedButton(
+                onClick = onTune,
+                shape = CircleShape,
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+            ) { Text("Atur") }
+        }
+    }
+}
+
+/**
+ * Kartu cover: gradasi per game, ikon aplikasi di tengah, dan scrim gelap di bawah
+ * untuk judul. Tekan sedikit mengecil agar terasa responsif.
+ */
+@Composable
 private fun CoverCard(
     game: GameRow,
+    live: Boolean,
+    active: Boolean,
     modifier: Modifier,
-    iconSize: Dp = 104.dp,
     onClick: () -> Unit,
 ) {
-    val context = LocalContext.current
-    val icon = remember(game.pkg) {
-        runCatching {
-            context.packageManager.getApplicationIcon(game.pkg).toBitmap(192, 192).asImageBitmap()
-        }.getOrNull()
-    }
     val hue = game.hue()
-    val chipColor = Color.White.copy(alpha = 0.16f)
+    val icon = rememberAppIcon(game.pkg, 224)
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.96f else 1f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = 500f),
+        label = "press"
+    )
 
     Box(
         modifier = modifier
-            .fillMaxSize()
-            .clip(RoundedCornerShape(24.dp))
+            .graphicsLayer {
+                scaleX *= pressScale
+                scaleY *= pressScale
+            }
+            .shadow(if (active) 22.dp else 6.dp, CARD_SHAPE, clip = false)
+            .clip(CARD_SHAPE)
             .background(
-                Brush.verticalGradient(
+                Brush.linearGradient(
                     listOf(
-                        Color.hsv(hue, 0.62f, 0.34f),
-                        Color.hsv((hue + 40f) % 360f, 0.55f, 0.18f),
+                        Color.hsv(hue, 0.62f, 0.36f),
+                        Color.hsv((hue + 40f) % 360f, 0.55f, 0.19f),
                         Color.hsv((hue + 70f) % 360f, 0.50f, 0.10f),
                     )
                 )
             )
-            .clickable(onClick = onClick)
-            .padding(16.dp)
+            .border(
+                width = if (active) 1.5.dp else 1.dp,
+                color = Color.White.copy(alpha = if (active) 0.32f else 0.10f),
+                shape = CARD_SHAPE
+            )
+            .clickable(interactionSource = source, indication = LocalIndication.current, onClick = onClick)
+            .padding(14.dp)
     ) {
+        // Halo lembut di belakang ikon.
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .size(170.dp)
+                .background(
+                    Brush.radialGradient(
+                        listOf(Color.hsv(hue, 0.7f, 1f).copy(alpha = 0.32f), Color.Transparent)
+                    ),
+                    CircleShape
+                )
+        )
+
         Column(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                ChipLabel(sourceLabel(game.source), chipColor)
-                ChipLabel(game.preset, chipColor)
+                ChipLabel(sourceLabel(game.source), Color.White.copy(alpha = 0.16f))
+                if (live) StatusPill("AKTIF") else ChipLabel(game.preset, Color.White.copy(alpha = 0.16f))
             }
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -447,7 +640,7 @@ private fun CoverCard(
                     Image(
                         bitmap = icon,
                         contentDescription = game.label(),
-                        modifier = Modifier.size(iconSize)
+                        modifier = Modifier.size(104.dp)
                     )
                 } else {
                     Text(
@@ -458,11 +651,21 @@ private fun CoverCard(
                     )
                 }
             }
-            Column {
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f))
+                        )
+                    )
+                    .padding(top = 18.dp)
+            ) {
                 Text(
                     game.label(),
                     color = Color.White,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -474,56 +677,6 @@ private fun CoverCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-            }
-        }
-    }
-}
-
-/**
- * Mode grid: tile cover seperti WebUI lama. 2 kolom di ponsel, 3 kolom di layar >= 600 dp.
- * Tap tile membuka detail; tombol Main di bawah tile langsung memulai sesi.
- */
-@Composable
-private fun GameGrid(
-    games: List<GameRow>,
-    sessionPkg: String,
-    onOpen: (GameRow) -> Unit,
-    onPlay: (GameRow) -> Unit,
-) {
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        val columns = if (maxWidth >= 600.dp) 3 else 2
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            games.chunked(columns).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    row.forEach { game ->
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            CoverCard(
-                                game = game,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(GRID_TILE_HEIGHT),
-                                iconSize = 56.dp,
-                                onClick = { onOpen(game) }
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                if (sessionPkg == game.pkg) StatusPill("AKTIF")
-                                Spacer(modifier = Modifier.weight(1f))
-                                Button(
-                                    onClick = { onPlay(game) },
-                                    shape = RoundedCornerShape(50)
-                                ) { Text("Main") }
-                            }
-                        }
-                    }
-                    repeat(columns - row.size) { Spacer(modifier = Modifier.weight(1f)) }
-                }
             }
         }
     }
@@ -544,6 +697,166 @@ private fun ChipLabel(text: String, background: Color) {
         )
     }
 }
+
+// ------------------------------------------------------------------- grid
+
+/** Mode grid: tile cover 2 kolom di ponsel, 3 kolom di layar >= 600 dp. */
+@Composable
+private fun GameGrid(
+    games: List<GameRow>,
+    sessionPkg: String,
+    onPlay: (GameRow) -> Unit,
+    onTune: (GameRow) -> Unit,
+) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        val columns = if (maxWidth >= 600.dp) 3 else 2
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            games.chunked(columns).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    row.forEach { game ->
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            CoverCard(
+                                game = game,
+                                live = game.pkg == sessionPkg,
+                                active = false,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(GRID_TILE_HEIGHT),
+                                onClick = { onPlay(game) }
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = { onTune(game) },
+                                    shape = CircleShape,
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) { Text("Atur", style = MaterialTheme.typography.labelLarge) }
+                                Button(
+                                    onClick = { onPlay(game) },
+                                    shape = CircleShape,
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) { Text("Main", style = MaterialTheme.typography.labelLarge) }
+                            }
+                        }
+                    }
+                    repeat(columns - row.size) { Spacer(modifier = Modifier.weight(1f)) }
+                }
+            }
+        }
+    }
+}
+
+// ------------------------------------------------------------ peluncuran
+
+/**
+ * Splash saat Main ditekan: kartu membesar lalu memudar (1,45 dtk), progress bar
+ * berdenyut. Sesi dimulai dan game dibuka setelah animasi selesai.
+ */
+@Composable
+private fun LaunchSplash(game: GameRow, onDone: () -> Unit) {
+    val progress = remember { Animatable(0f) }
+    val bar = remember { Animatable(0.10f) }
+
+    LaunchedEffect(game.pkg) {
+        launch {
+            bar.animateTo(
+                1f,
+                keyframes {
+                    durationMillis = 1200
+                    0.10f at 0
+                    0.82f at 720
+                    1f at 1200
+                }
+            )
+        }
+        progress.animateTo(1f, tween(durationMillis = 1450, easing = LinearEasing))
+        onDone()
+    }
+
+    val icon = rememberAppIcon(game.pkg, 256)
+    val hue = game.hue()
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.96f))
+            .clickable(onClick = {}),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(24.dp)
+                .graphicsLayer {
+                    val t = progress.value
+                    alpha = splashAlpha(t)
+                    val s = splashScale(t)
+                    scaleX = s
+                    scaleY = s
+                },
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(132.dp)
+                    .clip(RoundedCornerShape(32.dp))
+                    .background(
+                        Brush.linearGradient(
+                            listOf(
+                                Color.hsv(hue, 0.62f, 0.36f),
+                                Color.hsv((hue + 70f) % 360f, 0.50f, 0.10f),
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (icon != null) {
+                    Image(bitmap = icon, contentDescription = game.label(), modifier = Modifier.size(96.dp))
+                }
+            }
+            Text(
+                game.label(),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                "${game.preset} · ${sourceLabel(game.source)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            LinearProgressIndicator(
+                progress = { bar.value },
+                modifier = Modifier
+                    .width(200.dp)
+                    .height(6.dp)
+            )
+        }
+    }
+}
+
+private fun splashAlpha(t: Float): Float = when {
+    t < 0.2f -> t / 0.2f
+    t < 0.85f -> 1f
+    else -> ((1f - t) / 0.15f).coerceAtLeast(0f)
+}
+
+private fun splashScale(t: Float): Float = when {
+    t < 0.2f -> 0.92f + 0.08f * (t / 0.2f)
+    t < 0.85f -> 1f + 0.03f * ((t - 0.2f) / 0.65f)
+    else -> 1.03f + 0.07f * ((t - 0.85f) / 0.15f)
+}
+
+// ---------------------------------------------------------------- empty
 
 @Composable
 private fun EmptyLibrary(onScan: () -> Unit) {
@@ -573,60 +886,6 @@ private fun EmptyLibrary(onScan: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(50)
             ) { Text("Scan ulang") }
-        }
-    }
-}
-
-// ----------------------------------------------------------------- list
-
-@Composable
-private fun GameRowCard(g: GameRow, active: Boolean, onClick: () -> Unit) {
-    val ctx = LocalContext.current
-    val icon = remember(g.pkg) {
-        runCatching {
-            ctx.packageManager.getApplicationIcon(g.pkg).toBitmap(64, 64).asImageBitmap()
-        }.getOrNull()
-    }
-
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            if (icon != null) {
-                Image(
-                    bitmap = icon,
-                    contentDescription = g.label(),
-                    modifier = Modifier.size(40.dp)
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    g.label(),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    "${sourceLabel(g.source)} · ${g.pkg}",
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            if (active) {
-                StatusPill("AKTIF")
-            } else {
-                Text(g.preset, style = MaterialTheme.typography.labelMedium)
-            }
         }
     }
 }
@@ -694,11 +953,7 @@ private fun GameDetailSheet(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                val icon = remember(game.pkg) {
-                    runCatching {
-                        context.packageManager.getApplicationIcon(game.pkg).toBitmap(96, 96).asImageBitmap()
-                    }.getOrNull()
-                }
+                val icon = rememberAppIcon(game.pkg, 96)
                 if (icon != null) {
                     Image(
                         bitmap = icon,
