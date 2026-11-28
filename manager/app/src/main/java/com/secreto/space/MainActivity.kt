@@ -1,9 +1,18 @@
 package com.secreto.space
 
+import android.Manifest
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,36 +21,67 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Manager native (Compose) — Fase 0 skeleton.
- * Layar tunggal: status daemon via IPC + pintu ke konsol legacy (WebView)
- * sampai paritas layar tercapai. Side panel overlay tidak tersentuh.
+ * Secreto Space — Manager native (Compose).
+ *
+ * Alur: onboarding pertama kali (izin overlay → grant root → link daemon →
+ * boot hand-off) lalu Home. Pola boot hand-off ala AZenith:
+ * Menautkan → Memindai → Menyetel → Siap.
  */
 class MainActivity : ComponentActivity() {
+    private val prefs by lazy {
+        getSharedPreferences("secreto_manager", MODE_PRIVATE)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    ManagerHome(onOpenLegacy = { openLegacyConsole() })
+                    var onboarded by remember { mutableStateOf(prefs.getBoolean("onboarded", false)) }
+                    if (onboarded) {
+                        ManagerHome(onOpenLegacy = { openLegacyConsole() })
+                    } else {
+                        OnboardingFlow(
+                            onFinished = {
+                                prefs.edit().putBoolean("onboarded", true).apply()
+                                onboarded = true
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -51,6 +91,224 @@ class MainActivity : ComponentActivity() {
         startActivity(Intent(this, LegacyWebViewActivity::class.java))
     }
 }
+
+// ---------------------------------------------------------------- onboarding
+
+private const val STEP_COUNT = 5 // welcome, overlay, root, daemon, ready
+
+@Composable
+fun OnboardingFlow(onFinished: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    var step by remember { mutableIntStateOf(0) }
+    var overlayOk by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
+    var rootOk by remember { mutableStateOf<Boolean?>(null) } // null = belum dicek
+    var rootBusy by remember { mutableStateOf(false) }
+    var probe by remember { mutableStateOf<String?>(null) }
+    var bootPhase by remember { mutableStateOf("") }
+
+    // Izin overlay bisa berubah setelah user kembali dari Settings — cek ulang
+    // setiap kali layar kembali ke resumed.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val obs = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                overlayOk = Settings.canDrawOverlays(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
+
+    fun grantRoot() {
+        rootBusy = true
+        scope.launch {
+            rootOk = withContext(Dispatchers.IO) {
+                runCatching {
+                    val p = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
+                    val out = p.inputStream.bufferedReader().readLine()
+                    p.waitFor()
+                    out?.startsWith("uid=0") == true
+                }.getOrDefault(false)
+            }
+            rootBusy = false
+        }
+    }
+
+    fun finishBootHandoff() {
+        scope.launch {
+            val phases = listOf("Menautkan daemon…", "Memindai game…", "Menyetel profil…", "Siap.")
+            for (ph in phases) {
+                bootPhase = ph
+                delay(700)
+            }
+            onFinished()
+        }
+    }
+
+    val progress = animateFloatAsState(
+        targetValue = (step + 1f) / STEP_COUNT,
+        animationSpec = tween(300),
+        label = "progress"
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(20.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Text("Selamat datang di", style = MaterialTheme.typography.bodyMedium)
+        Text("Secreto Space", style = MaterialTheme.typography.headlineLarge)
+        LinearProgressIndicator(
+            progress = { progress.value },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        AnimatedContent(targetState = step, transitionSpec = { fadeIn() togetherWith fadeOut() }) { s ->
+            when (s) {
+                0 -> OnboardingCard(
+                    title = "Game space untuk A50",
+                    body = "Preset per game, side panel in-game, tangkap layar & rekam, " +
+                        "render scale, jaringan, dan pemulihan ke stock yang terjamin. " +
+                        "Semua dijalankan daemon Rust lokal — tanpa cloud, tanpa internet."
+                ) {
+                    Button(onClick = { step = 1 }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Mulai penyiapan")
+                    }
+                }
+
+                1 -> OnboardingCard(
+                    title = "1/3 — Izin overlay",
+                    body = "Dibutuhkan untuk side panel & FPS overlay di atas game. " +
+                        "Jika sudah pernah diizinkan lewat modul, langkah ini otomatis hijau.",
+                    status = if (overlayOk) CheckState.OK else CheckState.WAITING
+                ) {
+                    if (overlayOk) {
+                        Button(onClick = { step = 2 }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Lanjut")
+                        }
+                    } else {
+                        Button(onClick = {
+                            context.startActivity(
+                                Intent(
+                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:com.secreto.space")
+                                )
+                            )
+                        }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Izinkan tampil di atas aplikasi lain")
+                        }
+                    }
+                }
+
+                2 -> OnboardingCard(
+                    title = "2/3 — Akses root",
+                    body = "Manager berbicara ke daemon lewat KernelSU/Superuser. " +
+                        "Tekan tombolnya lalu izinkan dialog Superuser untuk com.secreto.space.",
+                    status = when {
+                        rootOk == true -> CheckState.OK
+                        rootOk == false -> CheckState.FAILED
+                        else -> CheckState.WAITING
+                    }
+                ) {
+                    when {
+                        rootBusy -> Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.height(20.dp))
+                            Spacer(modifier = Modifier.padding(6.dp))
+                            Text("Menunggu keputusan Superuser…")
+                        }
+                        rootOk == true -> Button(onClick = { step = 3 }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Lanjut")
+                        }
+                        else -> Button(onClick = { grantRoot() }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Minta akses root")
+                        }
+                    }
+                }
+
+                3 -> OnboardingCard(
+                    title = "3/3 — Hubungkan daemon",
+                    body = "Memastikan secretod berjalan di perangkat ini.",
+                    status = when {
+                        probe?.contains("\"device\":\"a50\"") == true -> CheckState.OK
+                        else -> CheckState.WAITING
+                    }
+                ) {
+                    LaunchedEffect(Unit) {
+                        probe = withContext(Dispatchers.IO) { IpcClient.sendCommand("probe") }
+                    }
+                    if (probe != null) {
+                        Text(
+                            probe!!.take(300),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        if (probe!!.contains("\"device\":\"a50\"")) {
+                            Button(onClick = { step = 4 }, modifier = Modifier.fillMaxWidth()) {
+                                Text("Selesai penyiapan")
+                            }
+                        } else {
+                            Text("Daemon tidak menjawab — pastikan modul aktif.", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+
+                4 -> OnboardingCard(
+                    title = "Siap terbang 🚀",
+                    body = bootPhase.ifEmpty { "Tekan tombol untuk menyelesaikan boot hand-off." }
+                ) {
+                    if (bootPhase.isEmpty()) {
+                        Button(onClick = { finishBootHandoff() }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Nyalakan Secreto Space")
+                        }
+                    } else if (bootPhase == "Siap.") {
+                        Button(onClick = onFinished, modifier = Modifier.fillMaxWidth()) {
+                            Text("Masuk")
+                        }
+                    } else {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            }
+        }
+
+        Text(
+            "Langkah ${step + 1} dari $STEP_COUNT",
+            style = MaterialTheme.typography.bodySmall
+        )
+    }
+}
+
+private enum class CheckState { WAITING, OK, FAILED }
+
+@Composable
+private fun OnboardingCard(
+    title: String,
+    body: String,
+    status: CheckState? = null,
+    content: @Composable () -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row {
+                Text(title, style = MaterialTheme.typography.titleLarge)
+                when (status) {
+                    CheckState.OK -> Text("  ✓", style = MaterialTheme.typography.titleLarge)
+                    CheckState.FAILED -> Text("  ✗", style = MaterialTheme.typography.titleLarge)
+                    else -> {}
+                }
+            }
+            Text(body, style = MaterialTheme.typography.bodyMedium)
+            content()
+        }
+    }
+}
+
+// ----------------------------------------------------------------------- home
 
 @Composable
 private fun ManagerHome(onOpenLegacy: () -> Unit) {
@@ -71,7 +329,7 @@ private fun ManagerHome(onOpenLegacy: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("Secreto Space", style = MaterialTheme.typography.headlineMedium)
-        Text("Manager native — Fase 0", style = MaterialTheme.typography.bodyMedium)
+        Text("Manager native", style = MaterialTheme.typography.bodyMedium)
 
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -105,6 +363,15 @@ private fun ManagerHome(onOpenLegacy: () -> Unit) {
         }
 
         Button(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = {
+                // placeholder Fase 1: diganti layar library Compose
+            }
+        ) {
+            Text("Library game (Fase 1)")
+        }
+
+        OutlinedButton(
             modifier = Modifier.fillMaxWidth(),
             onClick = onOpenLegacy
         ) {
