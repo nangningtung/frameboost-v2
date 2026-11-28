@@ -2894,3 +2894,24 @@ button:disabled,
 #tab-system .panel {
   padding: 16px;
 }
+
+/* ---------------------------------------------------------------- tab Game: seimbangkan gap atas dan bawah */
+.hud-main {
+  display: flex;
+  flex-direction: column;
+}
+
+#tab-games.tab-panel.active {
+  flex: 1;
+}
+
+#games-list-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+#games-carousel-view.games-carousel-view:not(.hidden) {
+  flex: 1;
+  justify-content: center;
+}

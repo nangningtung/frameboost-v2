@@ -1278,7 +1278,7 @@
         // Swipe left -> next
         if (carouselFiltered.length > 0) {
           let step = fastFlick ? 2 : 1;
-          carouselIndex = Math.min(carouselIndex + step, carouselFiltered.length - 1);
+          carouselIndex = (carouselIndex + step) % carouselFiltered.length;
           layoutCarousel(0, false);
           updateHeroAndDots(carouselFiltered);
         }
@@ -1286,7 +1286,7 @@
         // Swipe right -> prev
         if (carouselFiltered.length > 0) {
           let step = fastFlick ? 2 : 1;
-          carouselIndex = Math.max(carouselIndex - step, 0);
+          carouselIndex = (carouselIndex - step + carouselFiltered.length) % carouselFiltered.length;
           layoutCarousel(0, false);
           updateHeroAndDots(carouselFiltered);
         }
@@ -1324,9 +1324,9 @@
       if (Math.abs(dx) > 40) {
         if (carouselFiltered.length > 0) {
           if (dx < 0) {
-            carouselIndex = Math.min(carouselIndex + 1, carouselFiltered.length - 1);
+            carouselIndex = (carouselIndex + 1) % carouselFiltered.length;
           } else {
-            carouselIndex = Math.max(carouselIndex - 1, 0);
+            carouselIndex = (carouselIndex - 1 + carouselFiltered.length) % carouselFiltered.length;
           }
           layoutCarousel(0, false);
           updateHeroAndDots(carouselFiltered);
@@ -1372,18 +1372,18 @@
   function layoutCarousel(dragPx, noTransition) {
     const cards = carouselStage.querySelectorAll(".cover-card");
     if (!cards.length) return;
-    const N = cards.length;
+    // M = jumlah kartu di ring (untuk < 3 game kartu diulang); center = slot kartu aktif.
+    const M = cards.length;
+    const center = carouselIndex + (Number(carouselStage.dataset.base) || 0);
     const SPACING = 120;
     const dragInSlots = dragPx / SPACING;
-    // Clamp drag so cards don't move past the first/last game.
-    // At index 0, can't drag right (no prev). At index N-1, can't drag left.
-    let clampedDrag = dragInSlots;
-    if (carouselIndex === 0 && dragInSlots > 0) clampedDrag = dragInSlots * 0.3; // rubber band
-    if (carouselIndex === N - 1 && dragInSlots < 0) clampedDrag = dragInSlots * 0.3;
+    // Offset selalu di rentang [-M/2, M/2), jadi tetangga muncul simetris di kiri dan kanan.
+    const half = M / 2;
+    const wrapOffset = (v) => (((v % M) + M + half) % M) - half;
     cards.forEach((card) => {
       card.style.transition = noTransition ? "none" : "";
-      const idx = parseInt(card.dataset.idx, 10);
-      const offset = idx - carouselIndex + clampedDrag;
+      const slot = parseInt(card.dataset.slot, 10);
+      const offset = wrapOffset(slot - center + dragInSlots);
       const abs = Math.abs(offset);
       const sign = offset > 0 ? 1 : (offset < 0 ? -1 : 0);
       // Telescoping X: first unit full spacing, rest compressed to 55%
@@ -1420,16 +1420,24 @@
 
     if (carouselIndex >= games.length) carouselIndex = 0;
 
+    // Ring kartu: untuk < 3 game, kartu diulang supaya tetangga selalu tampil di kiri dan kanan.
+    const N = games.length;
+    const M = N >= 3 ? N : N === 2 ? 4 : 3;
+    carouselStage.dataset.base = M > N ? String(N) : "0";
+
     // Build DOM only if card count changed (avoids re-creating elements
     // so CSS transitions can animate between states).
     const existing = carouselStage.querySelectorAll(".cover-card");
-    if (existing.length !== games.length) {
-      carouselStage.innerHTML = games.map((game, idx) => {
+    if (existing.length !== M) {
+      carouselStage.innerHTML = Array.from({ length: M }, (_, slot) => {
+        const idx = slot % N;
+        const game = games[idx];
         const d = buildGameCardData(game);
         return `
           <div class="cover-card"
                data-pkg="${game.pkg}"
                data-idx="${idx}"
+               data-slot="${slot}"
                style="--tile-hue: ${d.hue};">
             <div class="game-tile-top">
               <span class="game-tile-source ${d.sourceClass}">${d.sourceLabel}</span>
@@ -1449,13 +1457,15 @@
         card.addEventListener("click", (e) => {
           if (e.target.closest("button,input,select")) return;
           if (swipeMoved) return;
-          const idx = parseInt(card.dataset.idx, 10);
-          if (idx === carouselIndex) {
+          // Kartu aktif membuka detail; kartu lain memindahkan carousel ke sana.
+          const slot = parseInt(card.dataset.slot, 10);
+          const center = carouselIndex + (Number(carouselStage.dataset.base) || 0);
+          if (slot === center) {
             openGameDetail(card.dataset.pkg);
           } else {
-            carouselIndex = idx;
+            carouselIndex = parseInt(card.dataset.idx, 10);
             layoutCarousel(0, false);
-            updateHeroAndDots(games);
+            updateHeroAndDots(carouselFiltered);
           }
         });
       });
@@ -1466,9 +1476,10 @@
     } else {
       // Update card content/data in-place (game list same length but
       // might have different packages after rescan).
-      games.forEach((game, idx) => {
-        const card = carouselStage.querySelector(`.cover-card[data-idx="${idx}"]`);
-        if (!card) return;
+      carouselStage.querySelectorAll(".cover-card").forEach((card, slot) => {
+        const idx = slot % N;
+        const game = games[idx];
+        card.dataset.slot = slot;
         const d = buildGameCardData(game);
         card.dataset.pkg = game.pkg;
         card.style.setProperty("--tile-hue", d.hue);
@@ -1941,7 +1952,9 @@
     const badge = document.getElementById("ksu-badge");
     const st = document.getElementById("ksu-status");
     if (badge) { badge.textContent = "GRANTED"; badge.className = "badge active"; }
-    if (st) st.textContent = "Status: root diberikan sebelumnya. Tekan untuk cek ulang.";
+    if (st) st.textContent = "Status: root sudah diberikan.";
+    const btn = document.getElementById("btn-ksu-root");
+    if (btn) { btn.disabled = true; btn.textContent = "Root granted"; }
   })();
   if (btnKsuRoot) {
     btnKsuRoot.addEventListener("click", async () => {
@@ -1955,6 +1968,8 @@
       btnKsuRoot.disabled = false;
       const ok = typeof out === "string" && out.startsWith("uid=0");
       try { localStorage.setItem("sg_root_granted", ok ? "1" : "0"); } catch (e) {}
+      btnKsuRoot.disabled = ok;
+      btnKsuRoot.textContent = ok ? "Root granted" : "Request root access";
       if (badge) badge.textContent = ok ? "GRANTED" : "NOT GRANTED";
       if (st) st.textContent = ok
         ? "Status: root diberikan - app terdaftar di Superuser KernelSU"
