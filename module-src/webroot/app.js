@@ -1473,16 +1473,7 @@
       const d = buildGameCardData(activeGame);
       if (carouselHero) carouselHero.style.setProperty("--tile-hue", d.hue);
       if (carouselHeroTitle) carouselHeroTitle.textContent = activeGame.name || activeGame.pkg;
-      if (carouselHeroSub) carouselHeroSub.textContent = activeGame.profile || activeGame.pkg;
-      const presetNow = (activeGame.preset || "BALANCED").toUpperCase();
-      document.querySelectorAll(".seg-mini-btn[data-game-preset]").forEach((b) => {
-        b.classList.toggle("active", b.dataset.gamePreset === presetNow);
-      });
-      const bbrBtnHero = document.getElementById("carousel-hero-bbr");
-      if (bbrBtnHero) {
-        bbrBtnHero.classList.toggle("active", !!activeGame.auto_bbr);
-        bbrBtnHero.textContent = activeGame.auto_bbr ? "BBR On" : "BBR Off";
-      }
+      if (carouselHeroSub) carouselHeroSub.textContent = activeGame.pkg;
       if (carouselHeroPreset) {
         carouselHeroPreset.textContent = d.currentPreset;
         carouselHeroPreset.className = "carousel-hero-preset preset-badge preset-badge-" + d.currentPreset.toLowerCase();
@@ -1515,7 +1506,7 @@
         btnViewToggle.innerHTML = viewToggleIcons.grid;
         btnViewToggle.dataset.mode = "carousel";
       }
-      renderCarousel(carouselFiltered);
+      renderCarousel(carouselFiltered.length ? carouselFiltered : allGames);
     } else {
       if (gamesCarouselView) gamesCarouselView.classList.add("hidden");
       gamesContainer.classList.remove("hidden");
@@ -1531,26 +1522,8 @@
     carousel: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="18" rx="2.5"/><path d="M2.5 8v8M21.5 8v8"/></svg>'
   };
 
-  // Filter: pencarian teks + sumber game (chip Config / Auto / Manual / Builtin).
-  let gameFilter = { source: "all", query: "" };
-  function filteredGames() {
-    const q = gameFilter.query.trim().toLowerCase();
-    return (allGames || []).filter((g) => {
-      if (gameFilter.source !== "all" && g.source !== gameFilter.source) return false;
-      if (!q) return true;
-      return (g.name || "").toLowerCase().includes(q) || (g.pkg || "").toLowerCase().includes(q);
-    });
-  }
   function applyFilter() {
-    const list = filteredGames();
-    const sub = document.getElementById("games-sub");
-    if (sub) {
-      const total = (allGames || []).length;
-      sub.textContent = total === list.length
-        ? `${total} game terpasang`
-        : `${list.length} dari ${total} game`;
-    }
-    renderGamesList(list);
+    renderGamesList(allGames);
   }
 
   const gamesListView = document.getElementById("games-list-view");
@@ -1885,50 +1858,6 @@
   carouselHeroTune?.addEventListener("click", () => {
     const activeCard = carouselStage?.querySelector(".cover-card-active");
     if (activeCard) openGameDetail(activeCard.dataset.pkg);
-  });
-
-  // Filter bindings
-  document.getElementById("game-search-input")?.addEventListener("input", (e) => {
-    gameFilter.query = e.target.value || "";
-    applyFilter();
-  });
-  document.querySelectorAll(".filter-strip .chip-btn[data-source]").forEach((chip) => {
-    chip.addEventListener("click", () => {
-      gameFilter.source = chip.dataset.source;
-      document.querySelectorAll(".filter-strip .chip-btn[data-source]").forEach((c) => {
-        c.classList.toggle("active", c === chip);
-      });
-      applyFilter();
-    });
-  });
-
-  // Quick bar hero: ganti preset / BBR untuk game yang sedang di tengah carousel.
-  // Memakai perintah set_game_profile yang sama dengan halaman detail.
-  async function setHeroGameProfile(preset, bbr) {
-    const game = carouselFiltered[carouselIndex];
-    if (!game) return;
-    const res = await sendSocketCmd(`set_game_profile ${game.pkg} ${preset} ${bbr ? "1" : "0"}`);
-    try {
-      const data = JSON.parse(res);
-      if (data.games) allGames = data.games;
-    } catch (e) {}
-    applyFilter();
-    const idx = carouselFiltered.findIndex((g) => g.pkg === game.pkg);
-    if (idx >= 0) carouselIndex = idx;
-    updateHeroAndDots(carouselFiltered);
-  }
-  document.querySelectorAll(".seg-mini-btn[data-game-preset]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const game = carouselFiltered[carouselIndex];
-      if (!game) return;
-      setHeroGameProfile(btn.dataset.gamePreset, !!game.auto_bbr);
-    });
-  });
-  document.getElementById("carousel-hero-bbr")?.addEventListener("click", () => {
-    const game = carouselFiltered[carouselIndex];
-    if (!game) return;
-    const preset = (game.preset || "BALANCED").toUpperCase();
-    setHeroGameProfile(preset, !game.auto_bbr);
   });
 
   // Initial load of games
