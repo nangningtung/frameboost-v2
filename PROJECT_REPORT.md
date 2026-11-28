@@ -420,6 +420,24 @@ Gunakan checklist ini setiap kali ada perubahan.
 
 ## 9. Changelog
 
+### `manager-fase0` - 2026-11-28
+
+`feat: Fase 0 - skeleton manager app Compose native, IPC terverifikasi di device`
+
+Perubahan:
+- Project Gradle baru `manager/` (AGP 8.9.2 + Kotlin 2.1 + Compose BOM 2025.01);
+  toolchain CLI: JDK 21 Temurin + Gradle 8.12 di gamespace-research/tools.
+- Semua kelas Java lama di-port utuh; `MainActivity` lama menjadi
+  `LegacyWebViewActivity`; `MainActivity.kt` Compose baru = launcher.
+- SigningConfig memakai `hud-app/debug.keystore` — install -r di atas
+  priv-app tidak ditolak signature.
+- Layar skeleton: status daemon via IPC `probe` + pintu konsol legacy.
+
+Testing:
+- device: APK debug 8.7 MB terinstall; layar Compose tampil; IPC
+  TERHUBUNG (probe: a50/Android 16/GSI/gos:false/root:true); side panel
+  tidak tersentuh.
+
 ### `daemon-panic-resilient` - 2026-11-27
 
 `fix: tick daemon tahan panic + lock anti-poison`
