@@ -2819,198 +2819,53 @@ button:disabled,
   display: none;
 }
 
-/* ---------------------------------------------------------------- GAME SPACE header + filter (Pixel OS reference) */
-.games-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 2px 2px 0;
+/* ---------------------------------------------------------------- Pixel OS card language: Session / Policy / System
+   Dibatasi ke tab non-Game supaya tab Game tidak ikut berubah. */
+#tab-session .panel,
+#tab-policy .panel,
+#tab-system .panel {
+  border-radius: 24px;
+  padding: 14px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
 
-.games-brand {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-width: 0;
-}
-
-.games-brand-badge {
-  width: 34px;
-  height: 34px;
-  flex: none;
-  border-radius: 12px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.games-brand-badge svg {
-  width: 18px;
-  height: 18px;
-}
-
-.games-title {
-  font-size: 17px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
-  color: var(--text);
-  white-space: nowrap;
-}
-
-.games-sub {
-  display: block;
-  margin-top: 2px;
-  font-size: 11px;
-  color: var(--text-dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.games-head .games-actions-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: none;
-}
-
-.icon-pill-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  height: 36px;
-  min-width: 36px;
-  padding: 0 10px;
-  flex: none;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--line);
-  background: var(--bg-surface);
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 600;
-  transition: transform 0.15s var(--ease-emph), background-color 0.2s var(--ease-emph);
-}
-
-.icon-pill-btn svg {
-  width: 15px;
-  height: 15px;
-}
-
-.icon-pill-btn:active {
-  transform: scale(0.95);
-}
-
-.icon-pill-add {
-  color: var(--accent);
-}
-
-.filter-strip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  padding: 2px 0;
-}
-
-.filter-strip::-webkit-scrollbar {
-  display: none;
-}
-
-.search-box {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: none;
-  height: 32px;
-  min-width: 118px;
-  padding: 0 10px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--line);
-  background: var(--bg-surface);
-  color: var(--text-dim);
-}
-
-.search-box input {
-  width: 90px;
-  min-width: 0;
-  background: transparent;
-  border: none;
-  outline: none;
-  font-size: 12px;
-  color: var(--text);
-}
-
-.search-box input::placeholder {
-  color: var(--text-dim);
-}
-
-.chip-btn {
-  flex: none;
-  height: 32px;
-  padding: 0 11px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--line);
-  background: var(--bg-surface);
+#tab-session .panel-title,
+#tab-policy .panel-title,
+#tab-system .panel-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: var(--text-mid);
-  font-size: 11.5px;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background-color 0.18s var(--ease-emph);
 }
 
-.chip-btn.active {
-  background: var(--accent-soft);
-  color: var(--accent);
-  border-color: transparent;
-}
-
-/* ---------------------------------------------------------------- hero quick bar (preset + BBR) */
-.carousel-quick-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 7px;
-  margin-top: 8px;
-}
-
-.segmented-mini {
-  display: inline-flex;
-  padding: 2px;
-  border-radius: var(--radius-pill);
+#tab-policy .preset-segmented-control,
+#tab-session .preset-segmented-control {
+  gap: 5px;
+  padding: 3px;
+  border-radius: 16px;
+  background: var(--bg-base);
   border: 1px solid var(--line);
+}
+
+#tab-policy .preset-segment-btn,
+#tab-session .preset-segment-btn {
+  border-radius: 12px;
+}
+
+#tab-policy .preset-segment-btn.active,
+#tab-session .preset-segment-btn.active {
   background: var(--bg-surface);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
-.seg-mini-btn {
-  min-height: 30px;
-  padding: 0 10px;
-  border-radius: var(--radius-pill);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-dim);
-  transition: background-color 0.18s var(--ease-emph), color 0.18s var(--ease-emph);
+/* HUD card di tab Session (pengganti header atas) */
+.hud-card .panel-head {
+  align-items: center;
 }
 
-.seg-mini-btn.active {
-  background: var(--bg-raised);
-  color: var(--accent);
-}
-
-.carousel-bbr-btn {
-  height: 30px;
-  font-size: 11px;
-}
-
-.carousel-bbr-btn.active {
-  color: var(--accent);
-  background: var(--accent-soft);
-  border-color: var(--accent-line);
+.hud-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }

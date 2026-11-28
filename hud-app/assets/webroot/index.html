@@ -5,27 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <title>Secreto Space</title>
-  <link rel="stylesheet" href="style.css?v=0.1.0-ui13">
+  <link rel="stylesheet" href="style.css?v=0.1.0-ui14">
 </head>
 <body>
   <div class="app-container">
     <h1 class="sr-only">Secreto Space Console</h1>
 
     <!-- Top Bar: identity + live link state -->
-    <header class="hud-header">
-      <div class="brand">
-        <span class="brand-pill">A50</span>
-        <span class="brand-title">SECRETO</span>
-      </div>
-      <div class="hud-status">
-        <button id="btn-toggle-hud" class="btn-hud-pill" title="Toggle floating HUD">
-          HUD <span id="hud-status-text">ON</span>
-        </button>
-        <span class="state-dot" id="state-dot"></span>
-        <span class="state-label" id="state-label">IDLE</span>
-      </div>
-    </header>
-
     <div id="preview-banner" class="preview-banner hidden" role="status">PREVIEW DATA - NOT LIVE TELEMETRY</div>
     <div id="operation-status" class="operation-status hidden" role="status" aria-live="polite">
       <span class="operation-spinner" aria-hidden="true"></span>
@@ -37,6 +23,26 @@
     <main class="hud-main">
       <!-- ===================== 1. SESSION ===================== -->
       <section class="tab-panel" id="tab-session">
+        <!-- Floating HUD + status daemon (dipindah dari header atas) -->
+        <section class="panel hud-card" aria-labelledby="hud-title">
+          <div class="panel-head">
+            <h2 class="panel-title" id="hud-title">Floating HUD</h2>
+            <span class="hud-state">
+              <span class="state-dot" id="state-dot"></span>
+              <span class="state-label" id="state-label">IDLE</span>
+            </span>
+          </div>
+          <div class="action-card">
+            <div class="action-info">
+              <div class="action-title">Overlay bubble</div>
+              <div class="action-desc">Tampilkan FPS dan suhu di atas game saat bermain.</div>
+            </div>
+            <button id="btn-toggle-hud" class="btn-hud-pill" title="Toggle floating HUD">
+              HUD <span id="hud-status-text">ON</span>
+            </button>
+          </div>
+        </section>
+
 
         <!-- Instrument cluster: identity + readouts + governor rail -->
         <div class="panel cluster">
@@ -257,43 +263,29 @@
 
       <!-- ===================== 2. GAMES ===================== -->
       <section class="tab-panel active" id="tab-games">
-        <div class="games-head">
-          <div class="games-brand">
-            <div class="games-brand-badge" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4-3c-.83 0-1.5-.67-1.5-1.5S18.67 9 19.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
-            </div>
-            <div>
-              <h2 class="games-title">Game Space</h2>
-              <span id="games-sub" class="games-sub">Game library</span>
-            </div>
-          </div>
+        <div class="section-header">
+          <h2>
+            Game library
+            <span class="auto-badge" title="Games detected automatically">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/>
+                <path d="M18.5 15.5l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8z"/>
+              </svg>
+            </span>
+          </h2>
           <div class="games-actions-row">
-            <button id="btn-view-toggle" class="icon-pill-btn" title="Switch view" aria-label="Switch view mode" type="button"></button>
-            <button id="btn-scan-games" class="icon-pill-btn" title="Rescan installed games" aria-label="Refresh games" type="button">
+            <button id="btn-view-toggle" class="btn btn-icon-only" title="Switch view" aria-label="Switch view mode" type="button"></button>
+            <button id="btn-scan-games" class="btn btn-icon-only" title="Rescan installed games" aria-label="Refresh games" type="button">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/>
               </svg>
             </button>
-            <button id="btn-toggle-add-drawer" class="icon-pill-btn icon-pill-add" title="Add custom game" aria-label="Add custom game" type="button">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+            <button id="btn-toggle-add-drawer" class="btn btn-icon-only" title="Add custom game" aria-label="Add custom game" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
                 <path d="M12 5v14M5 12h14"/>
               </svg>
-              <span>Add</span>
             </button>
           </div>
-        </div>
-
-        <!-- Filter: pencarian + sumber game -->
-        <div class="filter-strip" role="toolbar" aria-label="Filter games">
-          <label class="search-box">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-            <input id="game-search-input" type="search" placeholder="Filter..." autocomplete="off" aria-label="Filter games by name">
-          </label>
-          <button class="chip-btn active" data-source="all" type="button">All</button>
-          <button class="chip-btn" data-source="config" type="button">Config</button>
-          <button class="chip-btn" data-source="auto" type="button">Auto</button>
-          <button class="chip-btn" data-source="manual" type="button">Manual</button>
-          <button class="chip-btn" data-source="builtin" type="button">Builtin</button>
         </div>
 
         <!-- Add Game Modal -->
@@ -335,15 +327,6 @@
                   </svg>
                   <span>Tune</span>
                 </button>
-              </div>
-              <div class="carousel-quick-row">
-                <div class="segmented-mini" role="group" aria-label="Preset game">
-                  <button class="seg-mini-btn" data-game-preset="BATTERY" type="button">Save</button>
-                  <button class="seg-mini-btn" data-game-preset="BALANCED" type="button">Balanced</button>
-                  <button class="seg-mini-btn" data-game-preset="PERFORMANCE" type="button">Perf</button>
-                  <button class="seg-mini-btn" data-game-preset="ESPORTS" type="button">Esports</button>
-                </div>
-                <button id="carousel-hero-bbr" class="icon-pill-btn carousel-bbr-btn" type="button">BBR</button>
               </div>
             </div>
           </div>
@@ -454,6 +437,10 @@
           <button class="hud-btn secondary full-w" id="btn-sleep-save">Save whitelist</button>
         </section>
 
+      </section>
+
+      <!-- ===================== 4. SYSTEM ===================== -->
+      <section class="tab-panel" id="tab-system">
         <div class="policy-subhead">Network</div>
 
         <div class="target-chips-row">
@@ -591,10 +578,7 @@
           </div>
           <button class="hud-btn secondary full-w" id="btn-run-bufferbloat">Run bufferbloat test</button>
         </section>
-      </section>
 
-      <!-- ===================== 4. SYSTEM ===================== -->
-      <section class="tab-panel" id="tab-system">
         <div class="section-header">
           <h2>System</h2>
           <span class="sub-hint">Capabilities, thermal guard and rollback</span>
@@ -816,6 +800,6 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script src="app.js?v=0.1.0-ui13"></script>
+  <script src="app.js?v=0.1.0-ui14"></script>
 </body>
 </html>

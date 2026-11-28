@@ -5,27 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <title>Secreto Space</title>
-  <link rel="stylesheet" href="style.css?v=0.1.0-ui12">
+  <link rel="stylesheet" href="style.css?v=0.1.0-ui14">
 </head>
 <body>
   <div class="app-container">
     <h1 class="sr-only">Secreto Space Console</h1>
 
     <!-- Top Bar: identity + live link state -->
-    <header class="hud-header">
-      <div class="brand">
-        <span class="brand-pill">A50</span>
-        <span class="brand-title">SECRETO</span>
-      </div>
-      <div class="hud-status">
-        <button id="btn-toggle-hud" class="btn-hud-pill" title="Toggle floating HUD">
-          HUD <span id="hud-status-text">ON</span>
-        </button>
-        <span class="state-dot" id="state-dot"></span>
-        <span class="state-label" id="state-label">IDLE</span>
-      </div>
-    </header>
-
     <div id="preview-banner" class="preview-banner hidden" role="status">PREVIEW DATA - NOT LIVE TELEMETRY</div>
     <div id="operation-status" class="operation-status hidden" role="status" aria-live="polite">
       <span class="operation-spinner" aria-hidden="true"></span>
@@ -37,6 +23,26 @@
     <main class="hud-main">
       <!-- ===================== 1. SESSION ===================== -->
       <section class="tab-panel" id="tab-session">
+        <!-- Floating HUD + status daemon (dipindah dari header atas) -->
+        <section class="panel hud-card" aria-labelledby="hud-title">
+          <div class="panel-head">
+            <h2 class="panel-title" id="hud-title">Floating HUD</h2>
+            <span class="hud-state">
+              <span class="state-dot" id="state-dot"></span>
+              <span class="state-label" id="state-label">IDLE</span>
+            </span>
+          </div>
+          <div class="action-card">
+            <div class="action-info">
+              <div class="action-title">Overlay bubble</div>
+              <div class="action-desc">Tampilkan FPS dan suhu di atas game saat bermain.</div>
+            </div>
+            <button id="btn-toggle-hud" class="btn-hud-pill" title="Toggle floating HUD">
+              HUD <span id="hud-status-text">ON</span>
+            </button>
+          </div>
+        </section>
+
 
         <!-- Instrument cluster: identity + readouts + governor rail -->
         <div class="panel cluster">
@@ -431,6 +437,10 @@
           <button class="hud-btn secondary full-w" id="btn-sleep-save">Save whitelist</button>
         </section>
 
+      </section>
+
+      <!-- ===================== 4. SYSTEM ===================== -->
+      <section class="tab-panel" id="tab-system">
         <div class="policy-subhead">Network</div>
 
         <div class="target-chips-row">
@@ -568,10 +578,7 @@
           </div>
           <button class="hud-btn secondary full-w" id="btn-run-bufferbloat">Run bufferbloat test</button>
         </section>
-      </section>
 
-      <!-- ===================== 4. SYSTEM ===================== -->
-      <section class="tab-panel" id="tab-system">
         <div class="section-header">
           <h2>System</h2>
           <span class="sub-hint">Capabilities, thermal guard and rollback</span>
@@ -793,6 +800,6 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script src="app.js?v=0.1.0-ui12"></script>
+  <script src="app.js?v=0.1.0-ui14"></script>
 </body>
 </html>

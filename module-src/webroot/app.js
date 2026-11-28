@@ -231,11 +231,8 @@
           loadGames();
         }
         if (tab.dataset.tab === "tab-policy") {
+          // Ping hanya jalan saat user menekan "Test all", tidak otomatis saat tab dibuka.
           refreshSleepSettings();
-          if (!multiPingDone) {
-            multiPingDone = true;
-            runMultiPing();
-          }
         }
         if (tab.dataset.tab === "tab-system") {
           loadProbe();
@@ -610,23 +607,13 @@
     }
 
     // Active Preset Tag & Selector
-    const activePreset = (data.game_preset || "BALANCED").toUpperCase();
-    if (heroPresetTag) {
-      heroPresetTag.textContent = activePreset;
-    }
-    if (presetSegmentBtns && presetSegmentBtns.length) {
-      presetSegmentBtns.forEach(btn => {
-        const p = (btn.getAttribute("data-preset") || "").toUpperCase();
-        if (p === activePreset) {
-          btn.classList.add("active");
-        } else {
-          btn.classList.remove("active");
-        }
-        btn.disabled = !currentForegroundPkg;
-      });
-    }
-    const presetIdleHint = document.getElementById("preset-idle-hint");
-    if (presetIdleHint) presetIdleHint.classList.toggle("hidden", !!currentForegroundPkg);
+    // Ada game di depan: preset game itu. Tidak ada: preset global terakhir.
+    const activePreset = currentForegroundPkg
+      ? (data.game_preset || "BALANCED").toUpperCase()
+      : (globalPreset || "BALANCED");
+    if (heroPresetTag) heroPresetTag.textContent = activePreset;
+    paintPresetSegments(activePreset);
+    document.getElementById("preset-idle-hint")?.classList.add("hidden");
 
     // Badges
     if (heroStutterGov) {
@@ -787,6 +774,10 @@
   });
 
   let daemonOnline = null;
+  // Preset global terakhir (BATTERY|BALANCED|PERFORMANCE|ESPORTS), null = belum ada override.
+  let globalPreset = null;
+  const PRESET_MODE = { BATTERY: "powersave", BALANCED: "balance", PERFORMANCE: "performance", ESPORTS: "fast" };
+  const PRESET_FROM_FILE = { ECO: "BATTERY", BALANCED: "BALANCED", PERFORMANCE: "PERFORMANCE", ESPORTS: "ESPORTS" };
 
   function setDaemonActions(enabled) {
     [
@@ -816,6 +807,37 @@
     const label = document.querySelector(".engine-badge-text");
     if (cluster) cluster.classList.toggle("is-offline", !online);
     if (label) label.textContent = online ? "ENGINE ARMED" : "ENGINE OFFLINE";
+  }
+
+  // Baca setelan terakhir dari daemon/disk saat app dibuka, supaya UI tidak
+  // kembali ke default setiap kali dibuka ulang.
+  async function syncPersistedState() {
+    try {
+      const b = JSON.parse((await sendSocketCmd("get_bypass_charge")) || "{}");
+      if (typeof b.bypass === "boolean") {
+        bypassActive = b.bypass;
+        renderBypassState();
+      }
+    } catch (e) {}
+    try {
+      const h = JSON.parse((await sendSocketCmd("get_heads_up")) || "{}");
+      if (typeof h.enabled === "boolean") {
+        dndActive = !h.enabled;
+        renderDndState();
+      }
+    } catch (e) {}
+    const raw = await execCmd("cat /data/adb/secreto_space/global_preset 2>/dev/null");
+    const name = typeof raw === "string" ? raw.trim().toUpperCase() : "";
+    globalPreset = name ? (PRESET_FROM_FILE[name] || null) : null;
+  }
+
+  function paintPresetSegments(active) {
+    if (!presetSegmentBtns || !presetSegmentBtns.length) return;
+    presetSegmentBtns.forEach((btn) => {
+      const p = (btn.getAttribute("data-preset") || "").toUpperCase();
+      btn.classList.toggle("active", p === active);
+      btn.disabled = false;
+    });
   }
 
   function setDaemonOffline() {
@@ -906,6 +928,7 @@
           setDaemonActions(true);
           setEngineBadge(true);
           refreshGosStatus();
+          syncPersistedState();
         }
         renderSnapshot(snap);
         if (daemonStatus) {
@@ -1910,6 +1933,16 @@
   // Prompt Superuser muncul sekali; setelah diizinkan, app terdaftar di
   // daftar Superuser KernelSU dan pemanggilan berikutnya senyap.
   const btnKsuRoot = document.getElementById("btn-ksu-root");
+  // Pulihkan status root dari terakhir kali berhasil (tanpa memicu dialog su).
+  (function restoreRootState() {
+    let granted = false;
+    try { granted = localStorage.getItem("sg_root_granted") === "1"; } catch (e) {}
+    if (!granted) return;
+    const badge = document.getElementById("ksu-badge");
+    const st = document.getElementById("ksu-status");
+    if (badge) { badge.textContent = "GRANTED"; badge.className = "badge active"; }
+    if (st) st.textContent = "Status: root diberikan sebelumnya. Tekan untuk cek ulang.";
+  })();
   if (btnKsuRoot) {
     btnKsuRoot.addEventListener("click", async () => {
       const badge = document.getElementById("ksu-badge");
@@ -1921,6 +1954,7 @@
       try { out = await window._nativeBridge.requestRoot(); } catch (e) { out = "error: " + e; }
       btnKsuRoot.disabled = false;
       const ok = typeof out === "string" && out.startsWith("uid=0");
+      try { localStorage.setItem("sg_root_granted", ok ? "1" : "0"); } catch (e) {}
       if (badge) badge.textContent = ok ? "GRANTED" : "NOT GRANTED";
       if (st) st.textContent = ok
         ? "Status: root diberikan - app terdaftar di Superuser KernelSU"
@@ -1938,7 +1972,14 @@
         if (currentForegroundPkg) {
           await sendSocketCmd(`set_game_profile ${currentForegroundPkg} ${targetPreset}`);
         } else {
-          await sendSocketCmd(`apply_preset ${targetPreset}`);
+          // Tanpa game di depan: simpan sebagai preset global (persisten, dibaca lagi saat app dibuka).
+          const mode = PRESET_MODE[targetPreset];
+          if (mode) {
+            const res = await sendSocketCmd(`set_global_preset ${mode}`);
+            if (typeof res === "string" && res.includes('"status":"ok"')) {
+              globalPreset = targetPreset;
+            }
+          }
         }
       });
     });
@@ -2045,6 +2086,7 @@
     const customHost = customTargetInput.value.trim();
     if (customHost) {
       activeTarget = customHost;
+      try { localStorage.setItem("sg_custom_target", customHost); } catch (e) {}
       if (netTargetDisplay) netTargetDisplay.textContent = activeTarget;
       runProbe(activeTarget, 3);
     }
@@ -2363,6 +2405,18 @@
     multiPingDone = true;
     runMultiPing();
   });
+
+  // Pulihkan target probe kustom terakhir (tanpa menjalankan probe).
+  (function restoreCustomTarget() {
+    let saved = "";
+    try { saved = localStorage.getItem("sg_custom_target") || ""; } catch (e) {}
+    if (!saved) return;
+    activeTarget = saved;
+    if (customTargetInput) customTargetInput.value = saved;
+    if (netTargetDisplay) netTargetDisplay.textContent = saved;
+    targetChips.forEach((c) => c.classList.toggle("active", c.dataset.target === "custom"));
+    if (customTargetBox) customTargetBox.classList.remove("hidden");
+  })();
 
   // Quick Probe Button
   const btnQuickPing = document.getElementById("btn-quick-ping");

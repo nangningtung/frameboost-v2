@@ -2818,3 +2818,54 @@ button:disabled,
 .toast.hidden {
   display: none;
 }
+
+/* ---------------------------------------------------------------- Pixel OS card language: Session / Policy / System
+   Dibatasi ke tab non-Game supaya tab Game tidak ikut berubah. */
+#tab-session .panel,
+#tab-policy .panel,
+#tab-system .panel {
+  border-radius: 24px;
+  padding: 14px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+#tab-session .panel-title,
+#tab-policy .panel-title,
+#tab-system .panel-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-mid);
+}
+
+#tab-policy .preset-segmented-control,
+#tab-session .preset-segmented-control {
+  gap: 5px;
+  padding: 3px;
+  border-radius: 16px;
+  background: var(--bg-base);
+  border: 1px solid var(--line);
+}
+
+#tab-policy .preset-segment-btn,
+#tab-session .preset-segment-btn {
+  border-radius: 12px;
+}
+
+#tab-policy .preset-segment-btn.active,
+#tab-session .preset-segment-btn.active {
+  background: var(--bg-surface);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+/* HUD card di tab Session (pengganti header atas) */
+.hud-card .panel-head {
+  align-items: center;
+}
+
+.hud-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
