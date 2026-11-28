@@ -1278,7 +1278,7 @@
         // Swipe left -> next
         if (carouselFiltered.length > 0) {
           let step = fastFlick ? 2 : 1;
-          carouselIndex = (carouselIndex + step) % carouselFiltered.length;
+          carouselIndex = Math.min(carouselIndex + step, carouselFiltered.length - 1);
           layoutCarousel(0, false);
           updateHeroAndDots(carouselFiltered);
         }
@@ -1286,7 +1286,7 @@
         // Swipe right -> prev
         if (carouselFiltered.length > 0) {
           let step = fastFlick ? 2 : 1;
-          carouselIndex = (carouselIndex - step + carouselFiltered.length) % carouselFiltered.length;
+          carouselIndex = Math.max(carouselIndex - step, 0);
           layoutCarousel(0, false);
           updateHeroAndDots(carouselFiltered);
         }
@@ -1324,9 +1324,9 @@
       if (Math.abs(dx) > 40) {
         if (carouselFiltered.length > 0) {
           if (dx < 0) {
-            carouselIndex = (carouselIndex + 1) % carouselFiltered.length;
+            carouselIndex = Math.min(carouselIndex + 1, carouselFiltered.length - 1);
           } else {
-            carouselIndex = (carouselIndex - 1 + carouselFiltered.length) % carouselFiltered.length;
+            carouselIndex = Math.max(carouselIndex - 1, 0);
           }
           layoutCarousel(0, false);
           updateHeroAndDots(carouselFiltered);
@@ -1373,17 +1373,18 @@
     const cards = carouselStage.querySelectorAll(".cover-card");
     if (!cards.length) return;
     // M = jumlah kartu di ring (untuk < 3 game kartu diulang); center = slot kartu aktif.
-    const M = cards.length;
-    const center = carouselIndex + (Number(carouselStage.dataset.base) || 0);
+    const N = carouselFiltered.length;
+    const center = carouselIndex;
     const SPACING = 120;
     const dragInSlots = dragPx / SPACING;
-    // Offset selalu di rentang [-M/2, M/2), jadi tetangga muncul simetris di kiri dan kanan.
-    const half = M / 2;
-    const wrapOffset = (v) => (((v % M) + M + half) % M) - half;
+    // Mentok di kiri dan kanan: tidak ada looping. Di ujung, geser hanya dengan efek karet.
+    let clampedDrag = dragInSlots;
+    if (carouselIndex === 0 && dragInSlots > 0) clampedDrag = dragInSlots * 0.3;
+    if (carouselIndex === N - 1 && dragInSlots < 0) clampedDrag = dragInSlots * 0.3;
     cards.forEach((card) => {
       card.style.transition = noTransition ? "none" : "";
       const slot = parseInt(card.dataset.slot, 10);
-      const offset = wrapOffset(slot - center + dragInSlots);
+      const offset = slot - center + clampedDrag;
       const abs = Math.abs(offset);
       const sign = offset > 0 ? 1 : (offset < 0 ? -1 : 0);
       // Telescoping X: first unit full spacing, rest compressed to 55%
@@ -1422,8 +1423,8 @@
 
     // Ring kartu: untuk < 3 game, kartu diulang supaya tetangga selalu tampil di kiri dan kanan.
     const N = games.length;
-    const M = N >= 3 ? N : N === 2 ? 4 : 3;
-    carouselStage.dataset.base = M > N ? String(N) : "0";
+    const M = N;
+    carouselStage.dataset.base = "0";
 
     // Build DOM only if card count changed (avoids re-creating elements
     // so CSS transitions can animate between states).
@@ -1459,7 +1460,7 @@
           if (swipeMoved) return;
           // Kartu aktif membuka detail; kartu lain memindahkan carousel ke sana.
           const slot = parseInt(card.dataset.slot, 10);
-          const center = carouselIndex + (Number(carouselStage.dataset.base) || 0);
+          const center = carouselIndex;
           if (slot === center) {
             openGameDetail(card.dataset.pkg);
           } else {

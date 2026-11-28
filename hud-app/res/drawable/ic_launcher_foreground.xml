@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Outer soft Material You pill/controller frame (safe zone 26..82) -->
+    <path
+        android:fillColor="#263147"
+        android:pathData="M36,34 L72,34 A14,14 0 0,1 86,48 L86,60 A14,14 0 0,1 72,74 L36,74 A14,14 0 0,1 22,60 L22,48 A14,14 0 0,1 36,34 Z" />
+    <!-- Subtle inner border -->
+    <path
+        android:strokeColor="#A8C7FA"
+        android:strokeWidth="2.2"
+        android:strokeAlpha="0.35"
+        android:pathData="M36,34 L72,34 A14,14 0 0,1 86,48 L86,60 A14,14 0 0,1 72,74 L36,74 A14,14 0 0,1 22,60 L22,48 A14,14 0 0,1 36,34 Z" />
+    <!-- Left D-pad / cross -->
+    <path
+        android:strokeColor="#A8C7FA"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M34,49 L34,59 M29,54 L39,54" />
+    <!-- Right action dots -->
+    <path
+        android:fillColor="#81C995"
+        android:pathData="M74,47 A2.6,2.6 0 1,1 73.99,47 Z" />
+    <path
+        android:fillColor="#A8C7FA"
+        android:pathData="M79,54 A2.6,2.6 0 1,1 78.99,54 Z" />
+    <path
+        android:fillColor="#A8C7FA"
+        android:pathData="M69,54 A2.6,2.6 0 1,1 68.99,54 Z" />
+    <path
+        android:fillColor="#81C995"
+        android:pathData="M74,61 A2.6,2.6 0 1,1 73.99,61 Z" />
+    <!-- Center boost bolt -->
+    <path
+        android:fillColor="#A8C7FA"
+        android:pathData="M56,39 L46,55 L53,55 L50,69 L62,52 L55,52 Z" />
+</vector>

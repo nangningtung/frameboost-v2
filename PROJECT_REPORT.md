@@ -1095,7 +1095,20 @@ Testing:
 - E2E device: preset ESPORTS -> seluruh aksen lime; tap PERF -> seluruh aksen berganti amber real-time tanpa delay (screenshot).
 - Tidak ada regresi: struktur panel, touch target 44dp+48dp, dan sinkronisasi dua arah tetap utuh.
 
-## 11. Laporan Terbaru (2026-11-27, capture preset, tema side panel & priority boost)
+## 11. Laporan Terbaru (2026-11-28, tata letak Policy, carousel non-loop & logo Pixel OS)
+
+### Perubahan yang diselesaikan
+
+| Item | Ringkasan | Verifikasi |
+|---|---|---|
+| **Floating HUD di tab Policy** | Kartu Floating HUD (`Overlay bubble`) dipindah dari tab Session ke bawah header `Policy` di `module-src/webroot/index.html` | Screenshot tab Policy & Session di HP (`1920x1080` / `1080x2340`) |
+| **Carousel Game non-loop** | Swipe dan tap kartu samping di `module-src/webroot/app.js` mentok di kartu pertama/terakhir tanpa wrap-around; drag di ujung memakai redaman karet `0.3` | Swipe kiri/kanan di tab Games pada HP terverifikasi mentok |
+| **Penyelarasan deskripsi** | Sub-hint tab Policy diperbarui menjadi `Floating HUD, presets and background apps`; deskripsi Floating HUD disesuaikan ke `Show live FPS, temperature and quick side panel over games.` | Screenshot tab Policy (`ui21`) |
+| **Logo aplikasi Pixel OS** | Adaptive icon baru (`hud-app/res/mipmap-anydpi-v26/ic_launcher.xml`, `ic_launcher_background.xml`, `ic_launcher_foreground.xml`) + fallback `ic_launcher.xml` bertema Material You gelap (`#111318`, `#A8C7FA`, `#81C995`) + `<monochrome>` | Build `hud-app/SecretoSpace.apk` sukses & terpasang di HP; `OverlayService` tetap sinkron |
+
+---
+
+## 12. Laporan Sebelumnya (2026-11-27, capture preset, tema side panel & priority boost)
 
 ### Fitur & perbaikan yang diselesaikan
 
@@ -1114,7 +1127,7 @@ Testing:
 
 ---
 
-## 12. Laporan Sebelumnya (2026-11-26, sesi persistensi state)
+## 13. Laporan Sebelumnya (2026-11-26, sesi persistensi state)
 
 ### Masalah yang dilaporkan user
 
@@ -1149,7 +1162,7 @@ Saat pengujian, `system_server` GSI crash-restart 2x (load spike; bukan karena p
 
 ---
 
-## 13. Laporan Sebelumnya (2026-11-25, pembersihan & side panel instan)
+## 14. Laporan Sebelumnya (2026-11-25, pembersihan & side panel instan)
 
 ### Yang dihapus (gimmick)
 
