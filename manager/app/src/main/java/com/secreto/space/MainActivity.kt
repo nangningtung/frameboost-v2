@@ -1,6 +1,5 @@
 package com.secreto.space
 
-import android.Manifest
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -22,8 +21,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -46,20 +47,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.secreto.space.ui.SecretoTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Secreto Space — Manager native (Compose).
+ * Secreto Space — Manager native (Compose), tema Pixel/Material You.
  *
  * Alur: onboarding pertama kali (izin overlay → grant root → link daemon →
- * boot hand-off) lalu Home. Pola boot hand-off ala AZenith:
- * Menautkan → Memindai → Menyetel → Siap.
+ * boot hand-off) lalu Home. Side panel overlay tidak tersentuh.
  */
 class MainActivity : ComponentActivity() {
     private val prefs by lazy {
@@ -69,7 +71,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
+            SecretoTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     var onboarded by remember { mutableStateOf(prefs.getBoolean("onboarded", false)) }
                     if (onboarded) {
@@ -156,15 +158,20 @@ fun OnboardingFlow(onFinished: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(20.dp)
+            .padding(horizontal = 20.dp)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Selamat datang di", style = MaterialTheme.typography.bodyMedium)
-        Text("Secreto Space", style = MaterialTheme.typography.headlineLarge)
+        Spacer(modifier = Modifier.height(8.dp))
+        Text("Selamat datang di", style = MaterialTheme.typography.bodyLarge)
+        Text(
+            "Secreto Space",
+            style = MaterialTheme.typography.displaySmall,
+            fontWeight = FontWeight.Medium
+        )
         LinearProgressIndicator(
             progress = { progress.value },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         )
 
         AnimatedContent(targetState = step, transitionSpec = { fadeIn() togetherWith fadeOut() }) { s ->
@@ -175,7 +182,11 @@ fun OnboardingFlow(onFinished: () -> Unit) {
                         "render scale, jaringan, dan pemulihan ke stock yang terjamin. " +
                         "Semua dijalankan daemon Rust lokal — tanpa cloud, tanpa internet."
                 ) {
-                    Button(onClick = { step = 1 }, modifier = Modifier.fillMaxWidth()) {
+                    Button(
+                        onClick = { step = 1 },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = CircleShape
+                    ) {
                         Text("Mulai penyiapan")
                     }
                 }
@@ -187,18 +198,26 @@ fun OnboardingFlow(onFinished: () -> Unit) {
                     status = if (overlayOk) CheckState.OK else CheckState.WAITING
                 ) {
                     if (overlayOk) {
-                        Button(onClick = { step = 2 }, modifier = Modifier.fillMaxWidth()) {
+                        Button(
+                            onClick = { step = 2 },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = CircleShape
+                        ) {
                             Text("Lanjut")
                         }
                     } else {
-                        Button(onClick = {
-                            context.startActivity(
-                                Intent(
-                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                    Uri.parse("package:com.secreto.space")
+                        Button(
+                            onClick = {
+                                context.startActivity(
+                                    Intent(
+                                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                        Uri.parse("package:com.secreto.space")
+                                    )
                                 )
-                            )
-                        }, modifier = Modifier.fillMaxWidth()) {
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = CircleShape
+                        ) {
                             Text("Izinkan tampil di atas aplikasi lain")
                         }
                     }
@@ -220,10 +239,18 @@ fun OnboardingFlow(onFinished: () -> Unit) {
                             Spacer(modifier = Modifier.padding(6.dp))
                             Text("Menunggu keputusan Superuser…")
                         }
-                        rootOk == true -> Button(onClick = { step = 3 }, modifier = Modifier.fillMaxWidth()) {
+                        rootOk == true -> Button(
+                            onClick = { step = 3 },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = CircleShape
+                        ) {
                             Text("Lanjut")
                         }
-                        else -> Button(onClick = { grantRoot() }, modifier = Modifier.fillMaxWidth()) {
+                        else -> Button(
+                            onClick = { grantRoot() },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = CircleShape
+                        ) {
                             Text("Minta akses root")
                         }
                     }
@@ -246,13 +273,20 @@ fun OnboardingFlow(onFinished: () -> Unit) {
                             style = MaterialTheme.typography.bodySmall,
                             fontFamily = FontFamily.Monospace
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
                         if (probe!!.contains("\"device\":\"a50\"")) {
-                            Button(onClick = { step = 4 }, modifier = Modifier.fillMaxWidth()) {
+                            Button(
+                                onClick = { step = 4 },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = CircleShape
+                            ) {
                                 Text("Selesai penyiapan")
                             }
                         } else {
-                            Text("Daemon tidak menjawab — pastikan modul aktif.", style = MaterialTheme.typography.bodySmall)
+                            Text(
+                                "Daemon tidak menjawab — pastikan modul aktif.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
                         }
                     }
                 }
@@ -262,11 +296,19 @@ fun OnboardingFlow(onFinished: () -> Unit) {
                     body = bootPhase.ifEmpty { "Tekan tombol untuk menyelesaikan boot hand-off." }
                 ) {
                     if (bootPhase.isEmpty()) {
-                        Button(onClick = { finishBootHandoff() }, modifier = Modifier.fillMaxWidth()) {
+                        Button(
+                            onClick = { finishBootHandoff() },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = CircleShape
+                        ) {
                             Text("Nyalakan Secreto Space")
                         }
                     } else if (bootPhase == "Siap.") {
-                        Button(onClick = onFinished, modifier = Modifier.fillMaxWidth()) {
+                        Button(
+                            onClick = onFinished,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = CircleShape
+                        ) {
                             Text("Masuk")
                         }
                     } else {
@@ -292,13 +334,22 @@ private fun OnboardingCard(
     status: CheckState? = null,
     content: @Composable () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row {
-                Text(title, style = MaterialTheme.typography.titleLarge)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        )
+    ) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Medium
+                )
                 when (status) {
-                    CheckState.OK -> Text("  ✓", style = MaterialTheme.typography.titleLarge)
-                    CheckState.FAILED -> Text("  ✗", style = MaterialTheme.typography.titleLarge)
+                    CheckState.OK -> StatusPill(text = "Siap")
+                    CheckState.FAILED -> StatusPill(text = "Gagal")
                     else -> {}
                 }
             }
@@ -325,34 +376,36 @@ private fun ManagerHome(onOpenLegacy: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(horizontal = 20.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Secreto Space", style = MaterialTheme.typography.headlineMedium)
-        Text("Manager native", style = MaterialTheme.typography.bodyMedium)
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            "Secreto Space",
+            style = MaterialTheme.typography.displaySmall,
+            fontWeight = FontWeight.Medium
+        )
+        StatusPill(
+            text = when (probeOk) {
+                true -> "Daemon terhubung"
+                false -> "Daemon tidak menjawab"
+                null -> "Menyambung…"
+            }
+        )
 
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
-                containerColor = when (probeOk) {
-                    true -> MaterialTheme.colorScheme.primaryContainer
-                    false -> MaterialTheme.colorScheme.errorContainer
-                    null -> MaterialTheme.colorScheme.surfaceVariant
-                }
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
             )
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row {
-                    Text("Daemon  ", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        when (probeOk) {
-                            true -> "TERHUBUNG"
-                            false -> "GAGAL"
-                            null -> "…"
-                        },
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                }
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    "Perangkat",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium
+                )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     probe.take(400),
@@ -363,19 +416,35 @@ private fun ManagerHome(onOpenLegacy: () -> Unit) {
         }
 
         Button(
-            modifier = Modifier.fillMaxWidth(),
             onClick = {
                 // placeholder Fase 1: diganti layar library Compose
-            }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            shape = CircleShape
         ) {
             Text("Library game (Fase 1)")
         }
 
         OutlinedButton(
+            onClick = onOpenLegacy,
             modifier = Modifier.fillMaxWidth(),
-            onClick = onOpenLegacy
+            shape = CircleShape
         ) {
             Text("Buka konsol legacy (WebView)")
         }
+    }
+}
+
+@Composable
+private fun StatusPill(text: String) {
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.primaryContainer
+    ) {
+        Text(
+            text,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.labelMedium
+        )
     }
 }
