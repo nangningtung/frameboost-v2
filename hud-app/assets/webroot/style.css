@@ -2869,3 +2869,28 @@ button:disabled,
   align-items: center;
   gap: 6px;
 }
+
+/* ---------------------------------------------------------------- simetri layout antar tab (header atas dihapus) */
+.app-container {
+  padding-top: max(12px, env(safe-area-inset-top));
+}
+
+.hud-main {
+  padding: 0 16px calc(var(--safe-bottom) + 12px + env(safe-area-inset-bottom));
+}
+
+.tab-panel.active {
+  gap: 12px;
+  align-items: stretch;
+}
+
+.tab-panel > .panel,
+.tab-panel > section.panel {
+  width: 100%;
+}
+
+#tab-session .panel,
+#tab-policy .panel,
+#tab-system .panel {
+  padding: 16px;
+}
