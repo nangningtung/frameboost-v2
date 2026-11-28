@@ -83,6 +83,14 @@ pub struct BatteryState {
 
 static GOS_DISABLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
+/// Cached GOS presence. `pm path` forks a subprocess; the snapshot loop used to
+/// run it every 250 ms, so cache the answer instead of forking ~4x/second.
+static GOS_PRESENT: Mutex<Option<(bool, Instant)>> = Mutex::new(None);
+
+/// Cached network state. `ip route` + `tc qdisc` fork subprocesses; cache them
+/// for a couple of seconds instead of forking on every 250 ms snapshot.
+static NET_CACHE: Mutex<Option<(NetState, Instant)>> = Mutex::new(None);
+
 /// Cached "heads-up blocked" state. Reading the setting on every 250 ms
 /// snapshot would spam binder, but reporting `is_game` was a lie: turning DND
 /// off from the side panel never changed the snapshot. Cache for 5 s and
@@ -123,6 +131,21 @@ fn has_samsung_gos() -> bool {
         .output()
         .map(|o| o.status.success() && !o.stdout.is_empty())
         .unwrap_or(false)
+}
+
+fn has_samsung_gos_cached() -> bool {
+    if let Ok(c) = GOS_PRESENT.lock() {
+        if let Some((v, at)) = *c {
+            if at.elapsed() < Duration::from_secs(60) {
+                return v;
+            }
+        }
+    }
+    let v = has_samsung_gos();
+    if let Ok(mut c) = GOS_PRESENT.lock() {
+        *c = Some((v, Instant::now()));
+    }
+    v
 }
 
 fn getprop(key: &str) -> String {
@@ -313,6 +336,21 @@ fn read_net() -> NetState {
     }
 }
 
+fn read_net_cached() -> NetState {
+    if let Ok(c) = NET_CACHE.lock() {
+        if let Some((v, at)) = &*c {
+            if at.elapsed() < Duration::from_secs(2) {
+                return v.clone();
+            }
+        }
+    }
+    let v = read_net();
+    if let Ok(mut c) = NET_CACHE.lock() {
+        *c = Some((v.clone(), Instant::now()));
+    }
+    v
+}
+
 fn read_battery() -> BatteryState {
     let status = read_file("/sys/class/power_supply/battery/status");
     let capacity_pct = read_u32("/sys/class/power_supply/battery/capacity");
@@ -405,12 +443,12 @@ fn take_snapshot(
         temp_gpu_mc: read_u32("/sys/class/thermal/thermal_zone2/temp") as i32,
         gpu: read_gpu(),
         cpu: read_cpu(),
-        net: read_net(),
+        net: read_net_cached(),
         battery: read_battery(),
         vm_swappiness: read_u32("/proc/sys/vm/swappiness"),
         heads_up_blocked: heads_up_blocked_cached(),
         gos_disabled: GOS_DISABLED.load(Ordering::Relaxed),
-        has_gos: has_samsung_gos(),
+        has_gos: has_samsung_gos_cached(),
         daemon_uptime_s: start.elapsed().as_secs(),
         stock_saved: StockSnapshot::exists(),
         session: crate::session::info(),
@@ -921,7 +959,9 @@ fn main() {
             if let Ok(json) = serde_json::to_string(&snap) {
                 let _ = fs::write(SNAPSHOT_FILE, &json);
             }
-            thread::sleep(Duration::from_millis(250));
+            // 1s is plenty for the legacy WebUI console; the 250ms cadence only
+            // multiplied the subprocess forks (pm/ip/tc) above.
+            thread::sleep(Duration::from_millis(1000));
         }
     });
 
