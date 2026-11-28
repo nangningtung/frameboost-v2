@@ -1,6 +1,6 @@
 # Secreto Space 0.1.0 - Project Report
 
-Status: **rilis harian untuk A50; semua fitur inti terverifikasi di device; side panel keluar-masuk game instan (245-375 ms); state terakhir tersimpan di semua lapisan; capture preset + timer + tanpa batas waktu + aksen dinamis di side panel; renice + ionice game berjurnal; kontrak powercfg.json kompatibel Scene; standby hint + fail-safe apply + polling adaptif; daemon panic-resilient (catch_unwind + lock anti-poison); eksperimen HUD in-process di-shelve (kode tersimpan); tombol KernelSU access di WebUI; commit terakhir `6fe3bf9`**  
+Status: **rilis harian untuk A50; semua fitur inti terverifikasi di device; side panel keluar-masuk game instan (245-375 ms); state terakhir tersimpan di semua lapisan; capture preset + timer + tanpa batas waktu + aksen dinamis di side panel; renice + ionice game berjurnal; kontrak powercfg.json kompatibel Scene; standby hint + fail-safe apply + polling adaptif; daemon panic-resilient (catch_unwind + lock anti-poison); eksperimen HUD in-process di-shelve (kode tersimpan); tombol KernelSU access di WebUI; app manager 5 tab (Sesi + Kebijakan) + cover flow flat + tema statis + daemon snapshot tanpa fork subproses**  
 Device uji: `RR8M50C0W8T` (Samsung Galaxy A50, GSI API 36)  
 
 ---
@@ -419,6 +419,31 @@ Gunakan checklist ini setiap kali ada perubahan.
 ---
 
 ## 9. Changelog
+
+### `manager-5tab-perf` - 2026-11-28
+
+`feat: 5 tab lengkap (Sesi + Kebijakan) + optimisasi ringan untuk A50`
+
+Perubahan (app manager):
+- Tambah 2 tab baru: `SessionScreen` (telemetri live FPS/suhu/GPU/baterai, guard
+  Game DND + bypass charging, ping 1.1.1.1) dan `PolicyScreen` (histeresis termal
+  40–95 °C, Samsung GOS, kernel governor/swappiness, jalur pemulihan). Semua dari
+  IPC `snapshot`/`gos_status` — data nyata, tidak ada nilai pura-pura.
+- Cover flow jadi flat: hapus `rotationY` + `cameraDistance` (perspektif 3D berat
+  di Mali-G72 A50), hapus `blur` ambient glow, hapus shadow kartu, ikon cover
+  128 px dimuat off-main-thread (`produceState` + `Dispatchers.IO`).
+- Tema: ganti `dynamicColorScheme` (query wallpaper + hitung palet tiap startup,
+  jank di GSI) ke palet statis `CozyDark`/`CozyLight`.
+
+Perubahan (daemon `secretod`):
+- Cache `has_samsung_gos` (60 dtk) + `read_net` (2 dtk) supaya loop snapshot
+  tidak lagi fork `pm`/`ip`/`tc` ~13×/detik.
+- File writer snapshot 250 ms → 1000 ms (cukup untuk WebUI legacy).
+
+Testing:
+- build: `:app:assembleDebug` + `cargo build --release --target aarch64-linux-android` OK.
+- device: install + relaunch OK; 5 tab tampil; Sesi & Kebijakan render data telemetri
+  nyata; daemon baru menjawab `list_games`; memori app ~108 MB PSS.
 
 ### `manager-fase0` - 2026-11-28
 

@@ -1,0 +1,2668 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Game Space — FrameBoost v2 (Pixel OS)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    /* =========================================================================
+       1. AOSP / PIXEL OS MATERIAL YOU 3 DESIGN TOKENS
+       ========================================================================= */
+    :root {
+      --ease-emphasized: cubic-bezier(0.2, 0.0, 0.0, 1.0);
+      --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+
+      /* Pixel Dark (Default) */
+      --bg-base: #111318;
+      --bg-surface: #1B1F27;
+      --bg-surface-high: #252A34;
+      --bg-surface-variant: #2D3340;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.16);
+      --text-primary: #E2E2E9;
+      --text-secondary: #9EA3B0;
+      --accent: #A8C7FA;
+      --on-accent: #062E6F;
+      --accent-container: rgba(168, 199, 250, 0.16);
+      --accent-container-strong: rgba(168, 199, 250, 0.25);
+
+      --ok: #34D399;
+      --ok-bg: rgba(52, 211, 153, 0.14);
+      --warn: #FBBF24;
+      --warn-bg: rgba(251, 191, 36, 0.15);
+      --crit: #F87171;
+      --crit-bg: rgba(248, 113, 113, 0.16);
+      --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.25);
+    }
+
+    html[data-theme="amoled"] {
+      --bg-base: #000000;
+      --bg-surface: #0D0F14;
+      --bg-surface-high: #161922;
+      --bg-surface-variant: #1F2430;
+      --border-subtle: rgba(255, 255, 255, 0.09);
+      --border-strong: rgba(255, 255, 255, 0.18);
+    }
+
+    html[data-theme="light"] {
+      --bg-base: #F6F8FC;
+      --bg-surface: #FFFFFF;
+      --bg-surface-high: #EEF2F8;
+      --bg-surface-variant: #E1E7F0;
+      --border-subtle: rgba(15, 23, 42, 0.08);
+      --border-strong: rgba(15, 23, 42, 0.16);
+      --text-primary: #181C22;
+      --text-secondary: #5B6270;
+      --accent: #0B57D0;
+      --on-accent: #FFFFFF;
+      --accent-container: rgba(11, 87, 208, 0.11);
+      --accent-container-strong: rgba(11, 87, 208, 0.18);
+
+      --ok: #059669;
+      --ok-bg: rgba(5, 150, 105, 0.12);
+      --warn: #D97706;
+      --warn-bg: rgba(217, 119, 6, 0.12);
+      --crit: #DC2626;
+      --crit-bg: rgba(220, 38, 38, 0.12);
+      --shadow-card: 0 4px 14px rgba(15, 23, 42, 0.05);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #07080B;
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      overflow-x: hidden;
+    }
+
+    h1, h2, h3, .font-display {
+      font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+    }
+
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* Desktop Viewport Preview Bar */
+    .vp-bar {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 10px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #161920;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 11px;
+      color: #A0A6B5;
+    }
+    @media (min-width: 640px) {
+      .vp-bar { display: flex; }
+    }
+    .vp-btn {
+      background: transparent;
+      border: none;
+      color: inherit;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.18s var(--ease-emphasized);
+    }
+    .vp-btn:hover { background: rgba(255, 255, 255, 0.08); }
+    .vp-btn.active {
+      background: #A8C7FA;
+      color: #062E6F;
+      font-weight: 700;
+    }
+
+    /* Main Device Frame */
+    .app-shell {
+      width: 100%;
+      height: 100vh;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      container-type: inline-size;
+      transition: background-color 0.28s var(--ease-emphasized), color 0.28s var(--ease-emphasized), width 0.3s var(--ease-emphasized);
+    }
+
+    @media (min-width: 640px) {
+      .app-shell {
+        width: 404px;
+        height: 836px;
+        max-height: 92vh;
+        border-radius: 36px;
+        border: 1px solid var(--border-strong);
+        box-shadow: 0 28px 70px rgba(0, 0, 0, 0.65);
+      }
+    }
+
+    /* Dynamic Ambient Backdrop */
+    .ambient-glow {
+      position: absolute;
+      top: -90px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 145%;
+      height: 350px;
+      border-radius: 50%;
+      filter: blur(72px);
+      opacity: 0.32;
+      pointer-events: none;
+      z-index: 1;
+      transition: background 0.45s var(--ease-emphasized);
+    }
+
+    /* Status Bar & Header */
+    .status-bar {
+      position: relative;
+      z-index: 15;
+      padding: 10px 20px 4px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .camera-dot {
+      display: none;
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: #090A0D;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    @media (min-width: 640px) { .camera-dot { display: block; } }
+
+    .top-header {
+      position: relative;
+      z-index: 15;
+      padding: 6px 16px 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+    .brand-badge {
+      width: 32px;
+      height: 32px;
+      border-radius: 12px;
+      background: var(--accent-container);
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .brand-title {
+      font-size: 16.5px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+    }
+    .brand-sub {
+      font-size: 10.5px;
+      color: var(--text-secondary);
+      font-weight: 500;
+      display: block;
+      margin-top: 1px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .icon-pill-btn {
+      height: 32px;
+      min-width: 32px;
+      padding: 0 9px;
+      border-radius: 999px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-primary);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.15s var(--ease-emphasized), background-color 0.2s var(--ease-emphasized);
+    }
+    .icon-pill-btn:active, .pressable:active { transform: scale(0.95); }
+    .icon-pill-btn:hover { background: var(--bg-surface-high); }
+
+    /* Scrollable Panel Container */
+    .tab-panel {
+      position: relative;
+      z-index: 10;
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 2px 16px 18px;
+      scrollbar-width: none;
+    }
+    .tab-panel::-webkit-scrollbar { display: none; }
+
+    .tab-panel.games-panel {
+      display: flex;
+      flex-direction: column;
+      padding: 0 0 10px;
+      overflow: hidden;
+    }
+
+    /* =========================================================================
+       2. GAMES TAB: FILTER BAR, 3D COVER FLOW & GRID
+       ========================================================================= */
+    .filter-strip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 16px 6px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      flex-shrink: 0;
+    }
+    .filter-strip::-webkit-scrollbar { display: none; }
+
+    .search-box {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 999px;
+      padding: 4px 10px;
+      min-width: 112px;
+      flex-shrink: 0;
+    }
+    .search-box input {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text-primary);
+      font-size: 11px;
+      width: 78px;
+    }
+    .search-box input::placeholder { color: var(--text-secondary); }
+
+    .chip-btn {
+      padding: 5px 11px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-surface);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.18s var(--ease-emphasized);
+    }
+    .chip-btn.active {
+      background: var(--accent-container-strong);
+      color: var(--accent);
+      border-color: transparent;
+    }
+
+    /* 3D Cover Flow Carousel */
+    .carousel-wrapper {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+    }
+    .cover-stage-wrap {
+      position: relative;
+      flex: 1;
+      min-height: 250px;
+      max-height: 372px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: auto 0;
+    }
+    .cover-stage {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: grab;
+      touch-action: pan-y;
+    }
+    .cover-stage:active { cursor: grabbing; }
+
+    .nav-arrow {
+      position: absolute;
+      z-index: 25;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: rgba(15, 18, 25, 0.55);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #fff;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    @media (min-width: 640px) { .nav-arrow { display: flex; } }
+    .nav-arrow.left { left: 10px; }
+    .nav-arrow.right { right: 10px; }
+
+    .cover-card {
+      position: absolute;
+      width: var(--cover-w, 190px);
+      height: var(--cover-h, 264px);
+      border-radius: 26px;
+      overflow: hidden;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      color: #fff;
+      cursor: pointer;
+      will-change: transform, opacity;
+      transition: transform 0.38s var(--ease-spring), opacity 0.34s var(--ease-emphasized), box-shadow 0.38s var(--ease-emphasized);
+    }
+    .cover-card.center {
+      box-shadow: 0 22px 44px -12px rgba(0, 0, 0, 0.78), 0 0 0 1.5px rgba(255, 255, 255, 0.32);
+    }
+    .cover-card.side {
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.1);
+    }
+
+    .card-top-badges {
+      position: relative;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 4px;
+    }
+    .badge-glass {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.42);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      letter-spacing: 0.02em;
+    }
+    .badge-spoof {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 8.5px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: rgba(168, 199, 250, 0.25);
+      color: #E0ECFF;
+      border: 1px solid rgba(168, 199, 250, 0.4);
+    }
+
+    .card-art-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .card-bottom-overlay {
+      position: relative;
+      z-index: 3;
+      margin: auto -12px -12px;
+      padding: 26px 13px 13px;
+      background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 15%, rgba(0, 0, 0, 0.45) 65%, transparent 100%);
+    }
+    .card-short {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9.5px;
+      letter-spacing: 0.1em;
+      opacity: 0.78;
+      text-transform: uppercase;
+    }
+    .card-title {
+      font-size: 13.5px;
+      font-weight: 700;
+      line-height: 1.25;
+      margin-top: 2px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .dots-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 4px 0;
+      flex-shrink: 0;
+    }
+    .dot-btn {
+      height: 5px;
+      width: 5px;
+      border-radius: 999px;
+      border: none;
+      background: var(--border-strong);
+      cursor: pointer;
+      transition: all 0.28s var(--ease-emphasized);
+    }
+    .dot-btn.active {
+      width: 18px;
+      background: var(--accent);
+    }
+
+    /* Hero Game Showcase */
+    .hero-showcase {
+      padding: 2px 18px 2px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .hero-meta-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      font-size: 10.5px;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+    .status-dot-ok {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--ok);
+    }
+    .hero-title {
+      font-size: 19px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-top: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .hero-sub {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    .hero-cta-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .btn-play-primary {
+      flex: 1;
+      max-width: 215px;
+      height: 42px;
+      border-radius: 999px;
+      border: none;
+      background: var(--accent);
+      color: var(--on-accent);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(11, 87, 208, 0.25);
+      transition: transform 0.15s var(--ease-emphasized), filter 0.2s;
+    }
+    .btn-tune {
+      height: 42px;
+      padding: 0 14px;
+      border-radius: 999px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-primary);
+      font-size: 12px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+
+    .quick-bar-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      margin-top: 9px;
+    }
+    .segmented-mini {
+      display: inline-flex;
+      padding: 2px;
+      border-radius: 999px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+    }
+    .seg-mini-btn {
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.18s var(--ease-emphasized);
+    }
+    .seg-mini-btn.active {
+      background: var(--accent-container-strong);
+      color: var(--accent);
+    }
+
+    /* Compact Grid View */
+    .grid-view-wrap {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 16px 14px;
+      scrollbar-width: none;
+    }
+    .grid-view-wrap::-webkit-scrollbar { display: none; }
+    .games-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+    .grid-card {
+      position: relative;
+      height: 214px;
+      border-radius: 22px;
+      overflow: hidden;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      cursor: pointer;
+    }
+
+    /* Layar / shell lebih lebar: kartu grid & telemetri memakai kolom lebih banyak. */
+    @container (min-width: 520px) {
+      .games-grid { grid-template-columns: repeat(3, 1fr); }
+      .telemetry-grid { grid-template-columns: repeat(4, 1fr); }
+    }
+
+    /* =========================================================================
+       3. MATERIAL YOU 3 CARDS, TELEMETRY CANVAS & CONTROLS
+       ========================================================================= */
+    .m3-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 24px;
+      padding: 14px;
+      margin-bottom: 10px;
+      box-shadow: var(--shadow-card);
+    }
+    .card-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .section-kicker {
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-secondary);
+    }
+
+    .pill-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .pill-ok { background: var(--ok-bg); color: var(--ok); }
+    .pill-warn { background: var(--warn-bg); color: var(--warn); }
+    .pill-crit { background: var(--crit-bg); color: var(--crit); }
+    .pill-accent { background: var(--accent-container); color: var(--accent); }
+
+    /* Telemetry 2x2 Sparkline Grid */
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .tel-box {
+      background: var(--bg-base);
+      border: 1px solid var(--border-subtle);
+      border-radius: 18px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .tel-top {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+    .tel-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+    .tel-sub {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9.5px;
+      color: var(--text-secondary);
+    }
+    .tel-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 16px;
+      font-weight: 700;
+      margin: 3px 0 5px;
+      letter-spacing: -0.02em;
+    }
+    .spark-canvas {
+      width: 100%;
+      height: 30px;
+      display: block;
+    }
+
+    /* Progress / Headroom Bars */
+    .bar-track {
+      width: 100%;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--bg-surface-high);
+      overflow: hidden;
+      display: flex;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.35s var(--ease-emphasized), background-color 0.3s;
+    }
+
+    /* M3 Switch */
+    .m3-switch {
+      width: 44px;
+      height: 24px;
+      border-radius: 999px;
+      background: var(--bg-surface-variant);
+      border: 1px solid var(--border-strong);
+      padding: 2px;
+      cursor: pointer;
+      position: relative;
+      flex-shrink: 0;
+      transition: background-color 0.2s var(--ease-emphasized);
+    }
+    .m3-switch[aria-checked="true"] {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+    .m3-switch-thumb {
+      display: block;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--text-secondary);
+      transition: transform 0.22s var(--ease-spring), background-color 0.2s;
+    }
+    .m3-switch[aria-checked="true"] .m3-switch-thumb {
+      transform: translateX(20px);
+      background: var(--on-accent);
+    }
+
+    /* Segmented Row */
+    .seg-grid {
+      display: grid;
+      gap: 5px;
+      padding: 3px;
+      border-radius: 16px;
+      background: var(--bg-base);
+      border: 1px solid var(--border-subtle);
+    }
+    .seg-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+    .seg-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+    .seg-opt {
+      padding: 7px 4px;
+      border-radius: 12px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.18s var(--ease-emphasized);
+    }
+    .seg-opt.active {
+      background: var(--bg-surface);
+      color: var(--accent);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Range Slider */
+    input[type="range"].m3-slider {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: var(--bg-surface-high);
+      outline: none;
+    }
+    input[type="range"].m3-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    }
+
+    /* List Row Divider */
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 9px 0;
+      border-top: 1px solid var(--border-subtle);
+    }
+    .setting-row:first-child { border-top: none; padding-top: 2px; }
+    .setting-row:last-child { padding-bottom: 2px; }
+
+    /* IPC Console Box */
+    .ipc-console {
+      background: #0B0D12;
+      color: #D6E2FF;
+      border: 1px solid rgba(168, 199, 250, 0.18);
+      border-radius: 16px;
+      padding: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      line-height: 1.45;
+      max-height: 132px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    /* =========================================================================
+       4. MATERIAL YOU 3 BOTTOM NAVIGATION BAR
+       ========================================================================= */
+    .bottom-nav {
+      position: relative;
+      z-index: 20;
+      flex-shrink: 0;
+      padding: 6px 10px 10px;
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border-subtle);
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+    }
+    .nav-item {
+      border: none;
+      background: transparent;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      padding: 2px 0;
+      cursor: pointer;
+      color: var(--text-secondary);
+    }
+    .nav-indicator {
+      width: 54px;
+      height: 28px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.2s var(--ease-emphasized), color 0.2s;
+    }
+    .nav-item.active .nav-indicator {
+      background: var(--accent-container-strong);
+      color: var(--accent);
+    }
+    .nav-label {
+      font-size: 10.5px;
+      font-weight: 600;
+      transition: color 0.2s;
+    }
+    .nav-item.active .nav-label {
+      color: var(--text-primary);
+      font-weight: 700;
+    }
+
+    /* =========================================================================
+       5. FLOATING HUD PILL, SIDEPANEL DRAWER & BOTTOM SHEETS
+       ========================================================================= */
+    .floating-hud {
+      position: absolute;
+      top: 56px;
+      left: 14px;
+      z-index: 45;
+      touch-action: none;
+    }
+    .hud-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(17, 20, 28, 0.92);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(168, 199, 250, 0.32);
+      color: #fff;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+      cursor: move;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px;
+    }
+    .hud-drawer {
+      margin-top: 6px;
+      width: 248px;
+      border-radius: 22px;
+      background: rgba(20, 24, 33, 0.96);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: #E2E2E9;
+      padding: 12px;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.65);
+    }
+
+    /* Bottom Sheet & Modal Backdrop */
+    .modal-backdrop {
+      position: absolute;
+      inset: 0;
+      z-index: 50;
+      background: rgba(0, 0, 0, 0.62);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 10px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s var(--ease-emphasized);
+    }
+    .modal-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .sheet-card {
+      width: 100%;
+      max-width: 382px;
+      max-height: 86%;
+      overflow-y: auto;
+      scrollbar-width: none;
+      border-radius: 28px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-strong);
+      padding: 16px;
+      box-shadow: 0 24px 50px rgba(0, 0, 0, 0.6);
+      transform: translateY(18px);
+      transition: transform 0.28s var(--ease-spring);
+    }
+    .modal-backdrop.open .sheet-card { transform: translateY(0); }
+    .sheet-handle {
+      width: 36px;
+      height: 4px;
+      border-radius: 999px;
+      background: var(--border-strong);
+      margin: 0 auto 12px;
+    }
+
+    /* Launch Splash Overlay */
+    .launch-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 60;
+      background: rgba(11, 13, 18, 0.96);
+      backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #fff;
+      padding: 24px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s;
+    }
+    .launch-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    @keyframes barFillAnim {
+      0% { width: 8%; }
+      65% { width: 84%; }
+      100% { width: 100%; }
+    }
+    .launch-bar-fill {
+      height: 100%;
+      background: #A8C7FA;
+      border-radius: 999px;
+      animation: barFillAnim 1.3s var(--ease-emphasized) forwards;
+    }
+
+    /* Toast Notification */
+    .toast-pill {
+      position: absolute;
+      bottom: 72px;
+      left: 50%;
+      transform: translateX(-50%) translateY(12px);
+      z-index: 55;
+      padding: 7px 14px;
+      border-radius: 999px;
+      background: var(--text-primary);
+      color: var(--bg-base);
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.24s var(--ease-spring);
+    }
+    .toast-pill.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Desktop Viewport Preview Selector -->
+  <div class="vp-bar">
+    <span style="padding: 0 6px;">Viewport:</span>
+    <button class="vp-btn" onclick="setViewport('360px', this)">Compact 360</button>
+    <button class="vp-btn active" onclick="setViewport('404px', this)">Pixel OS 404</button>
+    <button class="vp-btn" onclick="setViewport('760px', this)">Tablet / Wide</button>
+  </div>
+
+  <!-- Main Device Frame -->
+  <main id="appShell" class="app-shell">
+    <!-- Dynamic Cover Ambient Glow -->
+    <div id="ambientGlow" class="ambient-glow"></div>
+
+    <!-- Minimal AOSP Status Bar -->
+    <header class="status-bar">
+      <span id="statusClock" class="mono">17:09</span>
+      <div class="camera-dot"></div>
+      <div style="display:flex;align-items:center;gap:6px;opacity:0.85;">
+        <span class="mono" style="font-size:9.5px;">5G+</span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M2 22h20V2L2 22z"/></svg>
+        <span id="statusBat" class="mono" style="font-size:10px;">86%</span>
+      </div>
+    </header>
+
+    <!-- Top App Bar -->
+    <div class="top-header">
+      <div class="brand-group">
+        <div class="brand-badge">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4-3c-.83 0-1.5-.67-1.5-1.5S18.67 9 19.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">Game Space</h1>
+          <span id="headerSubText" class="brand-sub">FrameBoost v2 • 6 games ready</span>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- Games-only View Toggle (Carousel / Grid) -->
+        <button id="btnViewToggle" class="icon-pill-btn" onclick="toggleLibraryView()" title="Switch Carousel / Grid">
+          <svg id="svgGrid" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
+            <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
+          </svg>
+          <svg id="svgCarousel" class="hidden" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <rect x="6" y="3" width="12" height="18" rx="2.5"/><path d="M2 7v10M22 7v10"/>
+          </svg>
+        </button>
+
+        <!-- Games-only + Add Game -->
+        <button id="btnAddGame" class="icon-pill-btn" onclick="openModal('addGameModal')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+          <span>Add</span>
+        </button>
+
+        <!-- Floating HUD Quick Trigger -->
+        <button class="icon-pill-btn" onclick="toggleFloatingHud()" title="Toggle Floating Overlay HUD">
+          <span class="mono" style="font-size:10px;color:var(--accent);">HUD</span>
+        </button>
+
+        <!-- Cycle Theme (Dark / AMOLED / Light) -->
+        <button class="icon-pill-btn" onclick="cycleTheme()" title="Switch Pixel Theme (Dark / AMOLED / Light)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.1">
+            <circle cx="12" cy="12" r="4"/>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- =======================================================================
+         TAB 1: GAMES (COVER FLOW CAROUSEL + GRID + FILTER + PER-GAME TUNING)
+         ======================================================================= -->
+    <section id="panel-games" class="tab-panel games-panel">
+      <!-- Search & Genre Filter Chips -->
+      <div class="filter-strip">
+        <div class="search-box">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="2.2">
+            <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
+          </svg>
+          <input id="gameSearchInput" type="text" placeholder="Filter..." oninput="handleFilterChange()" />
+        </div>
+        <button class="chip-btn active" data-genre="All" onclick="setGenreFilter('All', this)">All</button>
+        <button class="chip-btn" data-genre="MOBA" onclick="setGenreFilter('MOBA', this)">MOBA</button>
+        <button class="chip-btn" data-genre="Competitive" onclick="setGenreFilter('Competitive', this)">Competitive</button>
+        <button class="chip-btn" data-genre="Open World" onclick="setGenreFilter('Open World', this)">Open World</button>
+      </div>
+
+      <!-- 3D Cover Flow Carousel View -->
+      <div id="carouselContainer" class="carousel-wrapper">
+        <div class="cover-stage-wrap">
+          <button class="nav-arrow left pressable" onclick="stepCarousel(-1)" aria-label="Previous">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <button class="nav-arrow right pressable" onclick="stepCarousel(1)" aria-label="Next">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+
+          <div id="coverStage" class="cover-stage"></div>
+        </div>
+
+        <div id="carouselDots" class="dots-row"></div>
+
+        <!-- Active Game Hero Metadata + Primary Play CTA -->
+        <div class="hero-showcase">
+          <div class="hero-meta-pill">
+            <span class="status-dot-ok"></span>
+            <span id="heroMetaLine">MOBA • Played 148h • Last: 2h ago</span>
+          </div>
+          <h2 id="heroTitle" class="hero-title">Mobile Legends: Bang Bang</h2>
+          <p id="heroSpecLine" class="hero-sub">120Hz • 100% Scale • Balanced • Default A50</p>
+
+          <div class="hero-cta-row">
+            <button class="btn-play-primary pressable" onclick="launchSelectedGame()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              <span>Play</span>
+            </button>
+            <button class="btn-tune pressable" onclick="openPerGameSheet()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.2">
+                <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>
+              </svg>
+              <span>Tune</span>
+            </button>
+          </div>
+
+          <!-- Compact Bottom Quick-Bar -->
+          <div class="quick-bar-row">
+            <div class="segmented-mini">
+              <button class="seg-mini-btn" data-mode="Powersave" onclick="setGlobalPowerMode('Powersave')">Save</button>
+              <button class="seg-mini-btn active" data-mode="Balanced" onclick="setGlobalPowerMode('Balanced')">Balanced</button>
+              <button class="seg-mini-btn" data-mode="Performance" onclick="setGlobalPowerMode('Performance')">Perf</button>
+            </div>
+            <button id="quickDndPill" class="icon-pill-btn" style="height:28px;font-size:11px;" onclick="toggleDndState()">
+              <span id="quickDndText">DND Off</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Compact Grid View -->
+      <div id="gridContainer" class="grid-view-wrap hidden">
+        <div id="gamesGrid" class="games-grid"></div>
+      </div>
+    </section>
+
+    <!-- =======================================================================
+         TAB 2: SESSION (2HZ LIVE SPARKLINES, FLOATING HUD & OVERLAY CONTROLS)
+         ======================================================================= -->
+    <section id="panel-session" class="tab-panel hidden">
+      <!-- Active Session Hero Card -->
+      <div class="m3-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+          <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+            <div id="sessCoverThumb" style="width:42px;height:52px;border-radius:14px;overflow:hidden;flex-shrink:0;border:1px solid var(--border-strong);"></div>
+            <div style="min-width:0;">
+              <span id="sessStatePill" class="pill-badge pill-ok">STANDBY READY</span>
+              <h3 id="sessGameName" style="font-size:14px;font-weight:700;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Mobile Legends: Bang Bang</h3>
+              <div id="sessElapsedText" class="mono" style="font-size:11px;color:var(--text-secondary);margin-top:1px;">Elapsed: 00:00:00</div>
+            </div>
+          </div>
+
+          <button id="btnPollToggle" class="icon-pill-btn mono" style="font-size:10px;" onclick="togglePolling()">
+            <span id="pollIndicator" style="width:6px;height:6px;border-radius:50%;background:var(--ok);"></span>
+            <span id="pollText">2Hz</span>
+          </button>
+        </div>
+
+        <div style="display:flex;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border-subtle);">
+          <button class="icon-pill-btn pressable" style="flex:1;background:var(--accent);color:var(--on-accent);border:none;" onclick="launchSelectedGame()">Launch / Start</button>
+          <button id="btnSessPause" class="icon-pill-btn pressable" onclick="toggleSessionPause()">Pause</button>
+          <button class="icon-pill-btn pressable" onclick="endActiveSession()">End</button>
+        </div>
+      </div>
+
+      <!-- 2Hz Real-Time Telemetry Grid with HTML5 Canvas Sparklines -->
+      <div class="m3-card">
+        <div class="card-header-row">
+          <span class="section-kicker">Real-Time Hardware Telemetry</span>
+          <span id="fpsLowBadge" class="mono" style="font-size:10px;color:var(--accent);">1% Low: 114 FPS</span>
+        </div>
+
+        <div class="telemetry-grid">
+          <!-- FPS & Frame Time -->
+          <div class="tel-box">
+            <div class="tel-top">
+              <span class="tel-label">FPS / Frame</span>
+              <span id="telFrameMs" class="tel-sub">8.3ms</span>
+            </div>
+            <div id="telFpsVal" class="tel-val" style="color:var(--accent);">120 FPS</div>
+            <canvas id="sparkFps" class="spark-canvas"></canvas>
+          </div>
+
+          <!-- SoC Package Temp -->
+          <div class="tel-box">
+            <div class="tel-top">
+              <span class="tel-label">SoC Package</span>
+              <span id="telHeadroom" class="tel-sub">41°C left</span>
+            </div>
+            <div id="telTempVal" class="tel-val" style="color:var(--ok);">44.0°C</div>
+            <canvas id="sparkTemp" class="spark-canvas"></canvas>
+          </div>
+
+          <!-- CPU Clusters & Mali GPU -->
+          <div class="tel-box">
+            <div class="tel-top">
+              <span class="tel-label">Exynos 9610</span>
+              <span id="telGpuLoad" class="tel-sub">GPU 62%</span>
+            </div>
+            <div id="telCpuVal" class="tel-val" style="font-size:13px;">2.31 / 1.74 GHz</div>
+            <canvas id="sparkCpu" class="spark-canvas"></canvas>
+          </div>
+
+          <!-- Battery Current & ETA -->
+          <div class="tel-box">
+            <div class="tel-top">
+              <span class="tel-label">Battery Drain</span>
+              <span id="telBatEta" class="tel-sub">~4h 20m</span>
+            </div>
+            <div id="telBatVal" class="tel-val">-640 mA</div>
+            <canvas id="sparkBat" class="spark-canvas"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- In-Game Overlay & Session Guards -->
+      <div class="m3-card">
+        <div class="card-header-row">
+          <span class="section-kicker">OverlayService & Session Guards</span>
+          <button class="icon-pill-btn" style="height:26px;font-size:10.5px;color:var(--accent);" onclick="toggleFloatingHud(true)">Open HUD Drawer</button>
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <div style="font-size:12.5px;font-weight:600;">Game Do Not Disturb</div>
+            <div style="font-size:10.5px;color:var(--text-secondary);">Suppress heads-up alerts & calls</div>
+          </div>
+          <button id="swDnd" class="m3-switch" role="switch" aria-checked="false" onclick="toggleDndState()">
+            <span class="m3-switch-thumb"></span>
+          </button>
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <div style="font-size:12.5px;font-weight:600;">Touch Edge Mistouch Guard</div>
+            <div style="font-size:10.5px;color:var(--text-secondary);">Require double-swipe on navigation edges</div>
+          </div>
+          <button id="swEdge" class="m3-switch" role="switch" aria-checked="true" onclick="toggleM3Switch(this, 'Edge Guard')">
+            <span class="m3-switch-thumb"></span>
+          </button>
+        </div>
+
+        <div class="setting-row" style="flex-direction:column;align-items:stretch;gap:6px;">
+          <div style="display:flex;justify-content:space-between;">
+            <span style="font-size:12.5px;font-weight:600;">Brightness Lock</span>
+            <span id="brightLabel" class="mono" style="font-size:11px;color:var(--accent);font-weight:700;">78%</span>
+          </div>
+          <input id="brightSlider" type="range" min="15" max="100" value="78" class="m3-slider" oninput="syncBrightness(this.value)" />
+        </div>
+      </div>
+
+      <!-- Network Diagnostics Probe -->
+      <div class="m3-card">
+        <div class="card-header-row">
+          <div>
+            <span class="section-kicker">Network Diagnostics Probe</span>
+            <div class="mono" style="font-size:10px;color:var(--text-secondary);margin-top:2px;">TCP BBR Congestion Control • 1.1.1.1</div>
+          </div>
+          <button id="btnPingTest" class="icon-pill-btn pressable" onclick="runNetworkProbe()">Probe Ping</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;text-align:center;">
+          <div style="background:var(--bg-base);padding:8px;border-radius:14px;">
+            <div style="font-size:9.5px;color:var(--text-secondary);">Latency</div>
+            <div id="netLatency" class="mono" style="font-size:12.5px;font-weight:700;color:var(--ok);margin-top:2px;">17 ms</div>
+          </div>
+          <div style="background:var(--bg-base);padding:8px;border-radius:14px;">
+            <div style="font-size:9.5px;color:var(--text-secondary);">Jitter</div>
+            <div id="netJitter" class="mono" style="font-size:12.5px;font-weight:700;margin-top:2px;">1.8 ms</div>
+          </div>
+          <div style="background:var(--bg-base);padding:8px;border-radius:14px;">
+            <div style="font-size:9.5px;color:var(--text-secondary);">Packet Loss</div>
+            <div id="netLoss" class="mono" style="font-size:12.5px;font-weight:700;margin-top:2px;">0.0%</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =======================================================================
+         TAB 3: POLICY (THERMAL HYSTERESIS, SAMSUNG GOS, KERNEL & SAFETY)
+         ======================================================================= -->
+    <section id="panel-policy" class="tab-panel hidden">
+      <!-- Interactive Thermal Hysteresis Visualizer -->
+      <div class="m3-card">
+        <div class="card-header-row">
+          <div>
+            <span class="section-kicker">Thermal Hysteresis Engine</span>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:1px;">Simulated SoC Temp: <strong id="policyTempReadout" class="mono" style="color:var(--text-primary);">44°C</strong></div>
+          </div>
+          <span id="hysteresisBadge" class="pill-badge pill-ok">NORMAL</span>
+        </div>
+
+        <!-- Thermal Gauge Bar (40°C - 95°C) -->
+        <div style="position:relative;margin:10px 0 6px;">
+          <div class="bar-track" style="height:10px;">
+            <div style="width:76.3%;background:var(--ok);"></div>
+            <div style="width:5.5%;background:var(--warn);"></div>
+            <div style="width:9.1%;background:#FB923C;"></div>
+            <div style="width:9.1%;background:var(--crit);"></div>
+          </div>
+          <div id="thermalNeedle" style="position:absolute;top:-3px;left:7%;width:4px;height:16px;border-radius:3px;background:#fff;box-shadow:0 0 6px rgba(0,0,0,0.8);transition:left 0.25s var(--ease-emphasized);"></div>
+        </div>
+
+        <div class="mono" style="display:flex;justify-content:space-between;font-size:9.5px;color:var(--text-secondary);">
+          <span>40°C</span>
+          <span style="color:var(--ok);">Restore 82°C</span>
+          <span style="color:var(--warn);">Warn 85°C</span>
+          <span style="color:var(--crit);">Crit 90°C</span>
+        </div>
+
+        <!-- Interactive Thermal Test Slider & State Buttons -->
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border-subtle);">
+          <input id="thermalTestSlider" type="range" min="40" max="95" value="44" class="m3-slider" oninput="evaluateThermalHysteresis(Number(this.value))" />
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:8px;">
+            <button class="seg-opt" style="background:var(--bg-base);" onclick="setSimulatedTemp(44)">Normal 44°</button>
+            <button class="seg-opt" style="background:var(--bg-base);" onclick="setSimulatedTemp(85)">Warn 85°</button>
+            <button class="seg-opt" style="background:var(--bg-base);" onclick="setSimulatedTemp(91)">Crit 91°</button>
+            <button class="seg-opt" style="background:var(--bg-base);" onclick="setSimulatedTemp(81)">Cool 81°</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Samsung GOS Control Card -->
+      <div class="m3-card">
+        <div class="card-header-row">
+          <div>
+            <span class="section-kicker">Samsung GOS Control</span>
+            <div class="mono" style="font-size:10px;color:var(--text-secondary);margin-top:2px;">IPC: <span id="gosIpcCmd">gos_set_mode("bypass")</span></div>
+          </div>
+          <span id="gosStatusPill" class="pill-badge pill-accent">BYPASS</span>
+        </div>
+
+        <div class="seg-grid cols-3">
+          <button class="seg-opt" data-gos="stock" onclick="setGosPolicy('stock', this)">Stock Managed</button>
+          <button class="seg-opt active" data-gos="bypass" onclick="setGosPolicy('bypass', this)">Bypass Uncapped</button>
+          <button class="seg-opt" data-gos="custom" onclick="setGosPolicy('custom', this)">Custom Cap</button>
+        </div>
+      </div>
+
+      <!-- Kernel, Scheduler & SurfaceFlinger Tuning -->
+      <div class="m3-card">
+        <span class="section-kicker" style="display:block;margin-bottom:8px;">Kernel & SurfaceFlinger Policy</span>
+
+        <div style="margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;font-size:11.5px;font-weight:600;margin-bottom:5px;">
+            <span>CPU Scaling Governor</span>
+            <span id="govActiveLabel" class="mono" style="color:var(--accent);font-size:10.5px;">schedutil</span>
+          </div>
+          <div class="seg-grid cols-3">
+            <button class="seg-opt" onclick="setCpuGov('powersave', this)">powersave</button>
+            <button class="seg-opt active" onclick="setCpuGov('schedutil', this)">schedutil</button>
+            <button class="seg-opt" onclick="setCpuGov('performance', this)">performance</button>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <div style="font-size:12px;font-weight:600;">I/O Block Scheduler</div>
+            <div class="mono" style="font-size:10px;color:var(--text-secondary);">/sys/block/mmcblk0/queue/scheduler</div>
+          </div>
+          <button id="ioSchedBtn" class="icon-pill-btn mono" style="font-size:10.5px;color:var(--accent);" onclick="cycleIoScheduler()">mq-deadline</button>
+        </div>
+
+        <div class="setting-row" style="flex-direction:column;align-items:stretch;gap:5px;">
+          <div style="display:flex;justify-content:space-between;">
+            <span style="font-size:12px;font-weight:600;">ZRAM Swappiness</span>
+            <span id="zramValLabel" class="mono" style="font-size:11px;color:var(--accent);font-weight:700;">60</span>
+          </div>
+          <input type="range" min="10" max="100" value="60" class="m3-slider" oninput="document.getElementById('zramValLabel').textContent=this.value" />
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <div style="font-size:12px;font-weight:600;">SurfaceFlinger Latch Unsignaled</div>
+            <div class="mono" style="font-size:10px;color:var(--text-secondary);">debug.sf.latch_unsignaled=1</div>
+          </div>
+          <button class="m3-switch" role="switch" aria-checked="true" onclick="toggleM3Switch(this, 'SF Latch Unsignaled')">
+            <span class="m3-switch-thumb"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Multi-Level Exit Restore Pipeline & Anti-Cheat Guardrails -->
+      <div class="m3-card">
+        <span class="section-kicker" style="display:block;margin-bottom:8px;">Multi-Level Exit Restore Pipeline</span>
+        <div class="mono" style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;font-size:10px;margin-bottom:10px;">
+          <div style="background:var(--bg-base);padding:7px 9px;border-radius:12px;">1. Restore Refresh Hz</div>
+          <div style="background:var(--bg-base);padding:7px 9px;border-radius:12px;">2. Reset CPU Governor</div>
+          <div style="background:var(--bg-base);padding:7px 9px;border-radius:12px;">3. Disable Game DND</div>
+          <div style="background:var(--bg-base);padding:7px 9px;border-radius:12px;">4. Restore Brightness</div>
+        </div>
+
+        <div style="padding-top:9px;border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:5px;">
+          <span class="pill-badge pill-ok">Read-Only /proc Telemetry</span>
+          <span class="pill-badge pill-ok">Zero Memory Injection</span>
+          <span class="pill-badge pill-accent">KernelSU / Zygisk Safe</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- =======================================================================
+         TAB 4: SYSTEM (DAEMON IPC CONSOLE, QUICK BOOST, PERMISSIONS & DEVICE)
+         ======================================================================= -->
+    <section id="panel-system" class="tab-panel hidden">
+      <!-- Rust Daemon Unix Socket IPC Console -->
+      <div class="m3-card">
+        <div class="card-header-row">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div class="mono" style="width:32px;height:32px;border-radius:12px;background:var(--ok-bg);color:var(--ok);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;">RS</div>
+            <div>
+              <div style="font-size:13px;font-weight:700;" class="mono">frameboostd</div>
+              <div class="mono" style="font-size:9.5px;color:var(--text-secondary);">/dev/socket/frameboostd • PID 1492 • 2Hz</div>
+            </div>
+          </div>
+          <span class="pill-badge pill-ok">CONNECTED</span>
+        </div>
+
+        <!-- Interactive IPC Commands -->
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
+          <button class="chip-btn active mono" style="font-size:10px;" onclick="sendIpcCommand('snapshot', this)">snapshot</button>
+          <button class="chip-btn mono" style="font-size:10px;" onclick="sendIpcCommand('list_games', this)">list_games</button>
+          <button class="chip-btn mono" style="font-size:10px;" onclick="sendIpcCommand('gos_status', this)">gos_status</button>
+          <button class="chip-btn mono" style="font-size:10px;" onclick="sendIpcCommand('ping', this)">ping</button>
+        </div>
+
+        <pre id="ipcConsoleOutput" class="ipc-console">{
+  "status": "ok",
+  "daemon": "frameboostd v2.4.0-rust",
+  "uptime_sec": 18420,
+  "active_profile": "Balanced",
+  "soc_temp_c": 44.0,
+  "surfaceflinger_hz": 120
+}</pre>
+      </div>
+
+      <!-- Quick Boost Memory & Background Trim Pipeline -->
+      <div class="m3-card">
+        <div class="card-header-row">
+          <div>
+            <span class="section-kicker">Quick Boost Memory Pipeline</span>
+            <div id="ramBreakdownLabel" class="mono" style="font-size:10px;color:var(--text-secondary);margin-top:2px;">Used 2.1GB • Cached 0.7GB • Free 1.2GB / 4GB</div>
+          </div>
+          <button id="btnQuickBoost" class="icon-pill-btn pressable" style="background:var(--accent);color:var(--on-accent);border:none;" onclick="runQuickBoost()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+            <span>Boost</span>
+          </button>
+        </div>
+
+        <!-- Segmented RAM Bar -->
+        <div class="bar-track" style="height:9px;">
+          <div id="ramBarUsed" style="width:52%;background:var(--accent);transition:width 0.4s;"></div>
+          <div id="ramBarCached" style="width:18%;background:var(--warn);transition:width 0.4s;"></div>
+          <div id="ramBarFree" style="width:30%;background:var(--ok);transition:width 0.4s;"></div>
+        </div>
+      </div>
+
+      <!-- Android System Permissions & Capabilities Matrix -->
+      <div class="m3-card">
+        <div class="card-header-row">
+          <span class="section-kicker">System Permissions Matrix</span>
+          <span id="permSummaryBadge" class="mono" style="font-size:10px;color:var(--accent);font-weight:700;">5/6 Granted</span>
+        </div>
+        <div id="permMatrixList"></div>
+      </div>
+
+      <!-- Device, ROM Environment & Theme Controls -->
+      <div class="m3-card">
+        <span class="section-kicker" style="display:block;margin-bottom:8px;">Device & Pixel OS GSI Environment</span>
+        <div class="setting-row">
+          <span style="font-size:11.5px;color:var(--text-secondary);">Device / SoC</span>
+          <span class="mono" style="font-size:11px;font-weight:600;">Galaxy A50 (Exynos 9610)</span>
+        </div>
+        <div class="setting-row">
+          <span style="font-size:11.5px;color:var(--text-secondary);">ROM / Kernel</span>
+          <span class="mono" style="font-size:11px;font-weight:600;">PixelOS 15 GSI • 4.14-GKI</span>
+        </div>
+        <div class="setting-row">
+          <span style="font-size:11.5px;color:var(--text-secondary);">UI Theme Surface</span>
+          <div class="segmented-mini">
+            <button class="seg-mini-btn active" data-th="dark" onclick="setTheme('dark')">Dark</button>
+            <button class="seg-mini-btn" data-th="amoled" onclick="setTheme('amoled')">AMOLED</button>
+            <button class="seg-mini-btn" data-th="light" onclick="setTheme('light')">Light</button>
+          </div>
+        </div>
+        <div class="setting-row">
+          <span style="font-size:11.5px;color:var(--text-secondary);">WebUI Preview Mode (?preview=1)</span>
+          <button class="m3-switch" role="switch" aria-checked="true" onclick="toggleM3Switch(this, 'Preview Mock IPC')">
+            <span class="m3-switch-thumb"></span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- =======================================================================
+         MATERIAL YOU 3 BOTTOM NAVIGATION BAR
+         ======================================================================= -->
+    <nav class="bottom-nav" aria-label="Main Navigation">
+      <button class="nav-item active" data-tab="games" onclick="switchTab('games')">
+        <div class="nav-indicator">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4-3c-.83 0-1.5-.67-1.5-1.5S18.67 9 19.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+          </svg>
+        </div>
+        <span class="nav-label">Games</span>
+      </button>
+
+      <button class="nav-item" data-tab="session" onclick="switchTab('session')">
+        <div class="nav-indicator">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+          </svg>
+        </div>
+        <span class="nav-label">Session</span>
+      </button>
+
+      <button class="nav-item" data-tab="policy" onclick="switchTab('policy')">
+        <div class="nav-indicator">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </div>
+        <span class="nav-label">Policy</span>
+      </button>
+
+      <button class="nav-item" data-tab="system" onclick="switchTab('system')">
+        <div class="nav-indicator">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h6v6H9z"/>
+          </svg>
+        </div>
+        <span class="nav-label">System</span>
+      </button>
+    </nav>
+
+    <!-- =======================================================================
+         DRAGGABLE FLOATING IN-GAME HUD PILL & EXPANDABLE SIDEPANEL DRAWER
+         ======================================================================= -->
+    <div id="floatingHud" class="floating-hud hidden">
+      <div id="hudDragHandle" class="hud-pill" title="Drag HUD or Tap Expand">
+        <span style="width:7px;height:7px;border-radius:50%;background:#A8C7FA;"></span>
+        <span id="hudFpsText" style="color:#A8C7FA;font-weight:700;">120 FPS</span>
+        <span style="opacity:0.35;">|</span>
+        <span id="hudTempText" style="color:#34D399;">44°C</span>
+        <span style="opacity:0.35;">|</span>
+        <span id="hudBatText">86%</span>
+        <button onclick="toggleHudDrawer()" style="margin-left:2px;background:rgba(255,255,255,0.12);border:none;color:#fff;border-radius:999px;padding:2px 6px;font-size:9.5px;cursor:pointer;">☰</button>
+        <button onclick="toggleFloatingHud(false)" style="background:transparent;border:none;color:#9EA3B0;font-size:10px;cursor:pointer;">✕</button>
+      </div>
+
+      <!-- Expandable Sidepanel Drawer -->
+      <div id="hudDrawer" class="hud-drawer hidden">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <span class="mono" style="font-size:10px;font-weight:700;color:#A8C7FA;">IN-GAME OVERLAY PANEL</span>
+          <span id="hudModeBadge" class="mono" style="font-size:9.5px;padding:2px 6px;border-radius:999px;background:rgba(168,199,250,0.2);color:#A8C7FA;">Balanced</span>
+        </div>
+
+        <!-- Power Profile Switcher inside HUD -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:8px;">
+          <button onclick="setGlobalPowerMode('Powersave')" style="padding:5px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.06);color:#fff;font-size:10px;cursor:pointer;">Save</button>
+          <button onclick="setGlobalPowerMode('Balanced')" style="padding:5px;border-radius:10px;border:1px solid rgba(168,199,250,0.4);background:rgba(168,199,250,0.2);color:#A8C7FA;font-size:10px;font-weight:700;cursor:pointer;">Balanced</button>
+          <button onclick="setGlobalPowerMode('Performance')" style="padding:5px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.06);color:#fff;font-size:10px;cursor:pointer;">Perf</button>
+        </div>
+
+        <!-- Quick Action Tiles -->
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px;font-size:10px;margin-bottom:8px;">
+          <button id="hudDndTile" onclick="toggleDndState()" style="padding:6px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.06);color:#fff;cursor:pointer;">DND: Off</button>
+          <button onclick="showToast('Touch Mistouch Guard Toggled')" style="padding:6px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.06);color:#fff;cursor:pointer;">Edge Guard: On</button>
+          <button onclick="showToast('Screenshot saved to Pictures/GameSpace')" style="padding:6px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.06);color:#fff;cursor:pointer;">Screenshot</button>
+          <button onclick="runQuickBoost()" style="padding:6px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.06);color:#A8C7FA;font-weight:600;cursor:pointer;">Boost RAM</button>
+        </div>
+
+        <!-- Brightness Slider inside HUD -->
+        <div style="display:flex;align-items:center;gap:8px;font-size:10px;">
+          <span style="color:#9EA3B0;">☀</span>
+          <input id="hudBrightSlider" type="range" min="15" max="100" value="78" class="m3-slider" oninput="syncBrightness(this.value)" />
+          <span id="hudBrightVal" class="mono">78%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- =======================================================================
+         ENHANCED PER-GAME TUNING BOTTOM SHEET
+         ======================================================================= -->
+    <div id="perGameSheet" class="modal-backdrop" onclick="if(event.target===this) closeModal('perGameSheet')">
+      <div class="sheet-card">
+        <div class="sheet-handle"></div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+          <div>
+            <span class="mono" style="font-size:10px;color:var(--accent);font-weight:700;">PER-GAME POLICY</span>
+            <h3 id="sheetTitle" style="font-size:15.5px;font-weight:800;margin-top:2px;">Mobile Legends: Bang Bang</h3>
+            <div id="sheetPkg" class="mono" style="font-size:10px;color:var(--text-secondary);">com.mobile.legends</div>
+          </div>
+          <button class="icon-pill-btn" onclick="closeModal('perGameSheet')">✕</button>
+        </div>
+
+        <!-- Power Mode -->
+        <div style="margin-bottom:11px;">
+          <div class="section-kicker" style="margin-bottom:5px;">Power Profile</div>
+          <div class="seg-grid cols-3">
+            <button class="seg-opt" data-gp="Powersave" onclick="updateGameSetting('powerMode', 'Powersave')">Powersave</button>
+            <button class="seg-opt" data-gp="Balanced" onclick="updateGameSetting('powerMode', 'Balanced')">Balanced</button>
+            <button class="seg-opt" data-gp="Performance" onclick="updateGameSetting('powerMode', 'Performance')">Performance</button>
+          </div>
+        </div>
+
+        <!-- SurfaceFlinger Refresh Rate -->
+        <div style="margin-bottom:11px;">
+          <div class="section-kicker" style="margin-bottom:5px;">SurfaceFlinger Refresh Rate</div>
+          <div class="seg-grid cols-4">
+            <button class="seg-opt" data-ghz="Auto" onclick="updateGameSetting('targetHz', 'Auto')">Auto</button>
+            <button class="seg-opt" data-ghz="60Hz" onclick="updateGameSetting('targetHz', '60Hz')">60Hz</button>
+            <button class="seg-opt" data-ghz="90Hz" onclick="updateGameSetting('targetHz', '90Hz')">90Hz</button>
+            <button class="seg-opt" data-ghz="120Hz" onclick="updateGameSetting('targetHz', '120Hz')">120Hz</button>
+          </div>
+        </div>
+
+        <!-- Resolution Scale Slider -->
+        <div style="margin-bottom:11px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
+            <span class="section-kicker">Resolution Downscale (SurfaceFlinger)</span>
+            <span id="sheetScaleVal" class="mono" style="font-size:11px;font-weight:700;color:var(--accent);">100%</span>
+          </div>
+          <input id="sheetScaleSlider" type="range" min="70" max="100" step="5" value="100" class="m3-slider" oninput="updateGameSetting('resScale', Number(this.value))" />
+        </div>
+
+        <!-- Device Spoof Profile -->
+        <div style="margin-bottom:11px;">
+          <div class="section-kicker" style="margin-bottom:5px;">Device Spoof Profile</div>
+          <select id="sheetSpoofSelect" onchange="updateGameSetting('spoof', this.value)" style="width:100%;padding:9px 12px;border-radius:14px;background:var(--bg-base);border:1px solid var(--border-subtle);color:var(--text-primary);font-size:12px;outline:none;">
+            <option value="Default A50">Default (Samsung Galaxy A50)</option>
+            <option value="ROG Phone 8">ASUS ROG Phone 8 Pro</option>
+            <option value="Pixel 9 Pro XL">Google Pixel 9 Pro XL</option>
+            <option value="RedMagic 9 Pro">Nubia RedMagic 9 Pro</option>
+          </select>
+        </div>
+
+        <!-- Per-Game Network Override -->
+        <div class="setting-row" style="margin-bottom:12px;">
+          <div>
+            <div style="font-size:12px;font-weight:600;">Low-Latency Network Override</div>
+            <div style="font-size:10px;color:var(--text-secondary);">Force TCP BBR + 1.1.1.1 DNS routing</div>
+          </div>
+          <button id="sheetNetSwitch" class="m3-switch" role="switch" aria-checked="true" onclick="toggleGameNetOverride()">
+            <span class="m3-switch-thumb"></span>
+          </button>
+        </div>
+
+        <div style="display:flex;gap:8px;">
+          <button class="icon-pill-btn pressable" style="flex:1;height:38px;" onclick="resetGameToGlobal()">Reset to Global</button>
+          <button class="icon-pill-btn pressable" style="flex:1;height:38px;background:var(--accent);color:var(--on-accent);border:none;" onclick="closeModal('perGameSheet')">Done</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- =======================================================================
+         ADD GAME MODAL
+         ======================================================================= -->
+    <div id="addGameModal" class="modal-backdrop" onclick="if(event.target===this) closeModal('addGameModal')">
+      <div class="sheet-card">
+        <div class="sheet-handle"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <h3 style="font-size:15.5px;font-weight:800;">Add Game to Library</h3>
+          <button class="icon-pill-btn" onclick="closeModal('addGameModal')">✕</button>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:9px;">
+          <div>
+            <label class="section-kicker" style="display:block;margin-bottom:4px;">Game Title</label>
+            <input id="addTitleInput" type="text" placeholder="e.g. Honor of Kings" style="width:100%;padding:9px 12px;border-radius:14px;background:var(--bg-base);border:1px solid var(--border-subtle);color:var(--text-primary);font-size:12px;outline:none;" />
+          </div>
+          <div>
+            <label class="section-kicker" style="display:block;margin-bottom:4px;">Android Package Name</label>
+            <input id="addPkgInput" type="text" placeholder="com.levelinfinite.sgameGlobal" class="mono" style="width:100%;padding:9px 12px;border-radius:14px;background:var(--bg-base);border:1px solid var(--border-subtle);color:var(--text-primary);font-size:11.5px;outline:none;" />
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div>
+              <label class="section-kicker" style="display:block;margin-bottom:4px;">Category</label>
+              <select id="addGenreSelect" style="width:100%;padding:9px 10px;border-radius:14px;background:var(--bg-base);border:1px solid var(--border-subtle);color:var(--text-primary);font-size:12px;outline:none;">
+                <option value="MOBA">MOBA</option>
+                <option value="Competitive">Competitive</option>
+                <option value="Open World">Open World</option>
+              </select>
+            </div>
+            <div>
+              <label class="section-kicker" style="display:block;margin-bottom:4px;">Poster Palette</label>
+              <select id="addThemeSelect" style="width:100%;padding:9px 10px;border-radius:14px;background:var(--bg-base);border:1px solid var(--border-subtle);color:var(--text-primary);font-size:12px;outline:none;">
+                <option value="crimson">Crimson Blade</option>
+                <option value="cobalt">Cobalt Pulse</option>
+                <option value="emerald">Emerald Viper</option>
+                <option value="amber">Solar Gold</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:14px;">
+          <button class="icon-pill-btn" style="flex:1;height:38px;" onclick="closeModal('addGameModal')">Cancel</button>
+          <button class="icon-pill-btn pressable" style="flex:1;height:38px;background:var(--accent);color:var(--on-accent);border:none;" onclick="submitNewGame()">Add Cover</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- =======================================================================
+         GAME LAUNCH SPLASH OVERLAY
+         ======================================================================= -->
+    <div id="launchOverlay" class="launch-overlay">
+      <div id="launchArtPreview" style="width:94px;height:126px;border-radius:22px;overflow:hidden;margin-bottom:14px;border:1.5px solid rgba(255,255,255,0.2);box-shadow:0 20px 40px rgba(0,0,0,0.6);"></div>
+      <span class="mono" style="font-size:10px;letter-spacing:0.12em;color:#A8C7FA;text-transform:uppercase;">FrameBoost v2 Engine</span>
+      <h3 id="launchGameTitle" style="font-size:18px;font-weight:800;margin-top:4px;">Mobile Legends: Bang Bang</h3>
+      <p id="launchGameSpec" class="mono" style="font-size:11px;color:#9EA3B0;margin-top:3px;">120Hz • Balanced • BBR DNS</p>
+      <div style="width:170px;height:4px;background:rgba(255,255,255,0.12);border-radius:999px;overflow:hidden;margin-top:18px;">
+        <div id="launchProgressFill" class="launch-bar-fill"></div>
+      </div>
+    </div>
+
+    <!-- Toast Feedback Pill -->
+    <div id="toastPill" class="toast-pill">Profile Updated</div>
+  </main>
+
+  <script>
+    /* =========================================================================
+       1. GAME CATALOG & STATE
+       ========================================================================= */
+    const games = [
+      {
+        id: 'mlbb',
+        title: 'Mobile Legends: Bang Bang',
+        short: 'MLBB',
+        pkg: 'com.mobile.legends',
+        genre: 'MOBA',
+        playtime: 'Played 148h',
+        lastPlayed: '2h ago',
+        targetHz: '120Hz',
+        powerMode: 'Balanced',
+        resScale: 100,
+        spoof: 'Default A50',
+        netOverride: true,
+        glow: '#3B82F6',
+        gradient: 'linear-gradient(155deg, #1E3A8A 0%, #172554 55%, #090D16 100%)',
+        svg: `<svg viewBox="0 0 200 280" width="100%" height="100%"><circle cx="100" cy="112" r="76" fill="#60A5FA" fill-opacity="0.22"/><path d="M100 36 L130 96 L100 184 L70 96 Z" fill="#93C5FD" fill-opacity="0.24" stroke="#93C5FD" stroke-width="1.5"/><path d="M100 54 L118 98 L100 164 L82 98 Z" fill="#3B82F6" fill-opacity="0.6"/><circle cx="100" cy="98" r="10" fill="#EFF6FF"/></svg>`
+      },
+      {
+        id: 'mcgg',
+        title: 'Magic Chess: Go Go',
+        short: 'MCGG',
+        pkg: 'com.mobilechess.gp',
+        genre: 'MOBA',
+        playtime: 'Played 64h',
+        lastPlayed: 'Yesterday',
+        targetHz: '90Hz',
+        powerMode: 'Balanced',
+        resScale: 100,
+        spoof: 'Default A50',
+        netOverride: true,
+        glow: '#A855F7',
+        gradient: 'linear-gradient(155deg, #581C87 0%, #3B0764 55%, #0D0714 100%)',
+        svg: `<svg viewBox="0 0 200 280" width="100%" height="100%"><circle cx="100" cy="112" r="72" fill="#C084FC" fill-opacity="0.2"/><path d="M62 145 L72 92 L100 114 L128 92 L138 145 Z" fill="#E9D5FF" fill-opacity="0.28" stroke="#D8B4FE" stroke-width="1.6"/><rect x="60" y="150" width="80" height="12" rx="4" fill="#C084FC" fill-opacity="0.5"/><circle cx="100" cy="76" r="6" fill="#F3E8FF"/></svg>`
+      },
+      {
+        id: 'genshin',
+        title: 'Genshin Impact',
+        short: 'GENSHIN',
+        pkg: 'com.miHoYo.GenshinImpact',
+        genre: 'Open World',
+        playtime: 'Played 310h',
+        lastPlayed: '3d ago',
+        targetHz: '60Hz',
+        powerMode: 'Performance',
+        resScale: 85,
+        spoof: 'Pixel 9 Pro XL',
+        netOverride: true,
+        glow: '#06B6D4',
+        gradient: 'linear-gradient(155deg, #0E7490 0%, #164E63 55%, #071318 100%)',
+        svg: `<svg viewBox="0 0 200 280" width="100%" height="100%"><circle cx="100" cy="115" r="75" fill="#22D3EE" fill-opacity="0.2"/><path d="M100 44 Q106 108 160 115 Q106 122 100 186 Q94 122 40 115 Q94 108 100 44 Z" fill="#CFFAFE" fill-opacity="0.34" stroke="#67E8F9" stroke-width="1.5"/><circle cx="100" cy="115" r="14" fill="none" stroke="#ECFEFF" stroke-width="1.5"/></svg>`
+      },
+      {
+        id: 'pubgm',
+        title: 'PUBG Mobile',
+        short: 'PUBGM',
+        pkg: 'com.tencent.ig',
+        genre: 'Competitive',
+        playtime: 'Played 92h',
+        lastPlayed: '5h ago',
+        targetHz: '90Hz',
+        powerMode: 'Performance',
+        resScale: 90,
+        spoof: 'ROG Phone 8',
+        netOverride: true,
+        glow: '#F59E0B',
+        gradient: 'linear-gradient(155deg, #92400E 0%, #451A03 55%, #120B05 100%)',
+        svg: `<svg viewBox="0 0 200 280" width="100%" height="100%"><circle cx="100" cy="115" r="72" fill="#FBBF24" fill-opacity="0.18"/><circle cx="100" cy="115" r="46" fill="none" stroke="#FCD34D" stroke-width="1.5" stroke-dasharray="10 6"/><circle cx="100" cy="115" r="22" fill="#F59E0B" fill-opacity="0.28" stroke="#FDE68A" stroke-width="1.5"/></svg>`
+      },
+      {
+        id: 'arenabreakout',
+        title: 'Arena Breakout',
+        short: 'ARENA',
+        pkg: 'com.proximabeta.mf.uamo',
+        genre: 'Competitive',
+        playtime: 'Played 51h',
+        lastPlayed: '1d ago',
+        targetHz: '120Hz',
+        powerMode: 'Performance',
+        resScale: 90,
+        spoof: 'RedMagic 9 Pro',
+        netOverride: true,
+        glow: '#10B981',
+        gradient: 'linear-gradient(155deg, #065F46 0%, #064E3B 55%, #05110E 100%)',
+        svg: `<svg viewBox="0 0 200 280" width="100%" height="100%"><circle cx="100" cy="115" r="70" fill="#34D399" fill-opacity="0.18"/><polygon points="100,56 148,85 148,143 100,172 52,143 52,85" fill="#10B981" fill-opacity="0.25" stroke="#6EE7B7" stroke-width="1.6"/><circle cx="100" cy="114" r="7" fill="#ECFDF5"/></svg>`
+      },
+      {
+        id: 'carx',
+        title: 'CarX Street',
+        short: 'CARX',
+        pkg: 'com.carxtech.sr',
+        genre: 'Open World',
+        playtime: 'Played 39h',
+        lastPlayed: '4d ago',
+        targetHz: '60Hz',
+        powerMode: 'Performance',
+        resScale: 80,
+        spoof: 'Default A50',
+        netOverride: false,
+        glow: '#F43F5E',
+        gradient: 'linear-gradient(155deg, #9F1239 0%, #4C0519 55%, #120408 100%)',
+        svg: `<svg viewBox="0 0 200 280" width="100%" height="100%"><circle cx="100" cy="115" r="72" fill="#FB7185" fill-opacity="0.2"/><path d="M42 135 L74 96 H126 L158 135 Z" fill="#F43F5E" fill-opacity="0.32" stroke="#FDA4AF" stroke-width="1.6"/><circle cx="72" cy="138" r="11" fill="#FFE4E6"/><circle cx="128" cy="138" r="11" fill="#FFE4E6"/></svg>`
+      }
+    ];
+
+    const state = {
+      activeTab: 'games',
+      genreFilter: 'All',
+      searchQuery: '',
+      selectedIndex: 0,
+      isGridView: false,
+      globalPowerMode: 'Balanced',
+      dndEnabled: false,
+      brightness: 78,
+      sessionRunning: false,
+      sessionPaused: false,
+      sessionSeconds: 0,
+      pollingLive: true,
+      hudVisible: false,
+      hudDrawerOpen: false,
+      simTemp: 44,
+      hysteresisState: 'NORMAL',
+      gosMode: 'bypass',
+      cpuGov: 'schedutil',
+      ioSchedIdx: 0,
+      ramUsed: 2.1,
+      ramCached: 0.7,
+      ramFree: 1.2
+    };
+
+    const telemetryHistory = {
+      fps: Array(24).fill(120),
+      temp: Array(24).fill(44),
+      cpu: Array(24).fill(52),
+      bat: Array(24).fill(640)
+    };
+
+    const permissions = [
+      { id: 'usage', name: 'Usage Stats Access', desc: 'android.permission.PACKAGE_USAGE_STATS', granted: true },
+      { id: 'overlay', name: 'Display Over Other Apps', desc: 'SYSTEM_ALERT_WINDOW (OverlayService)', granted: true },
+      { id: 'dnd', name: 'Do Not Disturb Policy', desc: 'ACCESS_NOTIFICATION_POLICY', granted: true },
+      { id: 'secset', name: 'Write Secure Settings', desc: 'SurfaceFlinger min/peak refresh rate', granted: true },
+      { id: 'root', name: 'KernelSU / Root Daemon', desc: '/dev/socket/frameboostd IPC', granted: true },
+      { id: 'tile', name: 'AOSP Quick Settings Tile', desc: 'FrameBoost TileService', granted: false }
+    ];
+
+    /* =========================================================================
+       2. FILTERING & CAROUSEL / GRID RENDERING
+       ========================================================================= */
+    function getFilteredGames() {
+      return games.filter(g => {
+        const matchGenre = state.genreFilter === 'All' || g.genre === state.genreFilter;
+        const q = state.searchQuery.toLowerCase();
+        const matchQuery = !q || g.title.toLowerCase().includes(q) || g.short.toLowerCase().includes(q);
+        return matchGenre && matchQuery;
+      });
+    }
+
+    function setGenreFilter(genre, btn) {
+      state.genreFilter = genre;
+      state.selectedIndex = 0;
+      document.querySelectorAll('.filter-strip .chip-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderGamesView();
+    }
+
+    function handleFilterChange() {
+      state.searchQuery = document.getElementById('gameSearchInput').value.trim();
+      state.selectedIndex = 0;
+      renderGamesView();
+    }
+
+    function renderGamesView() {
+      const list = getFilteredGames();
+      document.getElementById('headerSubText').textContent = `FrameBoost v2 • ${list.length} games`;
+
+      if (state.selectedIndex >= list.length) state.selectedIndex = Math.max(0, list.length - 1);
+
+      if (state.isGridView) {
+        renderCompactGrid(list);
+      } else {
+        renderCarousel(list);
+      }
+      updateHeroShowcase(list[state.selectedIndex]);
+    }
+
+    function coverMetrics() {
+      const shell = document.getElementById('appShell');
+      const w = shell.clientWidth || 404;
+      const cardW = Math.min(w * 0.52, 230);
+      const cardH = cardW * 1.36;
+      const spread = cardW * 0.82;
+      return { cardW, cardH, spread };
+    }
+
+    function renderCarousel(list) {
+      const stage = document.getElementById('coverStage');
+      const dots = document.getElementById('carouselDots');
+
+      const { cardW, cardH, spread } = coverMetrics();
+      stage.style.setProperty('--cover-w', `${cardW}px`);
+      stage.style.setProperty('--cover-h', `${cardH}px`);
+
+      if (!list.length) {
+        stage.innerHTML = `<div style="font-size:12px;color:var(--text-secondary);">No matching games found</div>`;
+        dots.innerHTML = '';
+        return;
+      }
+
+      stage.innerHTML = list.map((g, idx) => {
+        const offset = idx - state.selectedIndex;
+        const abs = Math.abs(offset);
+        const tx = offset * spread;
+        const scale = offset === 0 ? 1 : Math.max(0.76, 0.86 - (abs - 1) * 0.08);
+        const rotY = offset === 0 ? 0 : (offset > 0 ? -11 : 11);
+        const opacity = abs > 2 ? 0 : (offset === 0 ? 1 : 0.65);
+        const z = 20 - abs;
+        const isSpoofed = g.spoof !== 'Default A50';
+
+        return `
+          <div class="cover-card ${offset === 0 ? 'center' : 'side'}"
+               onclick="onCoverCardTap(${idx})"
+               style="transform:translateX(${tx}px) scale(${scale}) perspective(800px) rotateY(${rotY}deg);opacity:${opacity};z-index:${z};background:${g.gradient};">
+            <div class="card-top-badges">
+              <span class="badge-glass">${g.targetHz}</span>
+              ${isSpoofed ? `<span class="badge-spoof">SPOOF</span>` : `<span class="badge-glass">${g.powerMode === 'Performance' ? 'PERF' : 'BAL'}</span>`}
+            </div>
+            <div class="card-art-layer">${g.svg}</div>
+            <div class="card-bottom-overlay">
+              <div class="card-short">${g.short} • ${g.genre}</div>
+              <div class="card-title">${g.title}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      dots.innerHTML = list.map((_, idx) => `
+        <button class="dot-btn ${idx === state.selectedIndex ? 'active' : ''}" onclick="selectCarouselIdx(${idx})" aria-label="Slide ${idx+1}"></button>
+      `).join('');
+    }
+
+    function renderCompactGrid(list) {
+      const grid = document.getElementById('gamesGrid');
+      grid.innerHTML = list.map((g, idx) => `
+        <div class="grid-card pressable" style="background:${g.gradient};" onclick="selectAndPlayGrid(${idx})">
+          <div class="card-top-badges">
+            <span class="badge-glass">${g.targetHz}</span>
+            <span class="badge-glass">${g.genre}</span>
+          </div>
+          <div class="card-art-layer" style="opacity:0.88;">${g.svg}</div>
+          <div class="card-bottom-overlay" style="margin:auto -10px -10px;padding:22px 10px 10px;">
+            <div style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${g.title}</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+              <span class="mono" style="font-size:9px;opacity:0.8;">${g.playtime}</span>
+              <span style="padding:3px 9px;border-radius:999px;background:#A8C7FA;color:#062E6F;font-size:10px;font-weight:800;">Play</span>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function updateHeroShowcase(game) {
+      if (!game) return;
+      document.getElementById('heroMetaLine').textContent = `${game.genre} • ${game.playtime} • Last: ${game.lastPlayed}`;
+      document.getElementById('heroTitle').textContent = game.title;
+      document.getElementById('heroSpecLine').textContent = `${game.targetHz} • ${game.resScale}% Scale • ${game.powerMode} • ${game.spoof}`;
+      document.getElementById('ambientGlow').style.background = `radial-gradient(circle, ${game.glow} 0%, transparent 72%)`;
+
+      // Sync Session tab cover preview
+      const thumb = document.getElementById('sessCoverThumb');
+      thumb.style.background = game.gradient;
+      thumb.innerHTML = game.svg;
+      document.getElementById('sessGameName').textContent = game.title;
+    }
+
+    function selectCarouselIdx(idx) {
+      const list = getFilteredGames();
+      state.selectedIndex = Math.max(0, Math.min(list.length - 1, idx));
+      renderGamesView();
+    }
+
+    function stepCarousel(delta) {
+      const list = getFilteredGames();
+      if (!list.length) return;
+      state.selectedIndex = (state.selectedIndex + delta + list.length) % list.length;
+      renderGamesView();
+    }
+
+    function onCoverCardTap(idx) {
+      if (idx === state.selectedIndex) {
+        launchSelectedGame();
+      } else {
+        selectCarouselIdx(idx);
+      }
+    }
+
+    function selectAndPlayGrid(idx) {
+      state.selectedIndex = idx;
+      renderGamesView();
+      launchSelectedGame();
+    }
+
+    function toggleLibraryView() {
+      state.isGridView = !state.isGridView;
+      document.getElementById('carouselContainer').classList.toggle('hidden', state.isGridView);
+      document.getElementById('gridContainer').classList.toggle('hidden', !state.isGridView);
+      document.getElementById('svgGrid').classList.toggle('hidden', state.isGridView);
+      document.getElementById('svgCarousel').classList.toggle('hidden', !state.isGridView);
+      renderGamesView();
+    }
+
+    /* Touch & Mouse Drag Gesture on Carousel */
+    (function initCarouselGestures() {
+      const stage = document.getElementById('coverStage');
+      let startX = 0;
+      let dragging = false;
+
+      stage.addEventListener('touchstart', e => {
+        startX = e.touches[0].clientX;
+        dragging = true;
+      }, { passive: true });
+
+      stage.addEventListener('touchend', e => {
+        if (!dragging) return;
+        const dx = e.changedTouches[0].clientX - startX;
+        if (Math.abs(dx) > 34) stepCarousel(dx < 0 ? 1 : -1);
+        dragging = false;
+      });
+
+      stage.addEventListener('mousedown', e => {
+        startX = e.clientX;
+        dragging = true;
+      });
+
+      window.addEventListener('mouseup', e => {
+        if (!dragging) return;
+        const dx = e.clientX - startX;
+        if (Math.abs(dx) > 38) stepCarousel(dx < 0 ? 1 : -1);
+        dragging = false;
+      });
+
+      window.addEventListener('keydown', e => {
+        if (state.activeTab !== 'games') return;
+        if (document.querySelector('.modal-backdrop.open')) return;
+        if (e.key === 'ArrowLeft') stepCarousel(-1);
+        if (e.key === 'ArrowRight') stepCarousel(1);
+      });
+    })();
+
+    /* =========================================================================
+       3. PER-GAME TUNING SHEET & ADD GAME MODAL
+       ========================================================================= */
+    function getActiveGame() {
+      const list = getFilteredGames();
+      return list[state.selectedIndex] || games[0];
+    }
+
+    function openPerGameSheet() {
+      const g = getActiveGame();
+      document.getElementById('sheetTitle').textContent = g.title;
+      document.getElementById('sheetPkg').textContent = g.pkg;
+      document.getElementById('sheetScaleSlider').value = g.resScale;
+      document.getElementById('sheetScaleVal').textContent = `${g.resScale}%`;
+      document.getElementById('sheetSpoofSelect').value = g.spoof;
+      document.getElementById('sheetNetSwitch').setAttribute('aria-checked', String(g.netOverride));
+      syncPerGameSheetButtons(g);
+      openModal('perGameSheet');
+    }
+
+    function syncPerGameSheetButtons(g) {
+      document.querySelectorAll('[data-gp]').forEach(b => b.classList.toggle('active', b.dataset.gp === g.powerMode));
+      document.querySelectorAll('[data-ghz]').forEach(b => b.classList.toggle('active', b.dataset.ghz === g.targetHz));
+    }
+
+    function updateGameSetting(key, val) {
+      const g = getActiveGame();
+      g[key] = val;
+      if (key === 'resScale') document.getElementById('sheetScaleVal').textContent = `${val}%`;
+      syncPerGameSheetButtons(g);
+      renderGamesView();
+    }
+
+    function toggleGameNetOverride() {
+      const g = getActiveGame();
+      g.netOverride = !g.netOverride;
+      document.getElementById('sheetNetSwitch').setAttribute('aria-checked', String(g.netOverride));
+    }
+
+    function resetGameToGlobal() {
+      const g = getActiveGame();
+      g.powerMode = state.globalPowerMode;
+      g.targetHz = 'Auto';
+      g.resScale = 100;
+      g.spoof = 'Default A50';
+      g.netOverride = true;
+      openPerGameSheet();
+      renderGamesView();
+      showToast('Reset to Global Policy');
+    }
+
+    function submitNewGame() {
+      const title = document.getElementById('addTitleInput').value.trim();
+      const pkg = document.getElementById('addPkgInput').value.trim() || 'com.android.customgame';
+      const genre = document.getElementById('addGenreSelect').value;
+      const palette = document.getElementById('addThemeSelect').value;
+
+      if (!title) {
+        showToast('Enter a game title first');
+        return;
+      }
+
+      const themes = {
+        crimson: { glow: '#F43F5E', grad: 'linear-gradient(155deg, #9F1239 0%, #4C0519 55%, #120408 100%)', hex: '#FB7185' },
+        cobalt: { glow: '#3B82F6', grad: 'linear-gradient(155deg, #1E3A8A 0%, #172554 55%, #090D16 100%)', hex: '#60A5FA' },
+        emerald: { glow: '#10B981', grad: 'linear-gradient(155deg, #065F46 0%, #064E3B 55%, #05110E 100%)', hex: '#34D399' },
+        amber: { glow: '#F59E0B', grad: 'linear-gradient(155deg, #92400E 0%, #451A03 55%, #120B05 100%)', hex: '#FBBF24' }
+      };
+      const t = themes[palette];
+      const shortCode = title.split(' ').map(w => w[0]).join('').slice(0, 4).toUpperCase();
+
+      games.push({
+        id: 'game-' + Date.now(),
+        title,
+        short: shortCode || 'GAME',
+        pkg,
+        genre,
+        playtime: 'New Added',
+        lastPlayed: 'Just now',
+        targetHz: '120Hz',
+        powerMode: state.globalPowerMode,
+        resScale: 100,
+        spoof: 'Default A50',
+        netOverride: true,
+        glow: t.glow,
+        gradient: t.grad,
+        svg: `<svg viewBox="0 0 200 280" width="100%" height="100%"><circle cx="100" cy="115" r="70" fill="${t.hex}" fill-opacity="0.22"/><rect x="64" y="79" width="72" height="72" rx="18" transform="rotate(45 100 115)" fill="${t.hex}" fill-opacity="0.25" stroke="${t.hex}" stroke-width="1.6"/><circle cx="100" cy="115" r="10" fill="#fff"/></svg>`
+      });
+
+      document.getElementById('addTitleInput').value = '';
+      document.getElementById('addPkgInput').value = '';
+      closeModal('addGameModal');
+      state.genreFilter = 'All';
+      document.querySelectorAll('.filter-strip .chip-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
+      state.selectedIndex = games.length - 1;
+      renderGamesView();
+      showToast(`Added ${title}`);
+    }
+
+    function openModal(id) { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+    /* =========================================================================
+       4. LAUNCH SPLASH & SESSION LIFECYCLE
+       ========================================================================= */
+    function launchSelectedGame() {
+      const g = getActiveGame();
+      state.sessionRunning = true;
+      state.sessionPaused = false;
+      state.sessionSeconds = 0;
+      syncSessionStatusUI();
+
+      const overlay = document.getElementById('launchOverlay');
+      const art = document.getElementById('launchArtPreview');
+      const fill = document.getElementById('launchProgressFill');
+
+      art.style.background = g.gradient;
+      art.innerHTML = g.svg;
+      document.getElementById('launchGameTitle').textContent = g.title;
+      document.getElementById('launchGameSpec').textContent = `${g.targetHz} • ${g.powerMode} • ${g.spoof}`;
+
+      fill.style.animation = 'none';
+      void fill.offsetWidth;
+      fill.style.animation = 'barFillAnim 1.3s var(--ease-emphasized) forwards';
+
+      overlay.classList.add('active');
+      setTimeout(() => {
+        overlay.classList.remove('active');
+        toggleFloatingHud(true);
+      }, 1350);
+    }
+
+    function toggleSessionPause() {
+      if (!state.sessionRunning) return;
+      state.sessionPaused = !state.sessionPaused;
+      document.getElementById('btnSessPause').textContent = state.sessionPaused ? 'Resume' : 'Pause';
+      syncSessionStatusUI();
+    }
+
+    function endActiveSession() {
+      state.sessionRunning = false;
+      state.sessionPaused = false;
+      state.sessionSeconds = 0;
+      document.getElementById('sessElapsedText').textContent = 'Elapsed: 00:00:00';
+      document.getElementById('btnSessPause').textContent = 'Pause';
+      syncSessionStatusUI();
+      showToast('Exit Restore Pipeline Executed');
+    }
+
+    function syncSessionStatusUI() {
+      const pill = document.getElementById('sessStatePill');
+      if (!state.sessionRunning) {
+        pill.className = 'pill-badge pill-ok';
+        pill.textContent = 'STANDBY READY';
+      } else if (state.sessionPaused) {
+        pill.className = 'pill-badge pill-warn';
+        pill.textContent = 'SESSION PAUSED';
+      } else {
+        pill.className = 'pill-badge pill-accent';
+        pill.textContent = 'ACTIVE IN-GAME';
+      }
+    }
+
+    /* =========================================================================
+       5. 2HZ TELEMETRY ENGINE & HTML5 CANVAS SPARKLINES
+       ========================================================================= */
+    function drawSparkline(canvasId, data, strokeColor, minVal, maxVal) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      if (!rect.width) return;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, rect.width, rect.height);
+
+      const stepX = rect.width / (data.length - 1);
+      ctx.beginPath();
+      data.forEach((v, i) => {
+        const norm = Math.max(0, Math.min(1, (v - minVal) / (maxVal - minVal || 1)));
+        const y = rect.height - 3 - norm * (rect.height - 6);
+        const x = i * stepX;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 1.8;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+
+      // Subtle gradient fill beneath line
+      ctx.lineTo(rect.width, rect.height);
+      ctx.lineTo(0, rect.height);
+      ctx.closePath();
+      ctx.fillStyle = strokeColor + '22';
+      ctx.fill();
+    }
+
+    function tickTelemetry2Hz() {
+      if (!state.pollingLive) return;
+      const g = getActiveGame();
+      const target = g.targetHz === 'Auto' ? 120 : parseInt(g.targetHz, 10);
+      const fpsJitter = state.sessionRunning && !state.sessionPaused ? Math.floor(Math.random() * 4) : 0;
+      const fps = Math.max(30, target - fpsJitter);
+      const low1 = Math.max(24, fps - 5 - Math.floor(Math.random() * 3));
+      const frameMs = (1000 / fps).toFixed(1);
+
+      const baseTemp = state.simTemp > 44 ? state.simTemp : (state.sessionRunning ? 45.5 + Math.random() * 1.4 : 43.2 + Math.random() * 0.6);
+      const tempRounded = Number(baseTemp.toFixed(1));
+      const headroom = Math.max(0, (85 - tempRounded).toFixed(0));
+
+      const bigMhz = state.globalPowerMode === 'Performance' ? '2.31' : (state.globalPowerMode === 'Powersave' ? '1.56' : '2.05');
+      const litMhz = state.globalPowerMode === 'Powersave' ? '1.14' : '1.74';
+      const gpuPct = state.sessionRunning ? 64 + Math.floor(Math.random() * 14) : 18 + Math.floor(Math.random() * 6);
+      const drain = state.globalPowerMode === 'Performance' ? 880 + Math.floor(Math.random() * 60) : (state.globalPowerMode === 'Powersave' ? 420 + Math.floor(Math.random() * 30) : 630 + Math.floor(Math.random() * 40));
+
+      telemetryHistory.fps.push(fps); telemetryHistory.fps.shift();
+      telemetryHistory.temp.push(tempRounded); telemetryHistory.temp.shift();
+      telemetryHistory.cpu.push(gpuPct); telemetryHistory.cpu.shift();
+      telemetryHistory.bat.push(drain); telemetryHistory.bat.shift();
+
+      document.getElementById('telFpsVal').textContent = `${fps} FPS`;
+      document.getElementById('telFrameMs').textContent = `${frameMs}ms`;
+      document.getElementById('fpsLowBadge').textContent = `1% Low: ${low1} FPS`;
+
+      document.getElementById('telTempVal').textContent = `${tempRounded}°C`;
+      document.getElementById('telHeadroom').textContent = `${headroom}°C left`;
+
+      document.getElementById('telCpuVal').textContent = `${bigMhz} / ${litMhz} GHz`;
+      document.getElementById('telGpuLoad').textContent = `GPU ${gpuPct}%`;
+
+      document.getElementById('telBatVal').textContent = `-${drain} mA`;
+      document.getElementById('telBatEta').textContent = drain > 800 ? '~3h 15m' : '~4h 40m';
+
+      // Sync Floating HUD
+      document.getElementById('hudFpsText').textContent = `${fps} FPS`;
+      document.getElementById('hudTempText').textContent = `${Math.round(tempRounded)}°C`;
+
+      if (state.activeTab === 'session') {
+        drawSparkline('sparkFps', telemetryHistory.fps, '#60A5FA', 30, 125);
+        drawSparkline('sparkTemp', telemetryHistory.temp, tempRounded >= 85 ? '#F87171' : '#34D399', 35, 95);
+        drawSparkline('sparkCpu', telemetryHistory.cpu, '#C084FC', 0, 100);
+        drawSparkline('sparkBat', telemetryHistory.bat, '#FBBF24', 300, 1100);
+      }
+    }
+
+    function togglePolling() {
+      state.pollingLive = !state.pollingLive;
+      document.getElementById('pollText').textContent = state.pollingLive ? '2Hz' : 'PAUSE';
+      document.getElementById('pollIndicator').style.background = state.pollingLive ? 'var(--ok)' : 'var(--text-secondary)';
+    }
+
+    /* =========================================================================
+       6. DRAGGABLE FLOATING HUD & OVERLAY DRAWER
+       ========================================================================= */
+    function toggleFloatingHud(forceState) {
+      state.hudVisible = typeof forceState === 'boolean' ? forceState : !state.hudVisible;
+      document.getElementById('floatingHud').classList.toggle('hidden', !state.hudVisible);
+    }
+
+    function toggleHudDrawer() {
+      state.hudDrawerOpen = !state.hudDrawerOpen;
+      document.getElementById('hudDrawer').classList.toggle('hidden', !state.hudDrawerOpen);
+    }
+
+    (function initHudDrag() {
+      const hud = document.getElementById('floatingHud');
+      const handle = document.getElementById('hudDragHandle');
+      let dragging = false, offsetX = 0, offsetY = 0;
+
+      const onStart = (x, y) => {
+        dragging = true;
+        offsetX = x - hud.offsetLeft;
+        offsetY = y - hud.offsetTop;
+      };
+      const onMove = (x, y) => {
+        if (!dragging) return;
+        const parent = document.getElementById('appShell');
+        const maxX = parent.clientWidth - hud.offsetWidth - 8;
+        const maxY = parent.clientHeight - hud.offsetHeight - 64;
+        hud.style.left = Math.max(8, Math.min(maxX, x - offsetX)) + 'px';
+        hud.style.top = Math.max(44, Math.min(maxY, y - offsetY)) + 'px';
+      };
+
+      handle.addEventListener('mousedown', e => { if (e.target.tagName !== 'BUTTON') onStart(e.clientX, e.clientY); });
+      window.addEventListener('mousemove', e => onMove(e.clientX, e.clientY));
+      window.addEventListener('mouseup', () => dragging = false);
+
+      handle.addEventListener('touchstart', e => { if (e.target.tagName !== 'BUTTON') onStart(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+      window.addEventListener('touchmove', e => { if (dragging) onMove(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+      window.addEventListener('touchend', () => dragging = false);
+    })();
+
+    /* =========================================================================
+       7. GLOBAL POWER, DND, BRIGHTNESS & NETWORK PROBE
+       ========================================================================= */
+    function setGlobalPowerMode(mode) {
+      state.globalPowerMode = mode;
+      document.querySelectorAll('.quick-bar-row .seg-mini-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.mode === mode);
+      });
+      document.getElementById('hudModeBadge').textContent = mode;
+      showToast(`Power Profile: ${mode}`);
+    }
+
+    function toggleDndState() {
+      state.dndEnabled = !state.dndEnabled;
+      document.getElementById('quickDndText').textContent = state.dndEnabled ? 'DND On' : 'DND Off';
+      document.getElementById('swDnd').setAttribute('aria-checked', String(state.dndEnabled));
+      document.getElementById('hudDndTile').textContent = state.dndEnabled ? 'DND: On' : 'DND: Off';
+      showToast(state.dndEnabled ? 'Game DND Enabled' : 'Game DND Disabled');
+    }
+
+    function syncBrightness(val) {
+      state.brightness = Number(val);
+      document.getElementById('brightSlider').value = val;
+      document.getElementById('hudBrightSlider').value = val;
+      document.getElementById('brightLabel').textContent = `${val}%`;
+      document.getElementById('hudBrightVal').textContent = `${val}%`;
+    }
+
+    function runNetworkProbe() {
+      const btn = document.getElementById('btnPingTest');
+      btn.textContent = 'Probing...';
+      setTimeout(() => {
+        const lat = 14 + Math.floor(Math.random() * 10);
+        const jit = (1.1 + Math.random() * 1.6).toFixed(1);
+        document.getElementById('netLatency').textContent = `${lat} ms`;
+        document.getElementById('netJitter').textContent = `${jit} ms`;
+        btn.textContent = 'Probe Ping';
+        showToast(`Ping 1.1.1.1: ${lat}ms`);
+      }, 360);
+    }
+
+    /* =========================================================================
+       8. POLICY TAB: THERMAL HYSTERESIS, GOS & KERNEL
+       ========================================================================= */
+    function setSimulatedTemp(t) {
+      document.getElementById('thermalTestSlider').value = t;
+      evaluateThermalHysteresis(t);
+    }
+
+    function evaluateThermalHysteresis(temp) {
+      state.simTemp = temp;
+      document.getElementById('policyTempReadout').textContent = `${temp}°C`;
+      const pct = Math.max(0, Math.min(98, ((temp - 40) / 55) * 100));
+      document.getElementById('thermalNeedle').style.left = `${pct}%`;
+
+      const badge = document.getElementById('hysteresisBadge');
+      if (temp >= 90) {
+        state.hysteresisState = 'CRITICAL_COOLDOWN';
+        badge.className = 'pill-badge pill-crit';
+        badge.textContent = 'CRITICAL_COOLDOWN';
+      } else if (temp >= 85) {
+        state.hysteresisState = 'THROTTLE_WARN';
+        badge.className = 'pill-badge pill-warn';
+        badge.textContent = 'THROTTLE_WARN';
+      } else if (temp >= 82 && (state.hysteresisState === 'THROTTLE_WARN' || state.hysteresisState === 'CRITICAL_COOLDOWN')) {
+        state.hysteresisState = 'HYSTERESIS_HOLD';
+        badge.className = 'pill-badge pill-warn';
+        badge.textContent = 'HYSTERESIS_HOLD (>82°)';
+      } else {
+        state.hysteresisState = 'NORMAL';
+        badge.className = 'pill-badge pill-ok';
+        badge.textContent = 'NORMAL';
+      }
+    }
+
+    function setGosPolicy(mode, btn) {
+      state.gosMode = mode;
+      document.querySelectorAll('[data-gos]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('gosIpcCmd').textContent = `gos_set_mode("${mode}")`;
+      document.getElementById('gosStatusPill').textContent = mode.toUpperCase();
+      showToast(`Samsung GOS: ${mode}`);
+    }
+
+    function setCpuGov(gov, btn) {
+      state.cpuGov = gov;
+      btn.parentElement.querySelectorAll('.seg-opt').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('govActiveLabel').textContent = gov;
+    }
+
+    function cycleIoScheduler() {
+      const scheds = ['mq-deadline', 'kyber', 'bfq', 'none'];
+      state.ioSchedIdx = (state.ioSchedIdx + 1) % scheds.length;
+      document.getElementById('ioSchedBtn').textContent = scheds[state.ioSchedIdx];
+    }
+
+    /* =========================================================================
+       9. SYSTEM TAB: DAEMON IPC CONSOLE, QUICK BOOST & PERMISSIONS
+       ========================================================================= */
+    function sendIpcCommand(cmd, btn) {
+      btn.parentElement.querySelectorAll('.chip-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const payloads = {
+        snapshot: {
+          status: 'ok',
+          daemon: 'frameboostd v2.4.0-rust',
+          uptime_sec: 18420 + state.sessionSeconds,
+          active_profile: state.globalPowerMode,
+          soc_temp_c: state.simTemp,
+          hysteresis: state.hysteresisState,
+          surfaceflinger_hz: getActiveGame().targetHz
+        },
+        list_games: {
+          status: 'ok',
+          count: games.length,
+          packages: games.map(g => g.pkg)
+        },
+        gos_status: {
+          status: 'ok',
+          vendor: 'samsung_gos_v4',
+          mode: state.gosMode,
+          thermal_mitigation: state.gosMode === 'stock'
+        },
+        ping: {
+          status: 'pong',
+          socket: '/dev/socket/frameboostd',
+          rtt_us: 142
+        }
+      };
+
+      document.getElementById('ipcConsoleOutput').textContent = JSON.stringify(payloads[cmd], null, 2);
+    }
+
+    function runQuickBoost() {
+      const btn = document.getElementById('btnQuickBoost');
+      btn.innerHTML = '<span>Trimming...</span>';
+      setTimeout(() => {
+        state.ramUsed = 1.6;
+        state.ramCached = 0.4;
+        state.ramFree = 2.0;
+        document.getElementById('ramBarUsed').style.width = '40%';
+        document.getElementById('ramBarCached').style.width = '10%';
+        document.getElementById('ramBarFree').style.width = '50%';
+        document.getElementById('ramBreakdownLabel').textContent = 'Used 1.6GB • Cached 0.4GB • Free 2.0GB / 4GB';
+        btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg><span>Boost</span>`;
+        showToast('Freed +800 MB Background RAM');
+      }, 380);
+    }
+
+    function renderPermissionsMatrix() {
+      const container = document.getElementById('permMatrixList');
+      const grantedCount = permissions.filter(p => p.granted).length;
+      document.getElementById('permSummaryBadge').textContent = `${grantedCount}/${permissions.length} Granted`;
+
+      container.innerHTML = permissions.map((p, i) => `
+        <div class="setting-row" style="cursor:pointer;" onclick="togglePermission(${i})">
+          <div>
+            <div style="font-size:12px;font-weight:600;">${p.name}</div>
+            <div class="mono" style="font-size:9.5px;color:var(--text-secondary);">${p.desc}</div>
+          </div>
+          <span class="pill-badge ${p.granted ? 'pill-ok' : 'pill-warn'}">${p.granted ? 'GRANTED' : 'GRANT'}</span>
+        </div>
+      `).join('');
+    }
+
+    function togglePermission(idx) {
+      permissions[idx].granted = !permissions[idx].granted;
+      renderPermissionsMatrix();
+      showToast(`${permissions[idx].name}: ${permissions[idx].granted ? 'Granted' : 'Revoked'}`);
+    }
+
+    /* =========================================================================
+       10. NAVIGATION, THEME & HELPERS
+       ========================================================================= */
+    function switchTab(tab) {
+      state.activeTab = tab;
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+      document.getElementById(`panel-${tab}`).classList.remove('hidden');
+
+      const isGames = tab === 'games';
+      document.getElementById('btnViewToggle').classList.toggle('hidden', !isGames);
+      document.getElementById('btnAddGame').classList.toggle('hidden', !isGames);
+
+      document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.toggle('active', item.dataset.tab === tab);
+      });
+
+      if (tab === 'session') tickTelemetry2Hz();
+      if (tab === 'system') renderPermissionsMatrix();
+    }
+
+    function setTheme(themeName) {
+      document.documentElement.setAttribute('data-theme', themeName);
+      document.querySelectorAll('[data-th]').forEach(b => b.classList.toggle('active', b.dataset.th === themeName));
+    }
+
+    function cycleTheme() {
+      const order = ['dark', 'amoled', 'light'];
+      const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+      const next = order[(order.indexOf(cur) + 1) % order.length];
+      setTheme(next);
+      showToast(`Theme: ${next.toUpperCase()}`);
+    }
+
+    function setViewport(width, btn) {
+      const shell = document.getElementById('appShell');
+      shell.style.width = width;
+      document.querySelectorAll('.vp-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderGamesView();
+    }
+
+    // Kartu cover dihitung dari lebar shell; hitung ulang saat shell/browser berubah.
+    window.addEventListener('resize', () => { if (state.activeTab === 'games') renderGamesView(); });
+
+    function toggleM3Switch(btn, label) {
+      const next = btn.getAttribute('aria-checked') !== 'true';
+      btn.setAttribute('aria-checked', String(next));
+      if (label) showToast(`${label}: ${next ? 'On' : 'Off'}`);
+    }
+
+    let toastTimer = null;
+    function showToast(msg) {
+      const el = document.getElementById('toastPill');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
+    }
+
+    function updateClock() {
+      const d = new Date();
+      document.getElementById('statusClock').textContent =
+        `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      updateClock();
+      setInterval(updateClock, 15000);
+      renderGamesView();
+      renderPermissionsMatrix();
+      // Deep-link ke tab via URL hash (mis. #session, #policy, #system).
+      const hashTab = (location.hash || '').replace('#', '');
+      if (['games', 'session', 'policy', 'system'].includes(hashTab)) switchTab(hashTab);
+      setInterval(tickTelemetry2Hz, 500);
+      setInterval(() => {
+        if (state.sessionRunning && !state.sessionPaused) {
+          state.sessionSeconds++;
+          const h = String(Math.floor(state.sessionSeconds / 3600)).padStart(2, '0');
+          const m = String(Math.floor((state.sessionSeconds % 3600) / 60)).padStart(2, '0');
+          const s = String(state.sessionSeconds % 60).padStart(2, '0');
+          document.getElementById('sessElapsedText').textContent = `Elapsed: ${h}:${m}:${s}`;
+        }
+      }, 1000);
+    });
+  </script>
+</body>
+</html>
