@@ -1,6 +1,8 @@
 package com.secreto.space.ui
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -52,7 +54,12 @@ fun SectionCard(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         )
     ) {
-        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(
+            modifier = Modifier
+                .animateContentSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
             Text(
                 title,
                 style = MaterialTheme.typography.titleMedium,
@@ -70,12 +77,12 @@ fun SectionCard(
 @Composable
 fun StatCard(label: String, value: String, sub: String? = null, modifier: Modifier = Modifier) {
     Card(
-        modifier = modifier,
+        modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         )
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Text(label, style = MaterialTheme.typography.labelMedium)
             Spacer(modifier = Modifier.padding(2.dp))
             Text(
@@ -90,19 +97,26 @@ fun StatCard(label: String, value: String, sub: String? = null, modifier: Modifi
     }
 }
 
-/** Grid 2 kolom sederhana dari pasangan sel. */
+/**
+ * Grid statistik adaptif: 2 kolom di ponsel, 3 kolom di layar lebar (>= 600 dp).
+ * Sel yang tersisa di baris terakhir diisi spacer agar lebarnya tetap sejajar.
+ */
 @Composable
 fun StatGrid(cells: List<@Composable () -> Unit>) {
-    cells.chunked(2).forEach { row ->
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            row.forEach { cell ->
-                Column(modifier = Modifier.weight(1f)) { cell() }
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val columns = if (maxWidth >= 600.dp) 3 else 2
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            cells.chunked(columns).forEach { row ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    row.forEach { cell ->
+                        Column(modifier = Modifier.weight(1f)) { cell() }
+                    }
+                    repeat(columns - row.size) { Spacer(modifier = Modifier.weight(1f)) }
+                }
             }
-            if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
         }
-        Spacer(modifier = Modifier.padding(top = 5.dp))
     }
 }

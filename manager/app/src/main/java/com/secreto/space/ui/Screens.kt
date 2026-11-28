@@ -1,5 +1,13 @@
 package com.secreto.space.ui
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,10 +49,16 @@ import org.json.JSONObject
 @Composable
 fun HomeScreen() {
     var snap by remember { mutableStateOf<JSONObject?>(null) }
+    val history = remember { mutableStateListOf<Float>() }
 
     LaunchedEffect(Unit) {
         while (isActive) {
-            snap = runCatching { JSONObject(ipc("snapshot")) }.getOrNull()
+            val next = runCatching { JSONObject(ipc("snapshot")) }.getOrNull()
+            snap = next
+            next?.let {
+                history.add(it.optInt("temp_big_mc", 0) / 1000f)
+                if (history.size > HISTORY_SIZE) history.removeAt(0)
+            }
             delay(2000)
         }
     }
@@ -53,14 +67,14 @@ fun HomeScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 20.dp)
+            .padding(horizontal = 16.dp)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             "Beranda",
-            style = MaterialTheme.typography.displaySmall,
+            style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Medium
         )
 
@@ -132,6 +146,18 @@ fun HomeScreen() {
             ) },
         ))
 
+        SectionCard(
+            title = "Suhu BIG",
+            subtitle = "Riwayat ±2 menit · ${"%.1f".format(history.lastOrNull() ?: 0f)} °C"
+        ) {
+            Sparkline(
+                values = history.toList(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(72.dp)
+            )
+        }
+
         SectionCard(title = "Lainnya") {
             Text(
                 "TCP: ${s.optJSONObject("net")?.optString("congestion_control", "—")} · " +
@@ -147,6 +173,7 @@ fun HomeScreen() {
 
 // ----------------------------------------------------------------- Sistem
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SystemScreen(onOpenLegacy: () -> Unit) {
     val scope = rememberCoroutineScope()
@@ -163,14 +190,14 @@ fun SystemScreen(onOpenLegacy: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 20.dp)
+            .padding(horizontal = 16.dp)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             "Sistem",
-            style = MaterialTheme.typography.displaySmall,
+            style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Medium
         )
 
@@ -178,7 +205,10 @@ fun SystemScreen(onOpenLegacy: () -> Unit) {
             title = "Preset global",
             subtitle = "Mode ala powercfg (Scene) — dipakai game tanpa config custom."
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 listOf(
                     "auto" to "Auto",
                     "eco" to "ECO",
@@ -209,7 +239,10 @@ fun SystemScreen(onOpenLegacy: () -> Unit) {
                 Text("Tidak ada GOS di ROM ini — tidak perlu bypass.")
             } else {
                 Text(if (gos!!.optBoolean("disabled")) "Status: disabled (bypass)" else "Status: enabled (stock)")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Button(onClick = {
                         scope.launch { ipc("gos_disable"); gos = JSONObject(ipc("gos_status")) }
                     }) { Text("Disable") }
@@ -278,6 +311,42 @@ fun SystemScreen(onOpenLegacy: () -> Unit) {
             dismissButton = {
                 OutlinedButton(onClick = { confirmRestore = false }) { Text("Batal") }
             }
+        )
+    }
+}
+
+// ------------------------------------------------------------------ chart
+
+private const val HISTORY_SIZE = 60 // 60 sampel x 2 detik ≈ 2 menit
+
+/** Grafik garis ringan untuk riwayat nilai; sumbu Y menyesuaikan min–max. */
+@Composable
+fun Sparkline(values: List<Float>, modifier: Modifier = Modifier) {
+    val line = MaterialTheme.colorScheme.primary
+    val fill = line.copy(alpha = 0.16f)
+    Canvas(modifier = modifier) {
+        if (values.size < 2) return@Canvas
+        val lo = values.min()
+        val hi = values.max()
+        val range = (hi - lo).takeIf { it > 0.01f } ?: 1f
+        val stepX = size.width / (values.size - 1)
+        val path = Path()
+        values.forEachIndexed { i, v ->
+            val x = i * stepX
+            val y = size.height - ((v - lo) / range) * size.height
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        val area = Path().apply {
+            addPath(path)
+            lineTo(size.width, size.height)
+            lineTo(0f, size.height)
+            close()
+        }
+        drawPath(area, fill)
+        drawPath(
+            path,
+            line,
+            style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
         )
     }
 }

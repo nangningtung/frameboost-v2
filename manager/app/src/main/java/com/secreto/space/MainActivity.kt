@@ -8,6 +8,7 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -137,10 +138,12 @@ private fun AppNav(onOpenLegacy: () -> Unit) {
                 .fillMaxSize()
                 .padding(pad)
         ) {
-            when (tab) {
-                0 -> HomeScreen()
-                1 -> GamesScreen()
-                else -> SystemScreen(onOpenLegacy = onOpenLegacy)
+            Crossfade(targetState = tab, label = "tab") { current ->
+                when (current) {
+                    0 -> HomeScreen()
+                    1 -> GamesScreen()
+                    else -> SystemScreen(onOpenLegacy = onOpenLegacy)
+                }
             }
         }
     }

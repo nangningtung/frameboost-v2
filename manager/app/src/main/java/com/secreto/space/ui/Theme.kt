@@ -3,6 +3,7 @@ package com.secreto.space.ui
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
@@ -11,6 +12,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
@@ -66,6 +68,30 @@ fun SecretoTheme(
             else dynamicLightColorScheme(context)
         darkTheme -> CozyDark
         else -> CozyLight
-    }
+    }.ensureReadableAccents()
     MaterialTheme(colorScheme = colorScheme, shapes = PixelShapes, content = content)
 }
+
+/**
+ * Warna wallpaper (dynamic color) kadang menghasilkan teks tombol yang pudar di atas
+ * warna aksen. Kalau kontras di bawah 4.5:1 (standar WCAG AA), teks diganti hitam/putih.
+ */
+private fun ColorScheme.ensureReadableAccents(): ColorScheme {
+    fun fix(bg: Color, fg: Color): Color {
+        if (contrastRatio(bg, fg) >= 7f) return fg
+        return if (bg.luminance() > 0.45f) Color.Black else Color.White
+    }
+    return copy(
+        onPrimary = fix(primary, onPrimary),
+        onPrimaryContainer = fix(primaryContainer, onPrimaryContainer),
+    )
+}
+
+private fun contrastRatio(a: Color, b: Color): Float {
+    val la = a.luminance()
+    val lb = b.luminance()
+    val hi = maxOf(la, lb)
+    val lo = minOf(la, lb)
+    return (hi + 0.05f) / (lo + 0.05f)
+}
+
