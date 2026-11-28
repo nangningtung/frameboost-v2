@@ -1,0 +1,51 @@
+#!/bin/sh
+
+# Gradle start up script for POSIX generated for Gradle 8.11.1.
+
+app_path=$0
+
+# Resolve symlinks, if any.
+while
+    APP_HOME=${app_path%"${app_path##*/}"}
+    [ -h "$app_path" ]
+do
+    ls=$(ls -ld "$app_path")
+    link=${ls#*' -> '}
+    case $link in
+      /*) app_path=$link ;;
+      *) app_path=$APP_HOME$link ;;
+    esac
+done
+
+APP_HOME=$(cd "${APP_HOME:-.}" && pwd -P) || exit
+
+CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
+
+if [ -n "$JAVA_HOME" ] ; then
+    JAVACMD=$JAVA_HOME/bin/java
+else
+    JAVACMD=java
+fi
+
+if ! command -v "$JAVACMD" >/dev/null 2>&1 ; then
+    echo "ERROR: JAVA_HOME is not set and no 'java' command could be found." >&2
+    exit 1
+fi
+
+# Increase the file descriptor limit where supported.
+MAX_FD="maximum"
+if ! ulimit -n >/dev/null 2>&1 ; then
+    MAX_FD=maximum
+else
+    ulimit -n "$MAX_FD" >/dev/null 2>&1 || true
+fi
+
+DEFAULT_JVM_OPTS="-Xmx64m -Xms64m"
+
+set -- \
+    "-Dorg.gradle.appname=$(basename "$0")" \
+    -classpath "$CLASSPATH" \
+    org.gradle.wrapper.GradleWrapperMain \
+    "$@"
+
+exec "$JAVACMD" $DEFAULT_JVM_OPTS "$@"
