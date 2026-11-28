@@ -40,6 +40,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.runtime.Composable
@@ -64,6 +66,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.secreto.space.ui.HomeScreen
 import com.secreto.space.ui.GamesScreen
+import com.secreto.space.ui.SessionScreen
+import com.secreto.space.ui.PolicyScreen
 import com.secreto.space.ui.SystemScreen
 import com.secreto.space.ui.SecretoTheme
 import kotlinx.coroutines.Dispatchers
@@ -111,6 +115,8 @@ class MainActivity : ComponentActivity() {
 private enum class Tab(val label: String, val icon: ImageVector) {
     Home("Beranda", Icons.Filled.Home),
     Games("Game", Icons.Filled.Star),
+    Session("Sesi", Icons.Filled.PlayArrow),
+    Policy("Kebijakan", Icons.Filled.Info),
     System("Sistem", Icons.Filled.Settings),
 }
 
@@ -140,8 +146,10 @@ private fun AppNav(onOpenLegacy: () -> Unit) {
         ) {
             Crossfade(targetState = tab, label = "tab") { current ->
                 when (current) {
-                    0 -> HomeScreen()
-                    1 -> GamesScreen()
+                    Tab.Home.ordinal -> HomeScreen()
+                    Tab.Games.ordinal -> GamesScreen()
+                    Tab.Session.ordinal -> SessionScreen()
+                    Tab.Policy.ordinal -> PolicyScreen()
                     else -> SystemScreen(onOpenLegacy = onOpenLegacy)
                 }
             }
